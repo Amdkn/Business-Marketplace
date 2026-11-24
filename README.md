@@ -1,122 +1,151 @@
-# 🏢 Business Office 3 OS (A'Space / OMK)
+# A’Space Business Marketplace
 
-> **Système d'Exploitation Exécutif Trimodal & Jumeau Numérique d'Entreprise**  
-> Architecte & Propriétaire : Amadou Kone (`amdkn`)  
-> Dépôt : `https://github.com/Amdkn/Business-Office-3-OS`
+> **AI-native business platform** — discover, compose, provision and operate business capabilities, domains and agent-powered services from one control plane.
 
----
-
-## 1. Vision & Architecture Trimodale
-
-**Business Office 3 OS** résout la fracture entre la puissance d'un environnement de travail complet sur grand écran, l'accessibilité immédiate d'un tableau de bord de gestion clair et la rapidité d'une télécommande exécutive sur smartphone.
-
-Le système fusionne 3 paradigmes en **une seule application unifiée**, partageant le même noyau de données, le même bus d'événements et les mêmes modèles métiers :
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                BUSINESS OFFICE 3 OS                                    │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                        │
-│  [ VUE 1 : PRO WEB DESKTOP OS ]                                                        │
-│  Gestionnaire de fenêtres multi-tâches (Draggable, Resizable, Dock, TopBar)            │
-│  13 applications métiers complètes (Finance, Clients, Sales, Ops, Legal, R&D...)       │
-│                                                                                        │
-│  ▲                                      ▲                                              │
-│  │ (Toggle TopBar / CMS Rideau)         │ (Responsive < 768px / Mode Télécommande)     │
-│  ▼                                      ▼                                              │
-│                                                                                        │
-│  [ VUE 2 : DIGITAL GARDEN SAAS OS ]    [ VUE 3 : MOBILE OS EDGE CLIENT ]               │
-│  Dashboard épuré & accessible          Interface smartphone ultra-rapide               │
-│  Cultivate · Nurture · Bloom · Roots   Springboard, Dynamic Island, Gestures, Haptics  │
-│  Board of Directors + Chat Jerry       Télécommande exécutive & widgets nomades        │
-│                                                                                        │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│                      COUCHE DE DONNÉES & NOYAU COMMUNS                                 │
-│  • Zustand Global Stores (Shell, Windows, Notifications)                               │
-│  • Référentiel unifié (clientsRepo, sopsRepo, documentsRepo, invoicesRepo)             │
-│  • Supabase Multi-Tenant (omk_saas.*) / LocalStorage Fallback                         │
-│  • FastMCP & Agentic Swarm Adapters                                                    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+**Product:** A’Space Business Marketplace  
+**Repository:** `Amdkn/Business-Marketplace`  
+**Production:** https://business-marketplace-amd-lab.vercel.app  
+**Foundation:** [Business Office 3 OS](https://github.com/Amdkn/Business-Office-3-OS)
 
 ---
 
-## 2. Les 3 Vues en Détail
+## Product thesis
 
-### 🖥️ Vue 1 : Pro Web Desktop OS
-* Interface type bureau virtuel (inspirée de macOS et du shell A'Space Life OS).
-* Fenêtres autonomes redimensionnables, minimisables, avec mémorisation de disposition.
-* Dock d'applications persistant et barre supérieure (`TopBar`) avec statut système et heure.
+Business Marketplace is not a directory of SaaS listings. It is the composition and operations layer for businesses: a place where an organization can model its business domains, activate capabilities, connect providers, assign agents, govern access, and observe execution.
 
-### 🌱 Vue 2 : Digital Garden SaaS OS
-* Overlay exécutif déployable depuis la barre du haut (`TopBar > Digital Garden`).
-* Vue simplifiée et reposante conçue pour réduire la surcharge cognitive du bureau virtuel.
-* Structure en 4 piliers : **Cultivate** (Dashboard, Finance, People), **Nurture** (Tasks, Clients, Knowledge, Documents, SOPs), **Bloom** (Sales, Product, Filiales), **Roots** (Legal, IT, Settings).
-* Conseil d'administration virtuel (`Board of Directors`) avec Jerry, Superman, Batman et Flash.
+The product has three cooperating planes:
 
-### 📱 Vue 3 : Mobile OS Edge Client (En cours d'intégration via Jules)
-* Portée depuis `https://github.com/Amdkn/The-OMK-Mobile-Back-Office`.
-* **Vue responsive par défaut sur mobile** : activée automatiquement sur les écrans de largeur inférieure à `768px` ou via le simulateur intégré.
-* Dynamic Island interactive (alertes, temps réel, KPI audio/voix), Springboard à icônes réorganisables, haptique tactile, et navigation par gestes.
+1. **Marketplace Experience** — discover business capabilities, solution packs, templates, agents and adapters; compare, configure, install and manage them.
+2. **Business Control Plane** — organization and workspace lifecycle, domain registry, capability graph, policies, adapter connections, deployments, usage and audit.
+3. **Business Office Runtime** — the operational workspace in which installed capabilities become usable business applications, workflows and agent surfaces.
 
----
+## Architecture: product planes × inherited surfaces
 
-## 3. Mission & Dossier de Délégation pour Jules (Google)
+The Business Office 3 OS substrate is retained as a multi-surface runtime, not mistaken for the product itself.
 
-La feuille de route complète pour l'intégration du **Mobile OS** par l'agent **Jules** est consignée dans :
-👉 [`delegation-a-jules/PRD-Business-Office-3-OS-Mobile-Integration.md`](./delegation-a-jules/PRD-Business-Office-3-OS-Mobile-Integration.md)  
-👉 [`delegation-a-jules/README.md`](./delegation-a-jules/README.md)
+| Surface | Role in Business Marketplace |
+|---|---|
+| Pro Web Desktop OS | Full operations cockpit: domain workspaces, application windows, orchestration and observability |
+| Digital Garden SaaS OS | Calm executive overview: portfolio, health, priorities and organization-level signals |
+| Mobile OS Edge Client | Field and executive companion: approvals, alerts, tasks and fast actions |
 
----
+The three surfaces share one identity, organization context, capability model, event vocabulary and policy boundary.
 
-## 4. Stack Technique
+## Core navigation (target information architecture)
 
-- **Runtime & Build :** Vite 8 + Bun / Node
-- **Framework :** React 19 + TypeScript (Typage 100% strict)
-- **Gestion d'État :** Zustand + Context Providers
-- **Design System :** Tailwind CSS v4, Lucide Icons, Glassmorphism
-- **Backend & Données :** Supabase (`omk_saas` schema) avec fallback dev LocalStorage
+- **Overview** — portfolio pulse, recently changed domains, pending approvals and operational signals.
+- **Domains** — hierarchical registry of business domains, subdomains, capabilities, owners, maturity and dependencies.
+- **Marketplace** — catalog of capabilities, solution packs, templates, agents and integrations.
+- **Adapters** — provider connections, credentials references, scopes, health, sync and event mappings.
+- **Workspaces** — organization spaces, teams, roles, projects and operational environments.
+- **Agents** — agent directory, contracts, tools, permissions, runs and evaluations.
+- **Workflows** — business processes, triggers, approvals, automations and run history.
+- **Data & Knowledge** — business objects, schemas, documents, knowledge sources and lineage.
+- **Governance** — policies, access reviews, audit trail, risk and compliance.
+- **Settings** — organization profile, billing, environments and platform configuration.
 
----
+Navigation is a target contract. Existing template applications are not automatically production-ready Marketplace modules.
 
-## 5. Démarrage Rapide
+## Domain model
+
+The first-class hierarchy is:
+
+`Organization → Workspace → Domain → Subdomain → Capability → Installation`
+
+Cross-cutting entities:
+
+- **Adapter** — a typed connector to an external provider or internal system.
+- **Connection** — a tenant-scoped configured instance of an adapter, with secret references and granted scopes.
+- **Agent** — an executable identity with a versioned contract, allowed tools and policy envelope.
+- **Workflow** — a versioned process composed from capabilities, adapters, agents and human approval steps.
+- **Installation** — an organization's activated instance of a marketplace capability or solution pack.
+- **Policy** — explicit rules for identity, data access, execution, approval and resource boundaries.
+- **Event** — an auditable state transition with actor, tenant, correlation and causality metadata.
+
+A domain is not just a navigation folder. It is an owned business boundary that can contain capabilities, workflows, data contracts, agents, integrations, controls and measurable outcomes.
+
+## Adapter architecture
+
+Adapters are capabilities behind a stable contract, not bespoke UI buttons. Every adapter should declare:
+
+- provider and adapter identity, version and lifecycle state;
+- supported capabilities and resource types;
+- authentication method and required scopes;
+- inbound/outbound operations and event subscriptions;
+- rate limits, retry policy, idempotency behavior and health checks;
+- data classification, residency and retention constraints;
+- tenant isolation and audit requirements.
+
+Initial adapter families to design for (availability is not implied):
+
+1. Identity & access — Google Workspace, Microsoft 365, Auth0/Clerk.
+2. Communication — Gmail, Outlook, Slack, Google Chat, Discord, Teams.
+3. Calendar & scheduling — Google Calendar, Microsoft Calendar, Cal.com.
+4. Files & knowledge — Google Drive, OneDrive, Notion, Confluence.
+5. Work management — Linear, ClickUp, Jira, GitHub Projects.
+6. Source control & delivery — GitHub, GitLab, Bitbucket, Vercel.
+7. Data & backend — Supabase, PostgreSQL, Redis, object storage.
+8. Automation & orchestration — n8n, Make, Zapier, Temporal.
+9. AI model providers — OpenAI, Anthropic, Google Gemini, local OpenAI-compatible endpoints.
+10. Agent protocols & tool runtimes — MCP, A2A, Composio, custom tool gateways.
+11. Finance & commerce — Stripe, accounting platforms, payment and invoicing providers.
+12. CRM & customer operations — HubSpot, Salesforce, Pipedrive.
+13. Support & customer communication — Intercom, Zendesk, Help Scout.
+14. Analytics & observability — PostHog, Sentry, OpenTelemetry.
+15. Documents & signatures — DocuSign, Dropbox Sign, PDF/document services.
+16. E-commerce & catalog — Shopify, WooCommerce, product feeds.
+17. HR & people operations — HRIS, recruiting and payroll providers.
+18. Maps & mobility — Google Maps, Mapbox, routing and fleet APIs.
+19. IoT & physical operations — MQTT brokers, device gateways and telemetry.
+20. Storage, backup & portability — S3-compatible providers, export and archive targets.
+
+Provider-specific implementations must be validated independently before being marked available.
+
+## Data and tenancy
+
+The connected A’Space Marketplace Supabase project is the target backend. Existing database schemas and migrations must be inspected before adding new tables. The current inherited frontend contains legacy Coach OS seed assumptions; those assumptions are **not** the Marketplace tenancy contract.
+
+Rules:
+
+- organization membership and role bindings are authoritative; browser storage is never an authorization boundary;
+- every tenant-owned row and operation must be scoped and enforced server-side;
+- RLS policies are required for exposed tenant data;
+- secrets are stored server-side or in a secret manager; never in browser-readable tables or client bundles;
+- demo data must be explicitly labeled and isolated from real organizations;
+- destructive migrations and legacy data removal require a reviewed migration plan.
+
+## Current implementation status
+
+- [x] Independent repository created from Business Office 3 OS foundation.
+- [x] Vercel production project connected and baseline deployment verified.
+- [x] Marketplace Supabase URL and public client key configured in Vercel environments.
+- [x] Coach schema adoption migration applied additively to Marketplace Supabase (no source rows copied).
+- [ ] Product identity and navigation separated from Coach OS legacy.
+- [ ] Domain registry and capability model implemented.
+- [ ] Adapter registry, connection lifecycle and health model implemented.
+- [ ] Organization/workspace provisioning and authorization verified end-to-end.
+- [ ] Marketplace installation lifecycle connected to backend.
+- [ ] Production authentication redirects verified against deployed routes.
+- [ ] E2E tests for tenant isolation, adapter permissions and install lifecycle.
+
+## Engineering principles
+
+- Preserve the inherited Desktop / Garden / Mobile surfaces while replacing legacy product assumptions deliberately.
+- Prefer contracts and registries over hard-coded provider-specific branches.
+- Keep provider credentials out of client code.
+- Make operations observable, idempotent and reversible where possible.
+- Distinguish catalog availability, connection health and actual operational readiness.
+- Never present seeded demo data as live customer data.
+- Ship vertical slices with tests and deployment evidence; a green static build is not proof of a working business workflow.
+
+## Development
 
 ```bash
-# Installation des dépendances
 bun install
-
-# Lancement du serveur de développement (Port 5174)
-bun run dev --port 5174
-
-# Validation stricte TypeScript (0 erreur tolérée)
-bun run tsc -p tsconfig.app.json --noEmit
+bun run dev
+bun run typecheck
+bun run test
+bun run build
 ```
 
-
-Runs, in order: `typecheck` (`tsc -b` — the only command that actually
-type-checks; `npx tsc --noEmit -p tsconfig.json` alone is a silent
-false-positive), `typecheck:api`, `test` (vitest with `--pool=threads`),
-`build`, and the four runtime benches (`_runtime/kernel.mjs`,
-`_runtime/bridge/{bridge,adapters,rbac-test}.mjs`). This is exactly what
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs on every push
-and pull request.
-
-## Docs
-
-- [`INSTALL.md`](./INSTALL.md) — full local setup, verification, and known traps
-- [`MIGRATION_SUPABASE.md`](./MIGRATION_SUPABASE.md) — data-layer migration plan, 3-stage tenancy model
-- [`PHASE0_RECEIPT.md`](./PHASE0_RECEIPT.md) — Supabase Phase 0 provisioning receipt
-
-
-<!-- ASPACE-WORLD-FEDERATION:BEGIN -->
-## A'Space World Federation
-
-This repository is a sovereign world/member of one A'Space V3 federation, not a monorepo subtree.
-
-- **Astra** — [Amdkn/Aspace_OS_V3](https://github.com/Amdkn/Aspace_OS_V3): unified system / Design-of-Design / registry.
-- **Sol** — [Amdkn/Agent-OS-Desktop](https://github.com/Amdkn/Agent-OS-Desktop): Agent OS interface & observability; local desktop `127.0.0.1:5555`.
-- **Terra** — [Amdkn/Life-OS-2026](https://github.com/Amdkn/Life-OS-2026): Life OS 2026.
-- **Luna** — Business federation: [BusinessOS](https://github.com/Amdkn/BusinessOS), [Business-Office-3-OS](https://github.com/Amdkn/Business-Office-3-OS), [01-OMK-Business-OS](https://github.com/Amdkn/01-OMK-Business-OS), [The-OMK-Office1.0-JaaS](https://github.com/Amdkn/The-OMK-Office1.0-JaaS), [Mobile Back Office](https://github.com/Amdkn/The-OMK-Mobile-Back-Office), [OMK Desktop Web OS](https://github.com/omk-services/OMK-DESKTOP-WEB-OS), [OMK SaaS OS](https://github.com/omk-services/00-omk-saas-os), and the private OMK landing repository.
-
-Filesystem junctions/symlinks are navigation projections only. Every member keeps its own Git history, remote, CI and release boundary. Canonical location mapping lives in Astra's `ASPACE_WORKSPACE_REGISTRY.json`.
-<!-- ASPACE-WORLD-FEDERATION:END -->
+See [PRODUCT_ARCHITECTURE.md](./docs/PRODUCT_ARCHITECTURE.md) for the initial control-plane contracts and implementation sequence.

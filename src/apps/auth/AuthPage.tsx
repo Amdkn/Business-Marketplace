@@ -220,11 +220,11 @@ function DemoEntryCard({
         className="text-[26px] font-bold tracking-tight text-stone-900"
         style={{ fontFamily: 'var(--theme-font-display)' }}
       >
-        Decouvrir Coach OS
+        Découvrir Business Marketplace
       </h1>
       <p className="text-sm text-stone-500 mt-1">
-        Le bureau de demonstration. Aucune donnee envoyee, tu peux casser
-        tout ce que tu veux — c’est ton bac a sable.
+        Un environnement de démonstration isolé. Les données affichées sont fictives :
+        aucune organisation réelle ni aucun compte client n’est provisionné.
       </p>
       <button
         type="button"
@@ -235,7 +235,7 @@ function DemoEntryCard({
           boxShadow: '0 10px 24px -10px rgba(240,129,67,0.6)',
         }}
       >
-        Ouvrir le bureau
+        Ouvrir le Control Plane
       </button>
       <button
         type="button"

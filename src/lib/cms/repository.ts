@@ -471,44 +471,24 @@ export async function getCurrentWorkspaceContext(): Promise<CurrentWorkspaceCont
         return null;
       }
 
-      const { data: memberships, error: membershipError } = await supabase
-        .schema('enterprise')
-        .from('workspace_memberships')
-        .select('organization_id, workspace_id')
-        .eq('user_id', session.user.id)
-        .eq('membership_status', 'ACTIVE');
-
-      if (membershipError) throw membershipError;
-      if (!memberships?.length) {
-        setMode('no-org', 'No active workspace membership');
-        return null;
-      }
-      if (memberships.length !== 1) {
-        setMode('no-org', 'Multiple active workspaces require an explicit workspace selection');
-        return null;
-      }
-
-      const membership = memberships[0];
-      const { data: workspace, error: workspaceError } = await supabase
-        .schema('enterprise')
-        .from('workspaces')
-        .select('name, workspace_status')
-        .eq('id', membership.workspace_id)
-        .eq('organization_id', membership.organization_id)
-        .maybeSingle();
-
-      if (workspaceError) throw workspaceError;
-      if (!workspace || workspace.workspace_status !== 'ACTIVE') {
-        setMode('no-org', 'The active workspace is unavailable');
+      // enterprise is a private schema. Resolve only the caller's unique
+      // active organization/workspace through the authenticated identity RPC.
+      const { data: contexts, error: contextError } = await supabase
+        .schema('identity')
+        .rpc('get_current_workspace_context');
+      if (contextError) throw contextError;
+      const context = Array.isArray(contexts) ? contexts[0] : contexts;
+      if (!context) {
+        setMode('no-org', 'No unique active organization/workspace context');
         return null;
       }
 
       setMode('connected');
       return {
-        organizationId: membership.organization_id as string,
-        workspaceId: membership.workspace_id as string,
+        organizationId: context.organization_id as string,
+        workspaceId: context.workspace_id as string,
         userId: session.user.id,
-        workspaceName: workspace.name as string,
+        workspaceName: context.workspace_name as string,
       };
     } catch (err) {
       setMode('unreachable', err);

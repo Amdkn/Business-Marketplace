@@ -304,7 +304,7 @@ export function ClientsApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Elena Marquez"
@@ -329,7 +329,7 @@ export function ClientsApp() {
                   value={composerSegment}
                   onChange={(e) => setComposerSegment(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Unassigned segment"
@@ -357,7 +357,7 @@ export function ClientsApp() {
                   value={composerTicket}
                   onChange={(e) => setComposerTicket(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="1200"

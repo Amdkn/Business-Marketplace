@@ -364,7 +364,7 @@ function heatColor(value: number): string {
   return `rgba(var(--theme-accent-rgb), ${opacity.toFixed(2)})`;
 }
 
-const TASK_KIND_COLOR: Record<ScheduleTask['kind'], string> = {
+const TASK_KIND_COLOR: Record<ScheduleKind, string> = {
   sync:    '#0891b2',
   run:     '#0d9488',
   audit:   '#9333ea',

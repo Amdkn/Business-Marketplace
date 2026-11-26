@@ -53,7 +53,7 @@ export const DocumentsView: React.FC = () => {
     if (!signatureTarget) return;
     const target = signatureTarget;
     setSignatureTarget(null);
-    showToast(`Signature request sent for "${target.title}".`, 'success');
+    showToast(`No e-sign provider is connected. No signature request was sent for "${target.title}".`, 'error');
   };
 
   if (loading) {
@@ -236,7 +236,7 @@ export const DocumentsView: React.FC = () => {
       <Modal
         open={signatureTarget !== null}
         onClose={() => setSignatureTarget(null)}
-        title="Request signature"
+        title="E-sign integration unavailable"
         size="sm"
         footer={
           <>

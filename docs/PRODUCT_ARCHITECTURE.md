@@ -356,3 +356,8 @@ The CMS repository now maps each collection ID to its dedicated table, stores de
 The source migration is `supabase/migrations/20261126083638_marketplace_interface_persistence.sql`; the regression suite is `supabase/tests/marketplace_interface_persistence.sql`. Hosted verification passed: 35 tables including the event sink, 138 RLS policies, no RLS-disabled tables, no anon table grants, and a rolled-back authenticated insert/read/update probe.
 
 This does not complete the interface conversion. The Sidebar-specific repositories still use `dashboard.clients` and `dashboard.agents`; the People/Agent screens need projection from canonical `identity.profiles`, `identity.organization_memberships` and `identity.agent_principals`. Workspace-scoped query enforcement and app-local stores outside the shared CMS also remain. The preview deployment and browser E2E must be rerun against the new branch head before acceptance.
+
+
+## 17. Legacy OMK naming removal — 2026-11-26
+
+The active Garden/Sidebar views, Mission Control surfaces, Web Desktop app entrypoints/seeds and Welcome landing/canvas copy were audited and the legacy OMK product/schema naming was removed or replaced with current Marketplace/A’Space terminology. This includes obsolete `omk_saas.*` UI labels, `ADR-OMK-*` comments, old product names, old demo service identifiers, and `omknexus.io` demo domains. The active source paths inspected now have no remaining OMK matches. The live Supabase catalog also has no schema with that name. Historical migration files and handoff records retain legacy references only as provenance; do not rewrite already-applied migrations to erase history.

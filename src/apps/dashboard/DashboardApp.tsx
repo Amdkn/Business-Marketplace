@@ -84,7 +84,7 @@ function deriveValidations(
   clients: CmsItem[],
   invoices: CmsItem[],
   deals: CmsItem[],
-): { cards: ValidationCard[]; fromSeed: boolean } {
+): ValidationCard[] {
   const cards: ValidationCard[] = [];
 
   // Open invoices (status != Paid) — top 2 by amount.
@@ -131,36 +131,7 @@ function deriveValidations(
       });
     });
 
-  if (cards.length === 0) {
-    return {
-      cards: [
-        {
-          id: 'val-seed-techflow',
-          title: 'Validation devis client TechFlow',
-          when: 'Démo seed',
-          tone: 'warn',
-          clientId: 'techflow',
-        },
-        {
-          id: 'val-seed-priya',
-          title: 'Retard livraison projet GreenScale',
-          when: 'Démo seed',
-          tone: 'danger',
-          clientId: 'priya-nandan',
-        },
-        {
-          id: 'val-seed-stripe',
-          title: 'Mise à jour Stripe requise',
-          when: 'Démo seed',
-          tone: 'accent',
-          targetApp: 'finance',
-          targetSection: 'Overview',
-        },
-      ],
-      fromSeed: true,
-    };
-  }
-  return { cards: cards.slice(0, 4), fromSeed: false };
+  return cards.slice(0, 4);
 }
 
 export function DashboardApp() {
@@ -192,8 +163,6 @@ export function DashboardApp() {
   const prevClient = openClientIndex > 0 ? clients[openClientIndex - 1] : undefined;
   const nextClient = openClientIndex >= 0 && openClientIndex < clients.length - 1 ? clients[openClientIndex + 1] : undefined;
 
-  const weightOf = (c: (typeof clients)[number]): number => Number(c.health ?? (c.status === 'Onboarding' ? 45 : 20));
-
   /** Toggle the `pinned` flag on a client. Persists via the CMS store.
    *  Toast on success and on error (mutation ratée → revert + message visible). */
   const togglePin = (clientId: string): void => {
@@ -222,7 +191,7 @@ export function DashboardApp() {
    *  Also marks the validation as acknowledged on the linked client, so the
    *  dashboard reacts to its own actions. */
   const openValidation = (v: ValidationCard): void => {
-    addToast({ source: 'Dashboard', type: 'info', message: `Acknowledged: ${v.title}` });
+    addToast({ source: 'Dashboard', type: 'info', message: `Opened validation: ${v.title}` });
     if (v.clientId) {
       const exists = clients.some((c) => c.id === v.clientId);
       if (exists) {
@@ -237,10 +206,7 @@ export function DashboardApp() {
   };
 
   // Wind Direction: derive from live state, fall back to seed and label it.
-  const { cards: validations, fromSeed: validationsFromSeed } = useMemo(
-    () => deriveValidations(clients, invoices, deals),
-    [clients, invoices, deals],
-  );
+  const validations = useMemo(() => deriveValidations(clients, invoices, deals), [clients, invoices, deals]);
 
   /* ─────────────────────────── Wind Direction (live or seed) ────────────────────── */
 
@@ -248,18 +214,7 @@ export function DashboardApp() {
     <div className="p-7">
       <SectionHead
         title="Wind Direction"
-        subtitle={validationsFromSeed
-          ? 'Things requiring your validation (démo seed — pas de signal live)'
-          : 'Things requiring your validation (dérivées du CMS live)'}
-        action={validationsFromSeed ? (
-          <span
-            data-wind-direction-source="seed"
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-            style={{ background: 'rgba(180,83,9,0.10)', color: '#b45309', border: '1px solid rgba(180,83,9,0.35)' }}
-          >
-            <Clock className="h-3 w-3" /> Démo seed
-          </span>
-        ) : undefined}
+        subtitle="Things requiring validation, derived from persisted workspace records."
       />
       {validations.length === 0 ? (
         <div
@@ -289,7 +244,7 @@ export function DashboardApp() {
               statusTone={v.tone}
               accent={v.tone === 'warn' ? '#f59e0b' : v.tone === 'danger' ? '#dc2626' : '#3b82f6'}
               icon={v.tone === 'warn' ? <AlertTriangle className="w-5 h-5" /> : v.tone === 'danger' ? <AlertTriangle className="w-5 h-5" /> : <Compass className="w-5 h-5" />}
-              meta={validationsFromSeed ? 'Démo seed' : `Reported ${v.when}`}
+              meta={`Reported ${v.when}`}
               onClick={() => openValidation(v)}
             />
           ))}
@@ -344,8 +299,6 @@ export function DashboardApp() {
 
     // Runway — months of cash left at the average monthly burn (avg outstanding × 1.5).
     // This is a rough indicator, not a forecast; we surface the assumption in the UI.
-    const monthlyBurn = totalInvoices > 0 ? outstandingInvoices / Math.max(1, totalInvoices) : 0;
-    const assumedCashMonths = monthlyBurn > 0 ? Math.min(36, Math.round(outstandingInvoices / Math.max(1, monthlyBurn) * 1.5)) : 0;
 
     const domains = [
       {
@@ -353,9 +306,9 @@ export function DashboardApp() {
         label: 'Sales',
         icon: Compass,
         accent: '#ea580c',
-        sub: 'pipeline this quarter',
-        metric: `$${(pipelineOpen / 1000).toFixed(1)}K`,
-        delta: `${wonCount} won · ${openDeals} open`,
+        sub: 'open opportunities',
+        metric: `${openDeals}`,
+        delta: `${wonCount} won`,
         tone: 'accent' as const,
       },
       {
@@ -363,9 +316,9 @@ export function DashboardApp() {
         label: 'Finance',
         icon: Wallet,
         accent: '#ca8a04',
-        sub: outstandingInvoices > 0 ? `${outstandingInvoices.toFixed(0)} outstanding` : 'invoices up to date',
-        metric: `${assumedCashMonths}mo`,
-        delta: paidInvoices > 0 ? `${paidInvoices} paid` : 'awaiting first paid',
+        sub: 'unpaid invoices',
+        metric: `${invoices.filter((invoice) => invoice.status !== 'Paid').length}`,
+        delta: `${paidInvoices} paid · ${totalInvoices} total`,
         tone: outstandingInvoices === 0 ? 'ok' as const : 'warn' as const,
       },
       {
@@ -383,9 +336,9 @@ export function DashboardApp() {
         label: 'Operations',
         icon: ListChecks,
         accent: '#4f46e5',
-        sub: 'incidents in queue',
-        metric: `${onboardingCount}`,
-        delta: onboardingCount === 0 ? 'queue clear' : 'onboarding open',
+        sub: 'operational incident feed',
+        metric: '—',
+        delta: 'not connected',
         tone: onboardingCount === 0 ? 'ok' as const : 'warn' as const,
       },
     ];
@@ -573,9 +526,9 @@ export function DashboardApp() {
             Interconnection
           </div>
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-            Sales pipeline feeds Finance runway. Operations owns the deploy surface. People fills
-            every squad. <strong style={{ color: 'var(--theme-text)' }}>Drill any domain</strong> from
-            above — the rest follow the same CCD. Numbers above are derived from your live CMS data.
+            Sales, Finance and Clients are summarized from persisted workspace records. Cash runway,
+            incident telemetry and AI execution metrics remain unavailable until their source systems
+            are connected. <strong style={{ color: 'var(--theme-text)' }}>Drill any domain</strong> from above.
           </p>
         </div>
       </div>

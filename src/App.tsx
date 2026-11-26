@@ -67,9 +67,9 @@ async function ensureTenantProvisioned(): Promise<void> {
   if (organizationError) throw new Error(`Unable to resolve organization memberships: ${organizationError.message}`);
 
   const organizations = organizationResult?.data ?? [];
-  if (organizations.length > 1) {
-    throw new Error('Multiple organizations are available; organization selection must be completed before opening a workspace.');
-  }
+  // Multiple organizations and workspaces are valid. The Workspaces view
+  // owns explicit selection; this boot helper must never block that surface.
+  if (organizations.length > 1) return;
 
   if (organizations.length === 0) {
     const { data: userResult, error: userError } = await supabase.auth.getUser();
@@ -120,12 +120,9 @@ async function ensureTenantProvisioned(): Promise<void> {
     });
     if (createError) throw new Error(`Default workspace provisioning failed: ${createError.message}`);
     if (!created?.data?.id) throw new Error('Default workspace provisioning returned no workspace identifier.');
-  } else {
-    const activeWorkspaces = workspaces.filter((workspace) => workspace.workspace_status === 'ACTIVE');
-    if (activeWorkspaces.length !== 1) {
-      throw new Error('The account has multiple or no active workspaces; explicit workspace selection is not yet connected to this entry point.');
-    }
   }
+  // More than one active workspace is valid. Do not choose one silently:
+  // the Workspaces view exposes the explicit organization/workspace selector.
 }
 
 export default function App() {

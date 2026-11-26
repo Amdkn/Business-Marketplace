@@ -63,7 +63,7 @@ export const SwarmRadar = ({ agents, size = 280 }: SwarmRadarProps): ReactElemen
       width={size}
       height={size}
       viewBox="-50 -50 100 100"
-      className="block overflow-visible"
+      className="block overflow-visible swarm-radar"
     >
       <defs>
         {/* Sweep gradient — green at leading edge fading to transparent trail. */}

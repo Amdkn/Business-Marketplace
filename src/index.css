@@ -217,3 +217,28 @@
 /* Onboarding Citadel: the Onboarding app now IS a Mini Desktop OS rendered
    inside the Macro WindowFrame (with mac-style traffic lights from Macro).
    The Macro WindowFrame chrome IS the prospect's window controls. */
+
+/* Swarm Radar component tokens — deliberately scoped to its SVG root. */
+.swarm-radar {
+  --color-signal: #b8e986;
+  --color-alarm: #e8b86f;
+  --color-cream: #f2f2e9;
+  --animate-swarm-radar-sweep: swarm-radar-sweep 8s linear infinite;
+  --animate-swarm-blip-in: swarm-blip-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-swarm-blip-halo: swarm-blip-halo 2.4s ease-out infinite;
+}
+
+@keyframes swarm-radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes swarm-blip-in {
+  from { opacity: 0; transform: scale(0.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes swarm-blip-halo {
+  0% { opacity: 0.65; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(1.8); }
+}

@@ -204,8 +204,10 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
   "deals": {
     "title": "client",
     "fields": [
+      "clientId",
       "offer",
       "value",
+      "currency",
       "stage"
     ]
   },

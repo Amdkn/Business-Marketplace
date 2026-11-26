@@ -75,10 +75,11 @@ export function ProductApp() {
   const launchesDrill = useCollectionDrill('product_launches', 'Lancement');
   const mvpsDrill = useCollectionDrill('product_mvps', 'MVP');
   const ideasDrill = useCollectionDrill('product_ideas', 'Idéation');
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<ProductDetailItem | null>(null);
+  const [mutatingItemId, setMutatingItemId] = useState<string | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
 
   useEffect(() => {
@@ -103,14 +104,21 @@ export function ProductApp() {
     now: null,
   };
 
-  const moveStage = (id: string, fromStage: string): void => {
+  const moveStage = async (id: string, fromStage: string): Promise<void> => {
     const next = STAGE_NEXT[fromStage];
     if (!next) {
       addToast({ source: 'Product', type: 'warning', message: 'Déjà sur "now" — fin de la chaîne.' });
       return;
     }
-    updateItem('product_items', id, { stage: next });
-    addToast({ source: 'Product', type: 'success', message: `Déplacé vers "${next}"` });
+    if (mutatingItemId) return;
+    setMutatingItemId(id);
+    try {
+      const result = await updateItem('product_items', id, { stage: next });
+      if (result.ok) addToast({ source: 'Product', type: 'success', message: `Déplacé et enregistré vers "${next}"` });
+      else addToast({ source: 'Product', type: 'warning', message: result.error ?? 'Changement de phase non enregistré.' });
+    } finally {
+      setMutatingItemId(null);
+    }
   };
 
   /* Ouverture d'une fiche.
@@ -184,7 +192,8 @@ export function ProductApp() {
           {nextStage ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); moveStage(String(item.id), stage); }}
+              onClick={(e) => { e.stopPropagation(); void moveStage(String(item.id), stage); }}
+              disabled={mutatingItemId === String(item.id)}
               data-move-stage-kanban={String(item.id)}
               className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-white px-1.5 py-0.5 rounded transition-all hover:opacity-90"
               style={{ background: STAGE_ACCENT[nextStage] ?? ACCENT }}
@@ -308,7 +317,8 @@ export function ProductApp() {
                       <button
                         type="button"
                         data-move-stage={String(it.id)}
-                        onClick={() => moveStage(String(it.id), stage)}
+                        onClick={() => void moveStage(String(it.id), stage)}
+                        disabled={mutatingItemId === String(it.id)}
                         className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-white px-2.5 py-1 rounded-md transition-all hover:opacity-90"
                         style={{ background: STAGE_ACCENT[nextStage] ?? ACCENT }}
                         title={`Passer de "${stage}" à "${nextStage}"`}
@@ -399,8 +409,10 @@ export function ProductApp() {
     const [composerFeature, setComposerFeature] = useState('');
     const [composerClient, setComposerClient] = useState('');
     const [composerWeeks, setComposerWeeks] = useState('2');
+    const [savingMvp, setSavingMvp] = useState(false);
 
-    const submitNewMvp = (): void => {
+    const submitNewMvp = async (): Promise<void> => {
+      if (savingMvp) return;
       const name = composerName.trim();
       const feature = composerFeature.trim();
       const client = composerClient.trim();
@@ -420,7 +432,8 @@ export function ProductApp() {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + Math.round(weeks * 7));
       const etaIso = etaDate.toISOString().slice(0, 10);
-      const result = addItem('product_mvps', {
+      setSavingMvp(true);
+      const result = await addItem('product_mvps', {
         name,
         feature,
         client: client || '—',
@@ -433,7 +446,7 @@ export function ProductApp() {
         notes: '',
       });
       if (result.ok) {
-        addToast({ source: 'Product', type: 'success', message: `MVP ajouté : ${name}` });
+        addToast({ source: 'Product', type: 'success', message: `MVP enregistré : ${name}` });
         setComposerName('');
         setComposerFeature('');
         setComposerClient('');
@@ -442,6 +455,7 @@ export function ProductApp() {
       } else {
         addToast({ source: 'Product', type: 'warning', message: result.error ?? 'Création impossible.' });
       }
+      setSavingMvp(false);
     };
 
     const cancelComposer = (): void => {
@@ -546,7 +560,8 @@ export function ProductApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewMvp}
+                onClick={() => void submitNewMvp()}
+                disabled={savingMvp}
                 className="text-[11px] font-semibold text-white px-3 py-1.5 rounded-lg transition-all hover:opacity-90"
                 style={{ background: ACCENT }}
                 data-mvp-submit

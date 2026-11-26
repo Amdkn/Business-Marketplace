@@ -31,6 +31,12 @@ BEGIN
  AND (p.proconfig IS NULL OR NOT EXISTS(SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
  OR has_function_privilege('anon',p.oid,'EXECUTE') OR has_function_privilege('authenticated',p.oid,'EXECUTE'));
  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Unsafe finance SECURITY DEFINER functions: %',v_bad; END IF;
+ SELECT string_agg(c.conname,', ') INTO v_bad FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+ WHERE c.contype='f' AND n.nspname='finance'
+ AND NOT EXISTS(SELECT 1 FROM pg_index i WHERE i.indrelid=c.conrelid AND i.indisvalid
+ AND (SELECT array_agg(k.attnum ORDER BY k.ord) FROM unnest(i.indkey::smallint[]) WITH ORDINALITY k(attnum,ord)
+ WHERE k.ord<=cardinality(c.conkey))=c.conkey);
+ IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Finance foreign keys lack covering indexes: %',v_bad; END IF;
  RAISE NOTICE 'PASS: Marketplace finance ledger baseline';
 END
 $test$;

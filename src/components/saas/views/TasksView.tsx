@@ -38,7 +38,7 @@ export const TasksView: React.FC = () => {
     setError(null);
     Promise.all([sopsRepo.list(), clientsRepo.list()])
       .then(([s, c]) => {
-        // UI-local "completed" toggle proxy: archived SOPs are "done".
+        // Archive state is persisted on the canonical workspace runbook.
         setTasks(
           safeArray<Sop>(s).map((row) => ({
             ...row,
@@ -119,7 +119,7 @@ export const TasksView: React.FC = () => {
   if (error) {
     return (
       <div className="p-6 bg-rose-50 border border-rose-200 rounded-lg text-rose-700" role="alert">
-        <p className="font-semibold">Error loading tasks</p>
+        <p className="font-semibold">Error loading procedures</p>
         <p className="text-sm mt-1">{error}</p>
       </div>
     );
@@ -215,7 +215,7 @@ export const TasksView: React.FC = () => {
             onClick={openModal}
             className="text-sm text-slate-500 hover:text-emerald-600 transition-colors py-2 w-full border border-dashed border-stone-200 rounded-xl hover:border-emerald-300 hover:bg-white flex items-center justify-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Add quick task
+            <Plus className="w-4 h-4" /> Add procedure
           </button>
         </div>
       </Card>

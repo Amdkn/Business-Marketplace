@@ -605,8 +605,6 @@ export function DashboardApp() {
                   statusTone={c.status === 'Active' ? 'ok' : c.status === 'Onboarding' ? 'warn' : 'danger'}
                   accent={ACCENT}
                   icon={<GitBranch className="w-5 h-5" />}
-                  metricLabel="weight"
-                  metricValue={`${weightOf(c)}%`}
                   meta={pinned ? 'Pinned to pipeline' : 'Pipeline tier'}
                   onClick={() => openPipelineClient(id)}
                 />

@@ -178,20 +178,6 @@ export function FinanceApp() {
     invoicesDrill.open(id);
   };
 
-  /** Mark an invoice as paid. The mutation is two-step: (1) flip the `status`
-   *  field to 'Paid', (2) emit a success toast so the coach can see the change
-   *  hit the store. The store's `updateItem` is fire-and-forget here — there
-   *  is no batch to revert if it fails, which is fine for a one-shot status. */
-  const markPaid = (id: string): void => {
-    const item = invoices.find((c) => c.id === id);
-    if (!item) return;
-    if (String(item.status) === 'paid' || String(item.status) === 'Paid') {
-      addToast({ source: 'Finance', type: 'warning', message: 'Already paid.' });
-      return;
-    }
-    updateItem('invoices', id, { status: 'Paid' });
-    addToast({ source: 'Finance', type: 'success', message: `Marked ${String(item.client ?? id)} as paid.` });
-  };
 
   /** Compose a new invoice. The coach enters a client name and an amount; the
    *  rest of the fields are defaulted to canonical Civadelle values. The
@@ -204,36 +190,44 @@ export function FinanceApp() {
   const [composerCurrency, setComposerCurrency] = useState('');
   const [savingInvoice, setSavingInvoice] = useState(false);
 
-  const submitNewInvoice = (): void => {
-    const client = composerClient.trim();
+  const submitNewInvoice = async (): Promise<void> => {
+    const client = clients.find((candidate) => String(candidate.id) === composerClientId);
     const amountNum = Number(composerAmount);
-    if (client.length === 0) {
-      addToast({ source: 'Finance', type: 'warning', message: 'Client name is required.' });
+    const currency = composerCurrency.trim().toUpperCase();
+    if (!client) {
+      addToast({ source: 'Finance', type: 'warning', message: 'Select an existing workspace client.' });
       return;
     }
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
       addToast({ source: 'Finance', type: 'warning', message: 'Amount must be a positive number.' });
       return;
     }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      addToast({ source: 'Finance', type: 'warning', message: 'Enter a valid ISO 4217 currency code.' });
+      return;
+    }
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
-    const labelMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const result = addItem('invoices', {
-      client,
-      number: `INV-${labelMonth}-${String(invoices.length + 1).padStart(3, '0')}`,
+    setSavingInvoice(true);
+    const result = await addItemPersisted('invoices', {
+      client: String(client.name ?? client.title ?? client.id),
+      clientId: String(client.id),
       amount: amountNum,
+      currency,
       status: 'Sent',
       due: due.toISOString().slice(0, 10),
-      issued: now.toISOString().slice(0, 10),
-      description: 'Invoice line · Citadelle monthly',
+      dueAt: due.toISOString(),
+      issuedAt: now.toISOString(),
     });
+    setSavingInvoice(false);
     if (result.ok) {
-      addToast({ source: 'Finance', type: 'success', message: `Invoice created for ${client}.` });
-      setComposerClient('');
+      addToast({ source: 'Finance', type: 'success', message: `Invoice persisted for ${String(client.name ?? client.id)}.` });
+      setComposerClientId('');
       setComposerAmount('');
+      setComposerCurrency('');
       setComposerOpen(false);
     } else {
-      addToast({ source: 'Finance', type: 'warning', message: result.error ?? 'Could not create invoice.' });
+      addToast({ source: 'Finance', type: 'warning', message: result.error ?? 'Could not persist invoice.' });
     }
   };
 

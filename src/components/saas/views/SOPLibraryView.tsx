@@ -418,7 +418,7 @@ export const SOPLibraryView: React.FC = () => {
               onClick={handleExecute}
               className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
-              Execute
+              Close
             </button>
           </>
         }

@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The live project returned **25 applied migration entries**. Twenty-five source files are tracked in this repository: 24 source migrations ported from V5 plus one catalog-derived reconstruction for the historical event-trigger ACL migration. The registry is source-covered, but exact original SQL provenance for that one historical entry remains unavailable:
+The live project returned **28 applied migration entries**. Twenty-eight source files are tracked in this repository, including the three new Finance & Capital migrations. The 20261126041718 historical event-trigger ACL migration remains a catalog-derived reconstruction, not byte-identical original SQL:
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -47,13 +47,13 @@ The live project returned **25 applied migration entries**. Twenty-five source f
 | 20261126051720 | adapter_oauth_runtime_guards | migrations/20261126050000_adapter_oauth_runtime_guards.sql |
 | 20261126052043 | google_drive_adapter_manifest_draft | migrations/20261126052200_google_drive_adapter_manifest_draft.sql |
 | 20261126052132 | google_drive_blueprint_contract_status | migrations/20261126052300_google_drive_blueprint_contract_status.sql |
-| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |
+| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |\n| 20261126061930 | finance_double_entry_foundation | migrations/20261126061930_finance_double_entry_foundation.sql |\n| 20261126062124 | finance_integrity_guards | migrations/20261126062124_finance_integrity_guards.sql |\n| 20261126062317 | finance_payment_fact_immutability | migrations/20261126062317_finance_payment_fact_immutability.sql |
 
 The first column is the actual cloud migration registry version; the source filename is the versioned migration name authored in Git. These timestamps differ because the cloud migration runner recorded its own application timestamp. Preserve both values in future audits. The 20261126041718 source file reproduces the verified live ACL but is explicitly a reconstruction, not recovered original SQL.
 
 ## Current database inventory
 
-Read-only live inspection returned 36 application tables, all with RLS enabled:
+Read-only live inspection returned 45 application tables, all with RLS enabled:
 
 | Schema | Tables | RLS |
 |---|---:|---:|
@@ -98,12 +98,12 @@ The platform has deployed schema and runtime foundations. It has not passed auth
 
 ## Source layout
 
-- `migrations/` — 25 tracked source migrations for the applied Marketplace schema (24 ported historical files + one catalog-derived reconstruction).
+- `migrations/` — 28 tracked source migrations for the applied Marketplace schema, including three Finance & Capital migrations.
 - `functions/marketplace-api/` — tenant lifecycle, structure installation, ownership/dependency/capability engines, catalog and commerce API.
 - `functions/adapter-api/` — connection lifecycle, OAuth initiation and execution control.
 - `functions/adapter-worker/` — Vault-backed provider execution, retries, refresh and manifest validation.
 - `functions/adapter-oauth-callback/` — one-time OAuth callback and PKCE exchange.
-- `tests/` — security baseline, OAuth, Google Drive manifest and capability entitlement regression SQL.
+- `tests/` — security baseline, OAuth, Google Drive manifest, capability entitlement and Finance ledger regression SQL.\n- `../docs/FINANCE_LEDGER_CONTRACT.md` — accounting, payment, refund, payout and dispute contract.
 - `config.toml` — project binding and Edge Function gateway JWT settings.
 
 ## Continuation

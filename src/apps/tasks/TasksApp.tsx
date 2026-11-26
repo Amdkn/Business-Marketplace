@@ -339,7 +339,7 @@ export function TasksApp() {
               value={composerLabel}
               onChange={(e) => setComposerLabel(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewTask();
+                if (e.key === 'Enter') void submitNewTask();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire la tâche…"
@@ -362,7 +362,7 @@ export function TasksApp() {
               value={composerWhen}
               onChange={(e) => setComposerWhen(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewTask();
+                if (e.key === 'Enter') void submitNewTask();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="ex. Thu 14:00 · tomorrow · next week"

@@ -213,9 +213,13 @@ export function LegalItemDetail(props: ItemDetailProps) {
    * fiche ni dans la liste : ce n'est pas une fonctionnalite. Les deux
    * ecrivent desormais le statut du document dans le CMS. */
   const updateItem = useCmsStore((s) => s.updateItemPersisted);
-  const setDocStatus = (next: string, message: string) => {
-    updateItem(def.id, String(item.id), { status: next });
-    addToast({ source: 'Legal', type: 'success', message });
+  const setDocStatus = async (next: string, message: string) => {
+    const result = await updateItem(def.id, String(item.id), { status: next });
+    if (result.ok) {
+      addToast({ source: 'Legal', type: 'success', message: `${message} Enregistré dans le workspace.` });
+    } else {
+      addToast({ source: 'Legal', type: 'warning', message: result.error ?? 'Mise à jour non enregistrée.' });
+    }
   };
   const title = String(item[def.titleField] ?? '');
   const subtitle = def.subtitleField ? String(item[def.subtitleField] ?? '') : '';

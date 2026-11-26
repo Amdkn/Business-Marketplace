@@ -1711,7 +1711,7 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Do not publish the user's email, auth UUID, organization UUID or workspace UUID in docs or logs.
 
 **Cloud database changes**
-- Added and applied migration 20261126090500_workspace_document_records.sql.
+- Added and applied migration 20261126090124_workspace_document_records.sql.
 - Added workspace_data.documents and workspace_data.legal_documents, with organization/workspace ownership, creator attribution, typed document metadata, RLS, least-privilege grants, organization indexes and four policies per table.
 - Cloud inventory after apply: 37 tables in workspace_data, 146 RLS policies; 1 real user / org / membership / workspace / workspace membership.
 - No tenant content rows were inserted by this work.

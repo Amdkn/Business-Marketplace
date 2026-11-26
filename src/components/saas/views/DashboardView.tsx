@@ -4,7 +4,7 @@
 // Bug fixes (D6 #98, D6 #102, D6 #104):
 //   - Never synthesize a client progress percentage from status; show persisted status only.
 //   - `client.status` translated via CLIENT_STATUS_LABEL.
-//   - "View Swarm Details" button now navigates to /agents (was dead).
+//   - "View Agent Directory" button now navigates to /agents (was dead).
 //   - Added <BackButton /> + EmptyState handling for clients/agents.
 
 import React, { useEffect, useState } from 'react';
@@ -190,18 +190,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 max-w-xs w-full lg:px-8">
-                        <div className="flex justify-between text-xs mb-2">
-                          <span className="text-slate-500">Status weight</span>
-                          <span className="font-medium text-slate-900">{CLIENT_STATUS_LABEL[client.status]}</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
                       <Badge variant={VARIANT_BY_STATUS[client.status]}>
                         {CLIENT_STATUS_LABEL[client.status]}
                       </Badge>
@@ -216,12 +204,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="space-y-6">
           <Card className="p-6 bg-slate-900 text-white border-slate-800">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold">AI Agents Swarm</h3>
-              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                24/7 Active
-              </span>
-            </div>
+              <h3 className="text-lg font-semibold">Workspace Agents</h3>
+              <span className="px-2 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">{agents.length} assigned</span>            </div>
             {agents.length === 0 ? (
               <p className="text-sm text-slate-400 italic">No agents configured yet.</p>
             ) : (

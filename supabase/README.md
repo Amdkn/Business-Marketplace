@@ -157,3 +157,7 @@ Fee engine hardening: migrations `20261126073100_finance_fee_policy_fk_indexes` 
 ## Captured Payment Journal Posting — 2026-11-26
 
 Added `api.post_captured_order_finance_entry` and the authenticated `post_captured_order_finance_entry` Marketplace API action. It only posts after provider-confirmed capture facts match the immutable order and fee snapshot. It creates the balanced entry: debit PSP clearing, credit seller payable and platform fee revenue. Journal posting is idempotent, and retries continue to return the original capture journal after later refund-state transitions. Live Edge Function is ACTIVE v22 (`verify_jwt=true`). See `docs/FINANCE_LEDGER_CONTRACT.md`.
+
+## Successful Refund Ledger Reversal — 2026-11-26
+
+Added immutable `finance.refund_fee_allocations` and `api.post_succeeded_refund_finance_entry`. A provider-confirmed successful refund reverses seller payable and platform fee revenue, and credits PSP clearing for the refund gross. Platform-fee reversal is calculated cumulatively against the original fee snapshot so partial-refund rounding reconciles exactly. The original capture journal remains immutable. Authenticated action: `post_succeeded_refund_finance_entry`; `marketplace-api` ACTIVE v23 (`verify_jwt=true`). No provider refund or journal fixture is created.

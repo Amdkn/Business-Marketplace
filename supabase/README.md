@@ -346,3 +346,15 @@ Vercel Preview [dpl_Cxp8KS7ptZBBo7zPxYcrPPzwUox6](https://vercel.com/amd-lab/bus
 This exact head includes the IT Software Kernel truth correction `2fe574f`. Non-blocking build warnings: Vite native config loader reports `__dirname`; CMS seed has an ineffective dynamic import; main JS bundle 2,958.06 kB (772.81 kB gzip); npm reports `core-js@3.49.0` postinstall not allowlisted and unknown `cache-dir` env config. No warning failed the build.
 
 Supabase Dashboard still reports Free / No backups. Leaked-password protection remains Pro+-gated. No backup/restore drill, authenticated browser E2E or production promotion was performed.
+
+
+## OAuth scope parser hotfix — 2026-11-26 21:08 UTC
+
+Source audit found that OAuth callback and refresh worker both used an over-escaped whitespace regex. A standard provider scope string such as `openid email profile` could be treated as one scope and rejected.
+
+- `adapter-oauth-callback` deployed **v2**, ACTIVE, `verify_jwt=false` (public callback remains protected by one-time SHA-256 state, expiry/consumption, PKCE verifier, provider allowlist and stored tenant/connection context).
+- `adapter-worker` deployed **v8**, ACTIVE, `verify_jwt=false` (worker retains its exact service-role bearer-key check).
+- Both deployed `index.ts` files were retrieved and compared byte-for-byte with the repository versions; exact parity confirmed.
+- Both now split scopes with `split(/\\s+/)`. Two Vitest regression checks were added to `src/lib/adapters/oauth-encoding.test.ts`, covering the exact Edge Function source patterns and space/tab/newline-separated scope strings.
+- The new tests are **not yet executed**. The previous hosted verify (548 tests) predates this commit; GitHub has no run for latest code commit `33e20d9`, and manual Vercel deployment creation is blocked by the 24-hour `api-deployments-free-per-day` quota. Do not mark the new tests passed until a later hosted CI run.
+- No OAuth client credentials, active manifest, tenant connection, OAuth transaction or execution was created. Real Google OAuth acceptance remains open.

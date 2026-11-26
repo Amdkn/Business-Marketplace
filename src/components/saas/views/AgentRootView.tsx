@@ -11,6 +11,7 @@ export const AgentRootView = (): React.ReactElement => {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [agentKey, setAgentKey] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [agentClass, setAgentClass] = useState('SPECIALIST');
@@ -36,6 +37,7 @@ export const AgentRootView = (): React.ReactElement => {
       return;
     }
     try {
+      setSaving(true);
       setError(null);
       await agentsRepo.register({ agentKey, displayName, agentClass, runtime, permissionCodes: codes });
       setAgentKey('');
@@ -47,6 +49,8 @@ export const AgentRootView = (): React.ReactElement => {
       setRevision((value) => value + 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to register agent');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -107,7 +111,7 @@ export const AgentRootView = (): React.ReactElement => {
         <span className="text-xs text-stone-500">These codes become an explicit workspace-scoped delegation. The API rejects empty, duplicate or malformed codes.</span>
       </label>
       <div className="md:col-span-2 flex justify-end">
-        <button type="submit" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Create principal + workspace delegation</button>
+        <button type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Create / update principal + workspace delegation'}</button>
       </div>
     </form>}
 

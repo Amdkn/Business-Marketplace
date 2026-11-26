@@ -394,7 +394,7 @@ export function OperationsApp() {
               value={changeTitle}
               onChange={(e) => setChangeTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void submitNewChange();
+                if (e.key === 'Enter') void void submitNewChange();
                 if (e.key === 'Escape') cancelChangeComposer();
               }}
               placeholder="ex. Add tag-based search to the vault"
@@ -413,7 +413,7 @@ export function OperationsApp() {
               value={changeSummary}
               onChange={(e) => setChangeSummary(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewChange();
+                if (e.key === 'Enter') void submitNewChange();
                 if (e.key === 'Escape') cancelChangeComposer();
               }}
               placeholder="Une phrase qui dit le quoi"
@@ -470,7 +470,7 @@ export function OperationsApp() {
                   value={changePolicy}
                   onChange={(e) => setChangePolicy(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChange();
+                    if (e.key === 'Enter') void submitNewChange();
                     if (e.key === 'Escape') cancelChangeComposer();
                   }}
                   placeholder="ex. ADR-OPS-013"
@@ -491,7 +491,7 @@ export function OperationsApp() {
                   value={changeProposedBy}
                   onChange={(e) => setChangeProposedBy(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChange();
+                    if (e.key === 'Enter') void submitNewChange();
                     if (e.key === 'Escape') cancelChangeComposer();
                   }}
                   placeholder="ex. human:ops"
@@ -651,7 +651,7 @@ export function OperationsApp() {
               value={composerTitle}
               onChange={(e) => setComposerTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void submitNewAlert();
+                if (e.key === 'Enter') void void submitNewAlert();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire l'incident…"
@@ -692,7 +692,7 @@ export function OperationsApp() {
                   value={composerSource}
                   onChange={(e) => setComposerSource(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewAlert();
+                    if (e.key === 'Enter') void submitNewAlert();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="ex. manual · ops"

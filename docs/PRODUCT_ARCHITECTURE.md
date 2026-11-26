@@ -343,3 +343,16 @@ Captured payment accounting now bridges provider-confirmed capture → immutable
 Finance now has a refund accounting path that reverses seller payable and platform fee revenue proportionally, credits PSP clearing for refund gross, preserves the original capture journal and uses cumulative fee allocation to avoid partial-refund rounding drift.
 
 Finance now supports the ledger side of seller payout settlement. The platform records the owning organization on each payout batch, verifies provider-confirmed paid status and available seller-payable/PSP-clearing balances, and posts an idempotent debit-to-seller-payable / credit-to-PSP-clearing journal. Journal account rows are locked in deterministic order to prevent concurrent balance races.
+
+
+## 16. Shared persistence for Garden and Web Desktop interfaces — 2026-11-26
+
+The interface audit found 37 registered CMS collections in `src/lib/cms/seed.ts`: 34 operational collections and three demo-only `demo_coach_*` showcase collections. The CMS repository had a dormant typed-table map but continued reading/writing the generic `cms_items` store. Its tenant lookup also used the legacy public `memberships` relation.
+
+The new `workspace_data` schema now provides 34 dedicated tenant tables with typed columns derived from the collection definitions. Every table is organization-owned, optionally workspace-scoped, RLS-protected and restricted to active tenant members for reads and S0/B1/B2 roles for writes. A trigger prevents organization/primary-key reassignment and preserves original creator identity. The event sink is `workspace_data.activity_events`.
+
+The CMS repository now maps each collection ID to its dedicated table, stores declared fields in typed columns and preserves unmodeled fields in `extra_data`. It resolves the organization through `identity.organization_memberships`. The store now treats an empty live collection as authoritative, replacing fictional sample rows instead of leaving demo data visible to a real tenant.
+
+The source migration is `supabase/migrations/20261126080300_marketplace_interface_persistence.sql`; the regression suite is `supabase/tests/marketplace_interface_persistence.sql`. Hosted verification passed: 35 tables including the event sink, 138 RLS policies, no RLS-disabled tables, no anon table grants, and a rolled-back authenticated insert/read/update probe.
+
+This does not complete the interface conversion. The Sidebar-specific repositories still use `dashboard.clients` and `dashboard.agents`; the People/Agent screens need projection from canonical `identity.profiles`, `identity.organization_memberships` and `identity.agent_principals`. Workspace-scoped query enforcement and app-local stores outside the shared CMS also remain. The preview deployment and browser E2E must be rerun against the new branch head before acceptance.

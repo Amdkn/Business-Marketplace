@@ -130,3 +130,7 @@ Authenticated Edge actions:
 - `apply_order_fee_policy`
 
 The SQL boundary rechecks active membership and Finance roles (S0, B1, B2, B2.2), uses SECURITY DEFINER with a pinned search_path, and grants EXECUTE only to `service_role`. The Edge Function uses `requireFinanceRole` and remains JWT-verified.
+
+### Fee policy activation concurrency hardening
+
+A follow-up migration serializes activations on the logical policy identity (owner organization + policy key + scope + scope organization + currency), rather than locking only by policy row ID. This closes the race where two different draft versions could otherwise be activated concurrently with overlapping effective windows. The active-window overlap check runs inside that shared advisory lock.

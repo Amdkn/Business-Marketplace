@@ -137,3 +137,18 @@ A follow-up migration serializes activations on the logical policy identity (own
 
 
 Fee-policy FK indexes and concurrency: migration `finance_fee_policy_fk_indexes` adds covering indexes for the policy creator and optional seller-scope foreign keys. Migration `fee_policy_activation_serialization` locks on owner organization + policy key + scope + seller scope + currency before checking effective-window overlap. Finance now has zero unindexed foreign keys.
+
+## Captured Payment → Ledger Posting
+
+A captured payment can now be converted into a double-entry journal entry through `api.post_captured_order_finance_entry(actor, owner_organization, payment_intent)`.
+
+The function requires an active Finance role, a payment intent in `CAPTURED` state with `captured_at` and provider payment ID, immutable order facts matching the payment, and an immutable order fee snapshot matching gross and currency. It resolves active tenant ledger accounts by stable system keys:
+- Debit `PSP_CLEARING` for captured gross.
+- Credit `SELLER_PAYABLE` for seller net (when non-zero).
+- Credit `PLATFORM_FEE_REVENUE` for platform fee (when non-zero).
+
+It delegates to the existing balanced, immutable, idempotent journal-posting API using `payment-capture:<payment_intent_id>`. A retry returns the existing capture journal even if the payment later transitions to partial/full refund; refunds must post as separate events and never rewrite capture history. Missing chart accounts, missing fee snapshot, mismatched order/payment facts or an unconfirmed capture are hard failures.
+
+Authenticated Edge action: `post_captured_order_finance_entry`. Live `marketplace-api` v22 is ACTIVE with `verify_jwt=true`.
+
+This is the accounting boundary for a trusted provider-confirmed capture, not a provider integration. No live payment intent, capture or journal was created in the empty tenant project.

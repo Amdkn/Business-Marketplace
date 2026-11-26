@@ -88,7 +88,7 @@ export function OperationsApp() {
     }
     setMutatingOperationId(id);
     try {
-      const result = await updateItem('alerts', id, { status: 'triage en cours' });
+      const result = await updateItem('alerts', id, { enrichment: 'enriched', status: 'triage en cours' });
       if (result.ok) addToast({ source: 'Operations', type: 'success', message: 'Triage démarré et enregistré. Enrichissement runtime toujours indisponible.' });
       else addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Démarrage du triage non enregistré.' });
     } finally {

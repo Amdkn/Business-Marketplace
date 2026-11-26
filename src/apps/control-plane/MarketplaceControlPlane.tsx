@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseConfigured } from '../../lib/supabase';
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness, Cpu,
-  Building2, Check, ChevronDown, ChevronRight, CircleDot, Cloud, Command, Compass,
+  Activity, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness, Cpu,
+  Building2, ChevronDown, ChevronRight, CircleDot, Cloud, Command, Compass,
   CreditCard, Database, FileText, GitBranch, Globe2, Layers3, LockKeyhole, Menu,
-  Network, Plus, Search, Settings2, ShieldCheck, Sparkles, Workflow, Zap,
+  Network, Search, Settings2, ShieldCheck, Sparkles, Workflow, Zap,
 } from 'lucide-react';
 import './marketplace.css';
 
@@ -356,6 +356,13 @@ function AdaptersView() {
   }, []);
 
   return <div className="bm-stack"><div className="bm-notice"><div className="bm-notice-icon"><Zap size={17}/></div><div><strong>20 adapter families mapped.</strong><span>Provider examples are design scope only; no production connector or tenant connection is implied.</span></div><span className="bm-notice-tag">CATALOG BLUEPRINT</span></div><div className={'bm-source-pill '+source}>{source==='database'?'SUPABASE REFERENCE DATA':source==='loading'?'LOADING ADAPTER REGISTRY':'LOCAL REFERENCE FALLBACK'}</div><div className="bm-adapter-grid">{families.map((item,i)=><div className="bm-adapter-card" key={item.family_key}><div className="bm-adapter-card-head"><span className="bm-adapter-icon">{adapterIcon(item.icon_key)}</span><span className="bm-adapter-number">A{i+1<10?'0':''}{i+1}</span></div><h3>{item.family_name}</h3><p>{item.provider_examples.join(' · ')}</p><div className="bm-adapter-card-foot"><span><i/> {item.implementation_status === 'AVAILABLE' ? 'Available' : item.implementation_status === 'IN_PROGRESS' ? 'In progress' : 'Not connected'}</span><span>{item.implementation_status === 'PLANNED' ? 'Manifest pending' : item.implementation_status}</span></div></div>)}</div></div>;
+}
+
+
+function adapterIcon(name: string) {
+  const icons: Record<string, typeof Activity> = { ShieldCheck, Zap, Activity, FileText, Workflow, GitBranch, Database, Blocks, Sparkles, Network, CreditCard, BriefcaseBusiness, Compass, Layers3, Building2, Globe2, Cloud };
+  const Icon = icons[name] ?? Box;
+  return <Icon size={18}/>;
 }
 
 function GovernanceView() {

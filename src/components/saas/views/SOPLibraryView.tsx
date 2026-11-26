@@ -1,5 +1,5 @@
 // src/components/views/SOPLibraryView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.sops schema.
+// Zero Bug Sprint — rewritten for the Marketplace tenant SOP repository.
 //
 // Schema (no `steps`/`time`/`uses`/`rating` columns — only `title`,
 // `content`, `category`, `version`, `status`, `createdAt`, `updatedAt`).

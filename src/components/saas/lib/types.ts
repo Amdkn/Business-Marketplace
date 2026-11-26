@@ -54,6 +54,11 @@ export interface Organization {
   status: 'active' | 'paused' | 'archived';
   createdAt: string;
   updatedAt: string;
+  /** Canonical identity/runtime metadata; present on AI principals only. */
+  agentKey?: string;
+  agentClass?: string;
+  runtime?: string;
+  permissionCodes?: string[];
 }
 
 export interface Membership {

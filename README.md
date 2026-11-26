@@ -13,6 +13,8 @@
 
 Business Marketplace is not a directory of SaaS listings. It is the composition and operations layer for businesses: a place where an organization can model its business domains, activate capabilities, connect providers, assign agents, govern access, and observe execution.
 
+The platform substrate has four cross-cutting foundations: **Compute Core**, **Inference Core**, **Memory Core**, and **CEL Security Core**. These are not departments or Areas OS portfolios; they support every product plane.
+
 The product has three cooperating planes:
 
 1. **Marketplace Experience** — discover business capabilities, solution packs, templates, agents and adapters; compare, configure, install and manage them.

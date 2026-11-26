@@ -7,7 +7,7 @@
 // (`/people-agents`, `/agents`) remain live.
 //
 // Data flow:
-//   - agents table (omk_saas.agents, RLS-scoped by org_id JWT claim)
+//   - agents table (dashboard.agents, RLS-scoped by org_id JWT claim)
 //     → 5 hero stat chips + agent grid + model routing panel
 //   - Hermes telemetry columns (state, load_pct, current_task, etc.)
 //     → exposed by migration `sql/07_hermes_agent_root.sql` (nullable,
@@ -356,7 +356,7 @@ export const AgentRootView = (): React.ReactElement => {
             <p className="font-sans text-[13px] text-cream/65 mt-4 max-w-md leading-relaxed">
               One rotating dish observes every specialist in real time. Blip state tells the
               truth; no chart required. Live telemetry from{' '}
-              <code className="font-mono text-cream">omk_saas.agents</code>.
+              <code className="font-mono text-cream">dashboard.agents</code>.
             </p>
             <div className="flex flex-wrap items-center gap-2 mt-5">
               <HeroChip icon={Activity} value={String(stats.totalTasksToday)} label="tasks logged" />
@@ -502,7 +502,7 @@ export const AgentRootView = (): React.ReactElement => {
             </div>
           </div>
           <p className="font-mono text-[10px] tracking-wider uppercase text-her-muted mt-4">
-            derived from omk_saas.agents · fallback when telemetry column missing
+            derived from dashboard.agents · fallback when telemetry column missing
           </p>
         </article>
         <article className="col-span-12 lg:col-span-5 rounded-3xl bg-ink text-cream p-6 relative overflow-hidden">
@@ -635,7 +635,7 @@ export const AgentRootView = (): React.ReactElement => {
           </ul>
           <p className="relative font-mono text-[10px] tracking-wider opacity-80 mt-4">
             changes apply on next dispatch · runtime telemetry from{' '}
-            <code className="font-mono">omk_saas.agents</code>
+            <code className="font-mono">dashboard.agents</code>
           </p>
         </article>
       </section>
@@ -692,7 +692,7 @@ export const AgentRootView = (): React.ReactElement => {
         <span className="flex items-center gap-2">
           <Layers className="size-3" /> Hermes Agent Root · v1.0
         </span>
-        <span className="text-ember">Channel · Supabase / omk_saas</span>
+        <span className="text-ember">Channel · Supabase / Marketplace</span>
         <span className="flex items-center gap-2">
           Live <Settings2 className="size-3" />
         </span>

@@ -61,7 +61,7 @@ function setMode(next: SupabaseMode, err?: unknown): void {
 /* Collection definitions are source-controlled; tenant records are stored in dedicated tables. */
 
 // Each persistent CMS collection has a dedicated typed table in workspace_data.
-const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table?: string }> = {
+const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table?: string; extraFields?: string[] }> = {
   "clients": {
     "title": "name",
     "fields": [
@@ -104,7 +104,9 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
     "fields": [
       "when",
       "severity",
-      "resolution",
+      "resolution"
+    ],
+    "extraFields": [
       "enrichment",
       "source",
       "riskScore",

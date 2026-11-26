@@ -1800,3 +1800,15 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Updated the CMS store header to reflect current Marketplace behavior: demo records belong only to the explicit local demo tenant; real tenants hydrate from workspace_data and remote failures are not demo-seeded.
 - Re-ran `supabase/tests/marketplace_interface_persistence.sql` against the hosted project after the workspace-scoping code changes; the DO assertion suite returned no exceptions. This is structural SQL verification, not browser CRUD.
 - Latest verified code changes are committed before this handoff. TypeScript/Vitest/build, live browser CRUD and deployment remain unverified and are explicitly not accepted.
+
+
+### 13.33 People & Agents UI source audit — 2026-11-26
+
+A deeper read of the actual People/Agents interfaces found additional non-persisted demo behavior that must be removed before calling the interface recycle complete:
+
+- Web Desktop `src/apps/people/PeopleApp.tsx` imports `FLEET_AGENTS`, `SCHEDULE_GRID` and `SCHEDULE_TASKS` from `src/apps/people/fleet.ts`. The overview, agent bench, activity heatmap and schedule are driven by hardcoded fixture arrays, not the tenant CMS collections.
+- `src/apps/people/seed.ts` defines synthetic personas, memory and codex records; real tenant seed guards prevent these sample rows from being inserted, but the UI must still be checked to ensure it does not render fixture arrays outside the CMS.
+- Garden `AgentsView` and `AgentRootView` read through `agentsRepo`, which currently maps to `workspace_data.people_agents`, not canonical `identity.agent_principals`.
+- Garden `AgentRootView` derives load, success rate, latency, task counts and default model from row index/status when telemetry is absent. These are synthetic metrics and must be replaced with explicit unknown/unavailable values, never displayed as live telemetry.
+- Next identity architecture: `identity.agent_principals` is the canonical agent identity; `identity.agent_delegations` is the authority boundary. Workspace-specific assignments and telemetry belong in a linked workspace projection with a foreign key to the principal, not a second identity registry. Human team identity similarly comes from `identity.profiles` and organization/workspace memberships.
+- No agent principals, runtime profiles, telemetry, tasks or synthetic agent rows were created during this audit.

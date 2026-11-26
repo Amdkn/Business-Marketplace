@@ -7,7 +7,7 @@ declare
     'marketplace_listings','product_items','product_releases','growth_channels','growth_experiments','deals','invoices',
     'contracts','policies','session_notes','legal_ai_act_checks','legal_frameworks','legal_controls',
     'legal_compliance_policies','legal_evidence','legal_risks','legal_vendors','legal_gaps','personas','memory','codex',
-    'approval_decisions','squads','content'
+    'approval_decisions','squads','content','documents','legal_documents'
   ];
   t text;
   n integer;
@@ -23,15 +23,21 @@ begin
     if not (select relrowsecurity from pg_class where oid=to_regclass(format('workspace_data.%I',t))) then raise exception 'RLS disabled on %',t; end if;
     select count(*) into n from pg_policies where schemaname='workspace_data' and tablename=t;
     if n <> 4 then raise exception 'expected four policies on %, found %',t,n; end if;
+    if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name=t and column_name='workspace_id') <> 'NO' then
+      raise exception 'workspace_id must be required on %',t;
+    end if;
     if has_table_privilege('anon',format('workspace_data.%I',t),'SELECT') then raise exception 'anon SELECT granted on %',t; end if;
     if not has_table_privilege('authenticated',format('workspace_data.%I',t),'SELECT') then raise exception 'authenticated SELECT missing on %',t; end if;
     if not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname=format('%s_tenant_guard',t) and not tgisinternal) then raise exception 'tenant immutability trigger missing on %',t; end if;
   end loop;
   if to_regclass('workspace_data.activity_events') is null then raise exception 'activity_events table missing'; end if;
   select count(*) into n from pg_policies where schemaname='workspace_data' and tablename='activity_events';
-  if n <> 2 then raise exception 'expected two activity event policies, found %',n; end if;
-  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE') <> 35 then
-    raise exception 'workspace_data table count differs from 34 collections + activity_events';
+  if n <> 2 then raise exception 'expected two append-only activity event policies, found %',n; end if;
+  if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name='activity_events' and column_name='workspace_id') <> 'NO' then
+    raise exception 'activity_events.workspace_id must be required';
+  end if;
+  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE') <> 37 then
+    raise exception 'workspace_data table count differs from 36 collections + activity_events';
   end if;
   if exists(select 1 from information_schema.tables where table_schema='workspace_data' and table_name like 'demo_coach_%') then
     raise exception 'demo-only collections must not have tenant persistence tables';

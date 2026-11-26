@@ -167,7 +167,7 @@ const servicesDef = def({
 });
 
 const servicesItems: CmsItem[] = [
-  { id: 'supabase-omk-saas', name: 'Supabase — omk_saas', note: 'p95 42ms', status: 'ok', detail: 'Primary Postgres for tenant data. p95 read latency 42ms over the last 24h, 0 failed connections.' },
+  { id: 'supabase-marketplace', name: 'Supabase — Marketplace', note: 'p95 42ms', status: 'ok', detail: 'Primary Postgres for tenant data. p95 read latency 42ms over the last 24h, 0 failed connections.' },
   { id: 'vercel-coach-dashboard', name: 'Vercel — coach dashboard', note: 'READY', status: 'ok', detail: 'Latest deploy promoted to production, all health checks green.' },
   { id: 'edge-signup-org', name: 'Edge — sign-up-organization', note: 'invoked 12×', status: 'ok', detail: 'Idempotent org-creation function. 12 invocations today, 0 errors.' },
   { id: 'agent-runtime-m3', name: 'Agent runtime (M3)', note: 'queue depth 3', status: 'warn', detail: 'MiniMax M3 runtime queue is backing up slightly — 3 jobs waiting. Not yet critical.' },

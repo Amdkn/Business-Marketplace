@@ -171,3 +171,17 @@ Zero-value debit lines are omitted. The entry delegates to the immutable journal
 Authenticated Edge action: `post_succeeded_refund_finance_entry`. Live `marketplace-api` v23 is ACTIVE with `verify_jwt=true`.
 
 No provider refund, refund allocation or journal has been fabricated. This is the ledger posting boundary for a trusted provider-confirmed refund; the provider adapter and signed webhook integration remain separate work.
+
+## Settled Seller Payout → Ledger Posting
+
+Payout batches now carry an explicit `owner_organization_id` so settlement accounting cannot be posted to an arbitrary tenant ledger. `api.post_paid_payout_item_finance_entry(actor, owner_organization, payout_item)` requires both batch and item to be provider-confirmed PAID, provider batch/item IDs, and a settled timestamp.
+
+Before posting it locks the payout item, batch and ledger accounts, verifies currency and owner, then checks both:
+- Seller payable credit-normal balance is at least the payout amount.
+- PSP clearing debit-normal balance is at least the payout amount.
+
+The journal debits seller payable and credits PSP clearing. It delegates to the journal API using `payout-settlement:<payout_item_id>`; retries reuse the same entry. The journal API now locks all affected ledger-account rows in sorted UUID order before posting, serializing concurrent journal writes and protecting payout balance checks from double-spend races.
+
+Authenticated Edge action: `post_paid_payout_item_finance_entry`. Live `marketplace-api` v24 is ACTIVE with `verify_jwt=true`.
+
+This records only a provider-confirmed settled payout. It does not submit a payout to a provider or create a bank transfer. No payout batch or item has been created in the empty tenant project.

@@ -15,6 +15,7 @@ import { FleetItemGrid } from '../_ui/FleetItemCard';
 import { CollectionRepeater } from '../../components/cms/CollectionRepeater';
 import { seedFinanceCms } from './seed';
 import { useShellStore } from '../../stores/shell.store';
+import { useIsDemoTenant } from '../../lib/cms/useIsDemoTenant';
 
 registerItemDetail('finance', FinanceItemDetail);
 seedFinanceCms();
@@ -27,69 +28,56 @@ const ACCENT = '#0d9488';
 // for the month label (~14px) + the gap-2 (8px) below it.
 const RUNWAY_BAR_PX = 160;
 
-function Overview() {
-  // KPIs from the CMS store. Empty state: we still render the section title,
-  // but each StatCard falls back to a placeholder when its item is missing —
-  // never an unhandled undefined.
-  const items = useCmsStore(s => s.items['finance_overview']) ?? [];
-  const byId = (id: string): CmsItem | undefined => items.find(i => i.id === `overview-${id}`);
-  // CmsItem values are typed as `unknown` because the shape is dynamic. We
-  // coerce to string at the boundary so StatCard (strictly typed) doesn't
-  // have to know about CMS shape.
-  const txt = (item: CmsItem | undefined, key: string): string => {
-    if (!item) return '';
-    const v = item[key];
-    return typeof v === 'string' ? v : '';
-  };
-  // StatCard tone is a closed union. Anything else (including our 'default'
-  // sentinel) falls back to a sensible per-card default supplied by the caller.
-  type StatTone = 'ok' | 'warn' | 'danger' | 'accent';
-  const tone = (item: CmsItem | undefined, fallback: StatTone): StatTone => {
-    const t = txt(item, 'tone');
-    return t === 'ok' || t === 'warn' || t === 'danger' || t === 'accent' ? t : fallback;
-  };
+function formatInvoiceAmount(amount: number, currency: string | null | undefined): string {
+  const code = String(currency ?? '').toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(amount); } catch { /* use explicit unset label */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
+}
 
-  const mrr = byId('mrr');
-  const burn = byId('burn');
-  const runway = byId('runway');
-  const ltvCac = byId('ltv-cac');
+function Overview() {
+  const invoices = useCmsStore((state) => state.items.invoices ?? []);
+  const paid = invoices.filter((invoice) => /paid/i.test(String(invoice.status ?? ''))).length;
+  const open = invoices.length - paid;
+  const outstandingByCurrency = new Map<string, number>();
+  for (const invoice of invoices) {
+    if (/paid/i.test(String(invoice.status ?? ''))) continue;
+    const currency = String(invoice.currency ?? '').toUpperCase() || 'UNSET';
+    outstandingByCurrency.set(currency, (outstandingByCurrency.get(currency) ?? 0) + Number(invoice.amount ?? 0));
+  }
+  const currencyLines = [...outstandingByCurrency.entries()].map(([currency, amount]) =>
+    currency === 'UNSET' ? `${amount.toLocaleString()} · currency not set` : formatInvoiceAmount(amount, currency));
 
   return (
     <div className="p-7">
-      <SectionHead title="Finance overview" subtitle="Unit economics at a glance" />
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard
-          label={txt(mrr, 'label') || 'MRR'}
-          value={txt(mrr, 'value') || '—'}
-          tone={tone(mrr, 'ok')}
-          hint={txt(mrr, 'hint') || 'no data'}
-        />
-        <StatCard
-          label={txt(burn, 'label') || 'Monthly burn'}
-          value={txt(burn, 'value') || '—'}
-          tone={tone(burn, 'warn')}
-          hint={txt(burn, 'hint')}
-        />
-        <StatCard
-          label={txt(runway, 'label') || 'Runway'}
-          value={txt(runway, 'value') || '—'}
-          tone={tone(runway, 'accent')}
-          hint={txt(runway, 'hint')}
-        />
+      <SectionHead title="Finance overview" subtitle="Persisted workspace invoices · no synthetic MRR, burn or cash runway." />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Invoices" value={String(invoices.length)} tone="accent" hint="Workspace records" />
+        <StatCard label="Paid" value={String(paid)} tone="ok" hint="Status recorded as paid" />
+        <StatCard label="Open" value={String(open)} tone={open ? 'warn' : 'ok'} hint="Not marked paid" />
+        <StatCard label="Currencies" value={String(outstandingByCurrency.size)} tone="accent" hint="Outstanding balances kept separate" />
       </div>
-      <div className="mt-4">
-        <StatCard
-          label={txt(ltvCac, 'label') || 'LTV : CAC'}
-          value={txt(ltvCac, 'value') || '—'}
-          tone={tone(ltvCac, 'ok')}
-          hint={txt(ltvCac, 'hint')}
-        />
+      <div className="mt-4 rounded-xl border p-4" style={{ background: 'var(--theme-surface)', borderColor: 'var(--panel-border)' }}>
+        <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--theme-text-muted)' }}>Outstanding by currency</h3>
+        {currencyLines.length === 0 ? <p className="mt-2 text-sm" style={{ color: 'var(--theme-text-dim)' }}>No open invoices in this workspace.</p> :
+          <ul className="mt-3 space-y-2">{currencyLines.map((line) => <li key={line} className="text-sm font-semibold tabular-nums" style={{ color: 'var(--theme-text)' }}>{line}</li>)}</ul>}
       </div>
     </div>
   );
 }
 
-function Runway() {
+function FinanceUnavailable({ title, description }: { title: string; description: string }) {
+  return <div className="p-7">
+    <SectionHead title={title} subtitle="Finance source not connected" />
+    <Card className="p-6">
+      <p className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>No verified records available</p>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>{description}</p>
+    </Card>
+  </div>;
+}
+
+function DemoRunway() {
   const items = useCmsStore(s => s.items['finance_overview']) ?? [];
   const projection = items.find(i => i.id === 'overview-projection');
   const rawProjection = projection?.projection;

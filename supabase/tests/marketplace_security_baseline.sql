@@ -52,7 +52,8 @@ BEGIN
         has_function_privilege('authenticated', p.oid, 'EXECUTE')
         AND p.oid NOT IN (
           to_regprocedure('identity.is_active_workspace_member(uuid,uuid)'),
-          to_regprocedure('identity.can_manage_workspace(uuid,uuid)')
+          to_regprocedure('identity.can_manage_workspace(uuid,uuid)'),
+          to_regprocedure('identity.get_current_workspace_context()')
         )
       )
     );
@@ -81,6 +82,19 @@ BEGIN
          AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
      ) THEN
     RAISE EXCEPTION 'Workspace RLS predicates do not meet the authenticated-user / fixed-search_path contract';
+  END IF;
+
+  IF to_regprocedure('identity.get_current_workspace_context()') IS NULL
+     OR has_function_privilege('anon', 'identity.get_current_workspace_context()', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'identity.get_current_workspace_context()', 'EXECUTE')
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_proc p
+       WHERE p.oid=to_regprocedure('identity.get_current_workspace_context()')
+         AND p.prosecdef
+         AND p.prosrc LIKE '%auth.uid()%'
+         AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+     ) THEN
+    RAISE EXCEPTION 'Caller-scoped workspace context RPC is not safely bounded';
   END IF;
 
   IF to_regprocedure('workspace_data.validate_mission_agent_delegation()') IS NULL

@@ -4,6 +4,16 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
+    WHERE table_schema='workspace_data' AND table_name='clients' AND column_name='currency'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='workspace_data.clients'::regclass AND conname='clients_currency_iso4217_check'
+  ) THEN
+    RAISE EXCEPTION 'Client ticket currency column/check is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
     WHERE table_schema='workspace_data' AND table_name='deals' AND column_name='client_id'
   ) OR NOT EXISTS (
     SELECT 1 FROM information_schema.columns

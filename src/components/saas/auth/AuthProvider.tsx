@@ -8,7 +8,7 @@
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 import { APP_MODE } from '../config/mode';
-import { setActiveOrgIdCache } from '../lib/tenant';
+import { setActiveOrgIdCache, setActiveWorkspaceIdCache } from '../lib/tenant';
 import type { AuthUser, Organization } from '../lib/types';
 
 export interface AuthContextValue {
@@ -80,10 +80,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthenticated: true,
     };
     setUser(authUser);
-    setActiveOrgIdCache(authUser.orgId);  // tenant.ts reads this for non-React code paths
+    setActiveOrgIdCache(authUser.orgId);
+    setActiveWorkspaceIdCache(null);
+
     if (authUser.orgId) {
       const org = await fetchUserOrg(authUser.orgId);
       setOrganization(org);
+
+      // Resolve exactly one active workspace for the signed-in organization.
+      // Garden repositories use this id on every read/write; RLS remains the
+      // final authorization boundary and independently checks membership.
+      const { data: workspaceMemberships, error: workspaceError } = await supabase
+        .schema('enterprise')
+        .from('workspace_memberships')
+        .select('workspace_id')
+        .eq('organization_id', authUser.orgId)
+        .eq('user_id', authUser.id)
+        .eq('membership_status', 'ACTIVE');
+
+      if (workspaceError) throw workspaceError;
+      if (workspaceMemberships?.length === 1) {
+        setActiveWorkspaceIdCache(workspaceMemberships[0].workspace_id as string);
+      } else if (APP_MODE === 'saas') {
+        throw new Error(
+          workspaceMemberships?.length
+            ? 'Multiple active workspaces require an explicit workspace selector.'
+            : 'No active workspace membership exists for this organization.',
+        );
+      }
     } else {
       setOrganization(null);
       if (APP_MODE === 'saas' && import.meta.env.DEV) {
@@ -171,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setOrganization(null);
     setActiveOrgIdCache(null);
+    setActiveWorkspaceIdCache(null);
   }, []);
 
   return (

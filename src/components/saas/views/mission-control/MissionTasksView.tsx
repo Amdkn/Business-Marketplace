@@ -210,13 +210,30 @@ export const MissionTasksView = (): React.ReactElement => {
             : mission)
           : previous);
       } else {
-        const nextPosition = missions.filter((mission) => mission.status === targetCol).length;
+        const targetItems = missions
+          .filter((mission) => mission.status === targetCol && mission.id !== activeId)
+          .sort((left, right) => left.position - right.position);
         const updated = await missionsRepo.update(activeId, {
           status: targetCol,
-          position: nextPosition,
+          position: targetItems.length,
         });
+        // Compact both affected columns after a cross-column move. Without
+        // this, removing a middle card leaves a gap and a later create-at-length
+        // can reuse an occupied position.
+        const sourceRemaining = sourceItems.filter((mission) => mission.id !== activeId);
+        const [sourceUpdated, targetUpdated] = await Promise.all([
+          Promise.all(sourceRemaining.map((mission, position) =>
+            missionsRepo.update(mission.id, { position })
+          )),
+          Promise.all(targetItems.map((mission, position) =>
+            missionsRepo.update(mission.id, { position })
+          )),
+        ]);
+        const persisted = new Map(
+          [updated, ...sourceUpdated, ...targetUpdated].map((mission) => [mission.id, mission]),
+        );
         setMissions((previous) => previous
-          ? previous.map((mission) => mission.id === activeId ? updated : mission)
+          ? previous.map((mission) => persisted.get(mission.id) ?? mission)
           : previous);
       }
     } catch (reason) {

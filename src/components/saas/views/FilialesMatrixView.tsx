@@ -1,5 +1,6 @@
 // src/components/views/FilialesMatrixView.tsx
-// Sidebar V2 — Filiales (per-ICP deploys) — topologie hybride §5.4 plan L2.
+// Portfolio de blueprints Filiales (per-ICP) — topologie hybride §5.4 plan L2.
+// This matrix is a template portfolio, not a tenant installation registry.
 // D6 #NEW: route /filiales. Sister canon: plan-L2-business-os.md §5.4 + ADR-L2-AAAS-001.
 
 import React from 'react';
@@ -17,7 +18,7 @@ interface Filiale {
   icp: string;
   wave: '01' | '02' | 'sanctuary';
   ticket: string;
-  status: 'live' | 'wip' | 'planned' | 'sanctuary';
+  status: 'legacy' | 'wip' | 'planned' | 'sanctuary';
   domainsLean: ReadonlyArray<string>;
   icon: React.ComponentType<{ className?: string }>;
 }
@@ -29,7 +30,7 @@ const FILIALES: ReadonlyArray<Filiale> = [
     icp: 'Executive & Leadership Coaching',
     wave: '01',
     ticket: '$1–1.5K/mo',
-    status: 'live',
+    status: 'legacy',
     domainsLean: ['Cyborg IT (Workflows)', 'GreenLantern People (SOP-Vault, Mémoire-Sync)'],
     icon: Sparkles,
   },
@@ -77,7 +78,7 @@ const FILIALES: ReadonlyArray<Filiale> = [
 
 const StatusBadge: React.FC<{ status: Filiale['status'] }> = ({ status }) => {
   const map = {
-    live: { v: 'success' as const, label: '● Live' },
+    legacy: { v: 'info' as const, label: 'Legacy · hors Marketplace' },
     wip: { v: 'warning' as const, label: '◐ WIP' },
     planned: { v: 'warning' as const, label: '○ Planned' },
     sanctuary: { v: 'success' as const, label: '◆ Sanctuary' },
@@ -102,7 +103,7 @@ export const FilialesMatrixView: React.FC = () => {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Filiales — Holding Matrix</h1>
         <p className="text-slate-500 text-sm mt-1">
-          5 templates per-ICP — topologie hybride §5.4 plan L2 — matrice lean par domaine Jerry
+          Portfolio de 5 blueprints per-ICP — aucun de ces templates ne vaut installation active dans un workspace Marketplace.
         </p>
       </div>
 
@@ -123,13 +124,13 @@ export const FilialesMatrixView: React.FC = () => {
 
       {/* Filiales matrix */}
       <section className="space-y-4">
-        <h2 className="text-lg font-medium text-slate-900">5 Templates Filiale</h2>
+        <h2 className="text-lg font-medium text-slate-900">5 Blueprints Filiale</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {FILIALES.map((f) => {
             const Icon = f.icon;
             return (
               <Card key={f.id} className="p-5 hover:border-emerald-200 transition-all relative overflow-hidden">
-                <div className={`absolute top-0 left-0 w-full h-1 ${f.status === 'live' ? 'bg-emerald-500' : f.status === 'sanctuary' ? 'bg-purple-500' : 'bg-amber-400'}`} />
+                <div className={`absolute top-0 left-0 w-full h-1 ${f.status === 'legacy' ? 'bg-slate-400' : f.status === 'sanctuary' ? 'bg-purple-500' : 'bg-amber-400'}`} />
                 <div className="flex items-start justify-between mb-3 mt-2">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600">
@@ -161,7 +162,7 @@ export const FilialesMatrixView: React.FC = () => {
                 </div>
                 <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
                   <span className="text-xs text-slate-400">
-                    {f.status === 'live' ? 'Deployed Vercel · A’Space product portfolio (W3 2026-07-03)' : 'Template · roadmap Q3 2026'}
+                    {f.status === 'legacy' ? 'Legacy Coach OS portfolio · not installed in Marketplace' : 'Blueprint · non installé · roadmap portfolio'}
                   </span>
                   <ArrowRight className="w-3 h-3 text-slate-300" />
                 </div>
@@ -172,7 +173,8 @@ export const FilialesMatrixView: React.FC = () => {
       </section>
 
       <p className="text-xs text-slate-400 italic">
-        Sister canon: <code className="text-emerald-600">plan-L2-business-os.md §5.4</code> + <code className="text-emerald-600">ADR-L2-AAAS-001</code>
+        Les statuts de cette matrice décrivent le portfolio historique. Seul le registre d’installations tenant fait foi pour un déploiement Marketplace.
+        <br />Sister canon: <code className="text-emerald-600">plan-L2-business-os.md §5.4</code> + <code className="text-emerald-600">ADR-L2-AAAS-001</code>
       </p>
     </div>
   );

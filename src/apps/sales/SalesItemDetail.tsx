@@ -228,9 +228,9 @@ export function SalesItemDetail(props: ItemDetailProps) {
             <div className="mt-5">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-[10.5px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-muted)' }}>
-                  Stage probability
+                  Win probability
                 </div>
-                <div className="text-[11px] font-extrabold tabular-nums" style={{ color: accent }}>{prob}%</div>
+                <div className="text-[11px] font-extrabold tabular-nums" style={{ color: accent }}>{prob === undefined ? 'Not reported' : `${prob}%`}</div>
               </div>
               <div
                 className="h-2 overflow-hidden"
@@ -238,7 +238,7 @@ export function SalesItemDetail(props: ItemDetailProps) {
               >
                 <div
                   className="h-full"
-                  style={{ width: `${prob}%`, background: accent }}
+                  style={{ width: `${prob ?? 0}%`, background: accent }}
                 />
               </div>
             </div>

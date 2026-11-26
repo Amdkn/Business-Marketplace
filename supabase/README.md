@@ -153,3 +153,7 @@ Fee activation concurrency is serialized by the logical policy identity (owner +
 
 
 Fee engine hardening: migrations `20261126073100_finance_fee_policy_fk_indexes` and `20261126073200_fee_policy_activation_serialization` add fee-policy FK indexes and serialize competing policy activations by logical policy identity. No unindexed Finance foreign keys remain.
+
+## Captured Payment Journal Posting — 2026-11-26
+
+Added `api.post_captured_order_finance_entry` and the authenticated `post_captured_order_finance_entry` Marketplace API action. It only posts after provider-confirmed capture facts match the immutable order and fee snapshot. It creates the balanced entry: debit PSP clearing, credit seller payable and platform fee revenue. Journal posting is idempotent, and retries continue to return the original capture journal after later refund-state transitions. Live Edge Function is ACTIVE v22 (`verify_jwt=true`). See `docs/FINANCE_LEDGER_CONTRACT.md`.

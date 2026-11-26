@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
     if(!Number.isFinite(expiresIn) || expiresIn<1 || expiresIn>31536000) throw new Error('OAUTH_EXPIRY_INVALID');
     const requested=Array.isArray(context.default_scopes)?context.default_scopes:[];
     const granted=typeof tokens.scope==='string' && tokens.scope.trim()
-      ? tokens.scope.trim().split(/\\s+/) : requested;
+      ? tokens.scope.trim().split(/\s+/) : requested;
     if(granted.some((scope:string)=>!requested.includes(scope))) throw new Error('OAUTH_SCOPE_ESCALATION_REJECTED');
     const secretJson=JSON.stringify({
       access_token:tokens.access_token,

@@ -164,7 +164,11 @@ export const useCmsStore = create<CmsState>((set, get) => ({
   /* ── Tenant-aware registration ─────────────────────────────────────── */
   registerCollectionFor: (tenantId, def, seedItems) => {
     const stampedDef = stampCollection(def, tenantId);
-    const stampedItems = seedItems.map((it) => stampTenant(it, tenantId));
+    // Bundled sample records are restricted to the explicit local demo tenant.
+    // A real Marketplace tenant starts empty and is hydrated only from its
+    // workspace_data rows; it must never inherit Coach demo customers/agents.
+    const tenantSeedItems = tenantId === TENANT_DEMO_COACH ? seedItems : [];
+    const stampedItems = tenantSeedItems.map((it) => stampTenant(it, tenantId));
 
     set((s) => {
       const tenantCollections = s.collectionsByTenant[tenantId] ?? {};

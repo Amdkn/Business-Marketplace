@@ -13,7 +13,7 @@ const LISTINGS = [
   { id: 'MP1', title: 'Compliance Sentinel Pro', description: 'Automated RLS audit + multi-tenant security guardrails for SaaS deployments.', price: '€199/mo', category: 'Security' },
   { id: 'MP2', title: 'Translator Swarm', description: '50+ language pairs with human validation workflow and certified output.', price: '€349/mo', category: 'Translation' },
   { id: 'MP3', title: 'Stripe Reconcile+', description: 'Auto-reconcile Stripe payouts against your bookkeeper spreadsheets.', price: '€89/mo', category: 'Finance' },
-  { id: 'MP4', title: 'Notion Sync Bridge', description: 'Two-way sync between your Notion workspace and the OMK database.', price: '€49/mo', category: 'Productivity' },
+  { id: 'MP4', title: 'Notion Sync Bridge', description: 'Two-way sync between your Notion workspace and the Marketplace workspace.', price: '€49/mo', category: 'Productivity' },
 ];
 
 export const MarketplaceView: React.FC = () => {

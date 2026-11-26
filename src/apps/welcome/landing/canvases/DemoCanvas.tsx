@@ -1,4 +1,4 @@
-/** OMK Coach Demo canvas — 4-question quiz overlay + citadel preview.
+/** A’Space Coach Demo canvas — 4-question quiz overlay + citadel preview.
  *
  *  Why this layout, not the landing template:
  *  The Demo page has a unique purpose: it's the lowest-friction door. No
@@ -180,7 +180,7 @@ export function DemoCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

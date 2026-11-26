@@ -907,12 +907,12 @@ async function provisionFinanceChartOfAccounts(user: User, body: Record<string, 
 
 function financeDecimal(value: unknown, field: string, nullable = false): string | null {
   if (nullable && (value === undefined || value === null || value === '')) return null;
-  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value)) throw new Error(\`Invalid \${field}\`);
+  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value)) throw new Error(`Invalid ${field}`);
   return value;
 }
 function financeInteger(value: unknown, field: string, fallback: number, min: number, max: number): number {
   const n = value === undefined ? fallback : value;
-  if (!Number.isInteger(n) || (n as number) < min || (n as number) > max) throw new Error(\`Invalid \${field}\`);
+  if (!Number.isInteger(n) || (n as number) < min || (n as number) > max) throw new Error(`Invalid ${field}`);
   return n as number;
 }
 async function createFeePolicy(user: User, body: Record<string, unknown>) {
@@ -940,12 +940,12 @@ async function createFeePolicy(user: User, body: Record<string, unknown>) {
   if (Number(fixed) < 0) throw new Error('Invalid fixed_fee_amount');
   return await withServiceRole(async (tx) => {
     await requireFinanceRole(tx, user.id, ownerId);
-    const rows = await tx\`SELECT api.create_fee_policy(
-      \${user.id}::uuid,\${ownerId}::uuid,\${policyKey},\${version}::integer,\${policyName},
-      \${scopeType},\${scopeOrgId}::uuid,\${currency}::char(3),\${rateBps}::integer,
-      \${fixed}::numeric,\${minimum}::numeric,\${maximum}::numeric,\${roundingScale}::smallint,
-      \${effectiveFrom}::timestamptz,\${effectiveTo}::timestamptz
-    ) AS policy_id\`;
+    const rows = await tx`SELECT api.create_fee_policy(
+      ${user.id}::uuid,${ownerId}::uuid,${policyKey},${version}::integer,${policyName},
+      ${scopeType},${scopeOrgId}::uuid,${currency}::char(3),${rateBps}::integer,
+      ${fixed}::numeric,${minimum}::numeric,${maximum}::numeric,${roundingScale}::smallint,
+      ${effectiveFrom}::timestamptz,${effectiveTo}::timestamptz
+    ) AS policy_id`;
     return rows[0];
   });
 }
@@ -954,7 +954,7 @@ async function activateFeePolicy(user: User, body: Record<string, unknown>) {
   const policyId = requiredString(body.policy_id, 'policy_id');
   return await withServiceRole(async (tx) => {
     await requireFinanceRole(tx, user.id, ownerId);
-    const rows = await tx\`SELECT api.activate_fee_policy(\${user.id}::uuid,\${ownerId}::uuid,\${policyId}::uuid) AS policy_id\`;
+    const rows = await tx`SELECT api.activate_fee_policy(${user.id}::uuid,${ownerId}::uuid,${policyId}::uuid) AS policy_id`;
     return rows[0];
   });
 }
@@ -964,9 +964,9 @@ async function applyOrderFeePolicy(user: User, body: Record<string, unknown>) {
   const policyId = requiredString(body.policy_id, 'policy_id');
   return await withServiceRole(async (tx) => {
     await requireFinanceRole(tx, user.id, ownerId);
-    const rows = await tx\`SELECT api.apply_order_fee_policy(
-      \${user.id}::uuid,\${ownerId}::uuid,\${orderId}::uuid,\${policyId}::uuid
-    ) AS fee_snapshot\`;
+    const rows = await tx`SELECT api.apply_order_fee_policy(
+      ${user.id}::uuid,${ownerId}::uuid,${orderId}::uuid,${policyId}::uuid
+    ) AS fee_snapshot`;
     return rows[0]?.fee_snapshot;
   });
 }

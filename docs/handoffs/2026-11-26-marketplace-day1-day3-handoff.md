@@ -1576,3 +1576,16 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - The current PR head is a later documentation/handoff commit. Its GitHub combined Vercel status currently reports a **build-rate-limit failure** (Vercel target: `upgradeToPro=build-rate-limit`). Do not conflate the READY app-code preview with a successful build for the latest PR HEAD.
 - GitHub Actions returned no PR workflow runs for the current PR head. The live Supabase Edge Function deployment is independently ACTIVE v21 with `verify_jwt=true`.
 - This checkpoint does not mark the overall Day 1–3 plan accepted or complete.
+
+### 13.19 Captured payment → double-entry ledger posting — 2026-11-26
+
+- Added migration `finance_captured_payment_posting` and source `supabase/migrations/20261126073300_finance_captured_payment_posting.sql`.
+- Added follow-up migration `captured_payment_posting_retry_safety` and source `supabase/migrations/20261126073400_captured_payment_posting_retry_safety.sql`.
+- Added `api.post_captured_order_finance_entry` and authenticated Edge action `post_captured_order_finance_entry`.
+- Posting requires a captured payment with `captured_at` and provider payment ID, exact immutable order/payment facts, a matching immutable order fee snapshot, and active chart accounts for the payment currency.
+- Accounting allocation: debit PSP clearing for gross; credit seller payable for net; credit platform fee revenue for commission. Zero-value lines are omitted while preserving at least two balanced journal lines.
+- Delegates to the existing double-entry API using `payment-capture:<payment_intent_id>`; retries reuse the original journal after a later partial/full refund state rather than trying to post capture a second time.
+- Role authorization is Finance-only (S0/B1/B2/B2.2), SQL function is SECURITY DEFINER with pinned search_path, and EXECUTE is service-role-only.
+- Deployed `marketplace-api` ACTIVE v22 with `verify_jwt=true`.
+- Expanded the Finance SQL regression suite to verify capture gates, provider-payment identity requirement, fee snapshot dependency, journal delegation, idempotency marker, API grants/search_path and zero unindexed Finance FKs. The Finance suite passed.
+- No live capture or journal was fabricated. The hosted project still has zero Auth users and organizations, and no payment provider is configured. Real capture-to-ledger E2E remains pending an actual tenant and verified provider webhook.

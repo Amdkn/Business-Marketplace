@@ -310,3 +310,12 @@ GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/a
 The separate Vercel commit status is currently `failure` with target URL `build-rate-limit`. Treat this as a deployment quota blocker, not as evidence that the source build failed. No Preview for the latest commit is verified. Preview SSO remains enabled; do not promote production or weaken access controls to bypass the blocker.
 
 The current hosted tenant inventory is one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. Do not manufacture a second identity or tenant. The absence of installations, provider connections, agent principals, listings, orders and payment activity remains the actual operational state.
+
+
+## Latest hosted Preview verification — 2026-11-26
+
+Vercel Preview [dpl_DdLLvP5GZv3FhoCZMZPfStFHghmF](https://vercel.com/amd-lab/business-marketplace/DdLLvP5GZv3FhoCZMZPfStFHghmF) for commit `ae81359f27ca6f22a21d496eba606c44296e1740` reached READY after full `bun run verify`: 53/53 Vitest files and 548/548 tests passed, app/API TypeScript passed, Vite production build passed, and kernel 27/27, bridge 20/20, adapters 39/39, RBAC 16/16 passed (102/102 runtime benchmarks). This confirms the audit logger test-isolation correction under Vercel's injected production environment variables.
+
+Non-blocking warnings: Vite native config loader reports `__dirname`; CMS seed module is imported both statically and dynamically; main JavaScript chunk is approximately 2.96 MB (772.75 KB gzip); Bun reports the `core-js` postinstall script is not explicitly allowlisted. Track chunking/config cleanup separately.
+
+The IT Software Kernel view no longer reports fabricated live connections, latency/uptime or a sovereignty score. It now distinguishes the target stack and P10–P18 control objectives from verified runtime evidence. Preview is not production and authenticated browser acceptance remains open.

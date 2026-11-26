@@ -16,7 +16,7 @@
  * Si une étape de la fusion échoue, RIEN n'est appliqué — l'UI le rend
  * explicite, sans escamoter l'échec (cf. capture preuve 6 du brief).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ListChecks, CheckCircle2, X, AlertTriangle, Trash2, RotateCcw,
   Sparkles, ShieldCheck, Eye, ChevronRight, GitMerge, Bot, Plus,
@@ -30,8 +30,9 @@ import { THEME_META } from '../../lib/themes/tokens';
 import { useCmsStore } from '../../lib/cms/cms.store';
 import { useShellStore } from '../../stores/shell.store';
 import { useCmsCollectionStatus } from './useCmsCollectionStatus';
+import { listWorkspaceAgents } from './people.repo';
 import { UnknownCollectionBanner } from '../../components/UnknownCollectionBanner';
-import { FLEET_AGENTS } from './fleet';
+
 import {
   linkScenarioToAgent,
   unlinkScenario,
@@ -42,23 +43,24 @@ function shortDate(ts: number): string {
   return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** Combined agent options for the "Nouveau scénario" form.
- *  Fleet (B3 operational agents) + People agents (RH/méta) — both can
- *  deposit proposals into a scenario. Order is stable for the dropdown. */
-function useAgentOptions(): { code: string; name: string; source: 'fleet' | 'people' }[] {
-  // Brief FIX-7 — silence bruyant. Si la collection people_agents n'est
-  // pas dans le registre, le dropdown tombe à [fleet] sans rien dire.
-  // On lit le discriminant via le hook ; le bandeau global est rendu
-  // au-dessus de la file d'approbation, pas dans la liste.
-  const peopleAgentsRead = useCmsCollectionStatus('people_agents');
-  const peopleAgents = peopleAgentsRead.items;
-  const fleet = FLEET_AGENTS.map((a) => ({ code: a.code, name: a.name, source: 'fleet' as const }));
-  const people = peopleAgents.map((it) => ({
-    code: String(it.codename ?? it.id),
-    name: String(it.name ?? it.id),
-    source: 'people' as const,
-  }));
-  return [...fleet, ...people];
+/** Active workspace delegations are the only valid agent targets for approvals. */
+function useAgentOptions(): { options: { code: string; name: string; source: 'workspace' }[]; error: string | null } {
+  const [options, setOptions] = useState<{ code: string; name: string; source: 'workspace' }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listWorkspaceAgents()
+      .then((agents) => {
+        if (!cancelled) setOptions(agents
+          .filter((agent) => agent.principalStatus === 'ACTIVE')
+          .map((agent) => ({ code: agent.agentKey, name: agent.displayName, source: 'workspace' as const })));
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load active workspace agents');
+      });
+    return () => { cancelled = true; };
+  }, []);
+  return { options, error };
 }
 
 const STATUS_TONE: Record<Scenario['status'], 'accent' | 'ok' | 'warn' | 'danger' | 'neutral'> = {
@@ -305,7 +307,7 @@ function ScenarioDetail({
   const canEdit = scenario.status === 'draft' || scenario.status === 'pending';
   const canMerge = scenario.status === 'pending' && scenario.proposals.length > 0;
   const agentCode = getAgentCodeForScenario(scenario.id);
-  const agentOptions = useAgentOptions();
+  const { options: agentOptions } = useAgentOptions();
   const linkedAgent = agentOptions.find((a) => a.code === agentCode);
 
   const handleEditProposal = (proposalId: string) => {
@@ -684,7 +686,7 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
   const [newName, setNewName] = useState('');
   const [newAgent, setNewAgent] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
-  const agentOptions = useAgentOptions();
+  const { options: agentOptions, error: agentOptionsError } = useAgentOptions();
 
   // Tri : pending d'abord, puis draft, puis le reste (récent d'abord à l'intérieur).
   const tier = (s: Scenario): number => {
@@ -824,9 +826,11 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
               }}
               data-new-scenario-agent
             >
-              {agentOptions.map((a) => (
+              {agentOptionsError && <div role="alert" className="text-[11px] text-rose-700">{agentOptionsError}</div>}
+          {agentOptions.length === 0 && !agentOptionsError && <div className="text-[11px] text-[var(--theme-text-muted)]">Aucun agent actif délégué à ce workspace.</div>}
+          {agentOptions.map((a) => (
                 <option key={`${a.source}:${a.code}`} value={a.code}>
-                  {a.code} · {a.name}{a.source === 'people' ? ' · People' : ''}
+                  {a.code} · {a.name} · Workspace
                 </option>
               ))}
             </select>
@@ -902,7 +906,6 @@ export function ApprovalsView() {
   // action et la décision est perdue. On annonce le défaut avant que
   // l'utilisateur ne clique.
   const approvalDecisionsRead = useCmsCollectionStatus('approval_decisions');
-  const agentsAvailableRead = useCmsCollectionStatus('people_agents');
 
   if (openScenario) {
     return (
@@ -917,12 +920,6 @@ export function ApprovalsView() {
       <UnknownCollectionBanner
         collectionId="approval_decisions"
         status={approvalDecisionsRead.status}
-        appName="People"
-      testFilePath="src/apps/people/seed-collections.test.ts"
-      />
-      <UnknownCollectionBanner
-        collectionId="people_agents"
-        status={agentsAvailableRead.status}
         appName="People"
       testFilePath="src/apps/people/seed-collections.test.ts"
       />

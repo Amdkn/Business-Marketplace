@@ -3,7 +3,7 @@
 // D6 #NEW: route /operations-knowledge. Old routes /documents + /sop keep working.
 //
 // Doctrine: Operations + Knowledge same workspace — SOPs (processes) + Documents (artefacts).
-// Sister canon: sopsRepo (omk_saas.sops schema).
+// Sister canon: sopsRepo (Marketplace tenant SOP repository).
 
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';

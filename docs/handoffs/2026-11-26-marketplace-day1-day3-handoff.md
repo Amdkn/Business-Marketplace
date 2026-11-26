@@ -1439,3 +1439,14 @@ The previously missing migration `20261126041718 / revoke_public_execution_rls_a
 Live advisors returned 29 INFO RLS-without-policy findings, 61 INFO unindexed-FK findings, 50 INFO unused-index findings and no health findings. The RLS findings were checked against schema usage and direct grants: private Marketplace schemas are not exposed to browser roles, and policy-less internal tables have no direct anon/authenticated table grants. Existing browser-facing policies inspected on identity/content are tenant- or self-scoped. We intentionally do not add broad RLS policies merely to silence the linter. The security baseline now checks the no-browser-grant invariant for policy-less internal tables and the event-trigger function ACL.
 
 The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-index notices are expected before representative tenant traffic. Neither category should trigger blind index creation or deletion.
+
+
+### 13.7 Continued execution checkpoint — 2026-11-26
+
+- Canonical branch head before this checkpoint: `cb7541fea86834d74e0adfd9065a6ed34fbaf86d`.
+- Added `supabase/migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql` as a catalog-derived reconstruction of the live ACL. It revokes EXECUTE from PUBLIC, anon and authenticated; the hosted project already has this state. The original historical SQL body is not claimed to be recovered byte-for-byte.
+- The security regression suite now checks effective privileges (including inherited grants) on policy-less internal tables, rather than only direct rows in `information_schema.role_table_grants`.
+- Re-ran all four SQL regression suites against the existing hosted Marketplace project at this checkpoint: security baseline, adapter OAuth runtime, Google Drive manifest and capability entitlements — all returned without assertion exceptions.
+- Rechecked the RLS advisor findings against effective privileges: zero policy-less internal tables had effective table privileges for anon or authenticated. Do not add permissive policies just to clear the INFO linter.
+- The latest Vercel deployment for the code/documentation checkpoint was observed in state BUILDING; GitHub Vercel status remained pending. No READY claim is made.
+- PR #1 remains OPEN / DRAFT. No Auth user or tenant fixture was created. The next Day 1 acceptance dependency is a real authorized signup/confirmation/sign-in journey; the project currently has no custom SMTP configured and no Auth users.

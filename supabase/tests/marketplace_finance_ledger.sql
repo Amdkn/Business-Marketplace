@@ -49,3 +49,35 @@ BEGIN
  RAISE NOTICE 'PASS: Marketplace finance ledger baseline';
 END
 $test$;
+DO $chart_test$
+DECLARE v_count integer; v_bad text;
+BEGIN
+  SELECT count(*) INTO v_count FROM finance.chart_account_templates WHERE chart_version='2026.1' AND is_required;
+  IF v_count<>16 THEN RAISE EXCEPTION 'Expected 16 required chart templates, found %',v_count; END IF;
+  IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='ledger_accounts' AND column_name='chart_version') THEN
+    RAISE EXCEPTION 'ledger_accounts.chart_version is missing';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='api' AND p.proname='provision_finance_chart_of_accounts' AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=pg_catalog, identity, finance, api']::text[]) THEN
+    RAISE EXCEPTION 'Chart provisioning API missing or unsafe';
+  END IF;
+  IF has_function_privilege('anon','api.provision_finance_chart_of_accounts(uuid,uuid,character,text)','EXECUTE')
+    OR has_function_privilege('authenticated','api.provision_finance_chart_of_accounts(uuid,uuid,character,text)','EXECUTE')
+    OR NOT has_function_privilege('service_role','api.provision_finance_chart_of_accounts(uuid,uuid,character,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Chart provisioning API grants are unsafe';
+  END IF;
+  IF has_table_privilege('anon','finance.chart_account_templates','SELECT,INSERT,UPDATE,DELETE')
+    OR has_table_privilege('authenticated','finance.chart_account_templates','SELECT,INSERT,UPDATE,DELETE')
+    OR NOT has_table_privilege('service_role','finance.chart_account_templates','SELECT,INSERT,UPDATE,DELETE') THEN
+    RAISE EXCEPTION 'Chart template grants are unsafe';
+  END IF;
+  SELECT string_agg(system_key,', ') INTO v_bad FROM finance.chart_account_templates
+  WHERE chart_version='2026.1' AND
+    ((account_type IN ('ASSET','EXPENSE') AND normal_balance<>'DEBIT')
+     OR (account_type IN ('LIABILITY','EQUITY','REVENUE') AND normal_balance<>'CREDIT'));
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Invalid normal balances: %',v_bad; END IF;
+  IF '2026.1' !~ '^[0-9]{4}[.][0-9]+$' THEN RAISE EXCEPTION 'Chart version format guard failed'; END IF;
+  RAISE NOTICE 'PASS: Marketplace finance chart provisioning baseline';
+END
+$chart_test$;

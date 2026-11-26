@@ -1611,3 +1611,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Journal allocation: debit seller payable; credit PSP clearing. Payout journal is immutable/idempotent using `payout-settlement:<payout_item_id>`.
 - Finance regression suite passed with payout owner, settlement gates, balance guards, API grants/search_path and account-lock ordering assertions.
 - No payout batch/item or bank transfer was created. Provider submission, payout orchestration and return/reversal handling remain separate work.
+
+### 13.22 Final live verification checkpoint — 2026-11-26
+
+- Hosted migration history: **40** applied migrations.
+- Finance schema: **13** private tables; all Finance foreign keys have covering indexes (**0** unindexed Finance FKs).
+- `marketplace-api`: **ACTIVE v24**, `verify_jwt=true`.
+- Regression: all five SQL suites pass after the capture, refund, payout and journal account-locking additions.
+- Health Advisor: no findings. Security Advisor: 42 INFO RLS-enabled/no-policy notices across intentionally private schemas. Performance Advisor: 61 unindexed foreign keys across the wider project (none in Finance) and 75 informational unused-index notices.
+- Live identity and Finance records remain empty: 0 Auth users, 0 organizations, 0 fee policies, 0 fee snapshots, 0 refund allocations, 0 payout batches and 0 payout items. No synthetic business/financial data was created.
+- PR #1 remains OPEN / DRAFT at `82b7e02fe5d71d393a80ede14bd4eedee4862879`. Current Vercel status is **failure: build-rate-limit**; this is an account/build-quota status, not a verified application compile failure. GitHub Actions reports no PR workflow runs.
+- The code paths are implemented and structurally tested; real tenant and provider E2E remains blocked until Auth onboarding, an organization, and a payment/payout provider are connected.

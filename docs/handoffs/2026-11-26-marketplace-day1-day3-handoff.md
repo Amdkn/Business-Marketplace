@@ -1636,3 +1636,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Updated Garden mode default from `internal` to `saas`, so the inherited Digital Garden data client selects `omk_saas` unless an explicit internal override is supplied.
 - Live verification: both tables exist, RLS is enabled on both, four policies are present per table, and both tables contain **0 rows**. No fake clients or agents were seeded.
 - Remaining acceptance gates: verify the Vercel production environment does not override `VITE_APP_MODE=internal`; verify the deployed bundle uses `omk_saas`; authenticate in browser and confirm the real user's JWT/RLS reads; then implement durable Dashboard activity/tasks and profile-backed Sidebar identity. This migration alone does not constitute full Dashboard E2E acceptance.
+
+
+### 13.24 Garden Dashboard regression and demo-data cleanup — 2026-11-26
+
+- Added `supabase/tests/marketplace_garden_dashboard.sql`; executed its assertions against the live project successfully. It verifies both tables, RLS enabled, four policies per table, no anon SELECT, authenticated SELECT and schema USAGE.
+- Executed a transaction-scoped authenticated RLS probe using the first tenant's actual user/organization. The user could insert and read one temporary client row; the transaction was rolled back. No probe data remains.
+- Verified the authenticated user can see exactly their own organization membership and active role binding through the existing identity RLS boundary.
+- Updated `DashboardView.tsx` to remove the three fabricated Wind Direction alert cards. The empty state now says no pending validations until real approval/activity records exist.
+- The first deployment for the mode/schema correction reached Vercel state **READY** at commit `c5a22992498bd637f45eb8631dd8d2380341e36d`. Subsequent UI/docs/test commits are newer than that deployment and still need a matching deployment/build check.
+- Vercel environment inventory contained only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; there is no `VITE_APP_MODE` override. The new default therefore selects `saas`.
+- Dashboard data tables remain empty by design. Full browser E2E, profile-backed Sidebar identity, persisted pending approvals/tasks, and agent provisioning/runtime telemetry remain open.

@@ -4,6 +4,38 @@ import { getCurrentWorkspaceContext } from '../../lib/cms/repository';
 export type ScheduleDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 export type ScheduleKind = 'sync' | 'run' | 'audit' | 'review' | 'sync-up';
 
+export interface WorkspaceMember {
+  id: string;
+  name: string;
+  roleCode: string | null;
+  membershipStatus: string;
+  workspaceRole: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listWorkspaceMembers(): Promise<WorkspaceMember[]> {
+  const current = await context();
+  const { data, error } = await supabase.functions.invoke('marketplace-api', {
+    body: {
+      action: 'list_workspace_members',
+      organization_id: current.organizationId,
+      workspace_id: current.workspaceId,
+    },
+  });
+  if (error) throw error;
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  return rows.map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    name: String(row.name ?? 'Workspace member'),
+    roleCode: row.role_code ? String(row.role_code) : null,
+    membershipStatus: String(row.membership_status ?? 'UNKNOWN'),
+    workspaceRole: String(row.workspace_role ?? 'MEMBER'),
+    createdAt: String(row.created_at ?? ''),
+    updatedAt: String(row.updated_at ?? ''),
+  }));
+}
+
 export interface WorkspaceAgent {
   id: string;
   agentKey: string;

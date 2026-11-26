@@ -455,8 +455,9 @@ export function FinanceApp() {
             const clientName = String(inv.client ?? inv.title ?? 'Invoice');
             const invNumber = String(inv.number ?? inv.id);
             const invDesc = String(inv.description ?? inv.memo ?? '');
-            const dueDate = String(inv.dueDate ?? inv.due ?? '');
+            const dueDate = String(inv.dueAt ?? inv.due ?? '');
             const amount = Number(inv.amount ?? 0);
+            const amountLabel = formatInvoiceAmount(amount, String(inv.currency ?? ''));
             return (
               <div
                 key={String(inv.id)}
@@ -504,7 +505,7 @@ export function FinanceApp() {
                     >
                       <span className="font-semibold tabular-nums" style={{ color: 'var(--theme-text)' }}>
                         <span className="mr-1" style={{ color: 'var(--theme-text-dim)' }}>amount</span>
-                        ${amount.toLocaleString('en-US')}
+                        {amountLabel}
                       </span>
                       <span className="truncate flex-1">{dueDate ? `due ${dueDate}` : 'no due date'}</span>
                     </div>
@@ -516,19 +517,15 @@ export function FinanceApp() {
                 >
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); markPaid(String(inv.id)); }}
-                    disabled={isPaid}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{
-                      background: isPaid ? 'var(--theme-surface-hover)' : '#16a34a',
-                      color: isPaid ? 'var(--theme-text-dim)' : '#ffffff',
-                      border: '1px solid var(--panel-border)',
-                    }}
-                    aria-label={`Mark ${clientName} paid`}
+                    disabled
+                    title="Payment reconciliation requires a connected payment provider and finance ledger workflow."
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold opacity-50 cursor-not-allowed"
+                    style={{ background: 'var(--theme-surface-hover)', color: 'var(--theme-text-dim)', border: '1px solid var(--panel-border)' }}
+                    aria-label={`Payment reconciliation unavailable for ${clientName}`}
                   >
                     <Check className="w-3.5 h-3.5" />
-                    {isPaid ? 'Paid' : 'Mark paid'}
-                  </button>
+                    {isPaid ? 'Paid' : 'Payment flow unavailable'}
+                  </button>>
                 </div>
               </div>
             );
@@ -540,11 +537,11 @@ export function FinanceApp() {
 
   const sections: AppSection[] = [
     { id: 'overview', label: 'Overview', icon: BarChart3, render: Overview },
-    { id: 'runway', label: 'Runway', icon: PiggyBank, render: Runway },
-    { id: 'planchers', label: 'Planchers', icon: Scale, render: Planchers },
-    { id: 'courbes', label: 'Courbes', icon: LineChart, render: Courbes },
-    { id: 'tokens', label: 'Tokens', icon: Coins, render: Budgets },
-    { id: 'formes', label: 'Formes', icon: CircleDollarSign, render: Formes },
+    { id: 'runway', label: 'Runway', icon: PiggyBank, render: () => isDemoTenant ? <DemoRunway /> : <FinanceUnavailable title="Cash runway" description="Cash balances and operating burn are not connected to a verified source. This view remains unavailable until bank/ledger balances and an approved forecast are available." /> },
+    { id: 'planchers', label: 'Planchers', icon: Scale, render: () => isDemoTenant ? <Planchers /> : <FinanceUnavailable title="Margin floors" description="Margin-floor scenarios are local demo fixtures. A persistent pricing and margin policy table has not been connected." /> },
+    { id: 'courbes', label: 'Courbes', icon: LineChart, render: () => isDemoTenant ? <Courbes /> : <FinanceUnavailable title="Demand curves" description="Demand curves are local demo fixtures. No persistent demand forecast source is connected to this workspace." /> },
+    { id: 'tokens', label: 'Tokens', icon: Coins, render: () => isDemoTenant ? <Budgets /> : <FinanceUnavailable title="AI budgets" description="Token budgets require provider usage and billing events. The runtime usage source is not connected." /> },
+    { id: 'formes', label: 'Formes', icon: CircleDollarSign, render: () => isDemoTenant ? <Formes /> : <FinanceUnavailable title="Pricing models" description="Pricing-model experiments are local demo fixtures. No persistent pricing-model catalogue is connected." /> },
     { id: 'invoices', label: 'Invoices', icon: Receipt, render: Invoices },
   ];
 

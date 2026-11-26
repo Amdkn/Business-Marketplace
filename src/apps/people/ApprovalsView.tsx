@@ -688,6 +688,10 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
   const [nameError, setNameError] = useState<string | null>(null);
   const { options: agentOptions, error: agentOptionsError } = useAgentOptions();
 
+  useEffect(() => {
+    if (creating && !newAgent && agentOptions.length > 0) setNewAgent(agentOptions[0].code);
+  }, [creating, newAgent, agentOptions]);
+
   // Tri : pending d'abord, puis draft, puis le reste (récent d'abord à l'intérieur).
   const tier = (s: Scenario): number => {
     if (s.status === 'pending') return 0;

@@ -4,7 +4,6 @@ import { AppFrame, SectionHead, type AppSection } from '../../components/AppFram
 import { Card, StatCard } from '../_ui/kit';
 import { useCollectionDrill } from '../../hooks/useCollectionDrill';
 import { useCmsStore } from '../../lib/cms/cms.store';
-import type { CmsItem } from '../../lib/cms/types';
 import { useWindowPage } from '../../contexts/WindowContext';
 import { AppDetailOverlay } from '../../components/cms/AppDetailOverlay';
 import { DynamicPageView } from '../../components/cms/DynamicPageView';

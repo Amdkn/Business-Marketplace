@@ -8,22 +8,31 @@ import {
 import './marketplace.css';
 
 type Section = 'overview' | 'domains' | 'marketplace' | 'adapters' | 'workspaces' | 'agents' | 'workflows' | 'governance';
-type Domain = { id: string; name: string; code: string; description: string; capabilities: number; color: string; children: string[] };
+type Domain = { id: string; name: string; code: string; description: string; color: string; axis: 'department' | 'area'; role: string };
 
-const domains: Domain[] = [
-  { id: 'strategy', name: 'Strategy & Leadership', code: 'D01', description: 'Direction, governance, planning and performance.', capabilities: 8, color: '#c3e88d', children: ['Strategic planning', 'OKRs & scorecards', 'Decision records'] },
-  { id: 'product', name: 'Product & Innovation', code: 'D02', description: 'Portfolio, discovery, design and delivery.', capabilities: 12, color: '#e6b879', children: ['Product portfolio', 'Research & discovery', 'Roadmap & delivery'] },
-  { id: 'growth', name: 'Growth & Marketing', code: 'D03', description: 'Demand generation, brand, content and experiments.', capabilities: 10, color: '#d4a5ed', children: ['Brand & content', 'Campaign operations', 'Analytics & experiments'] },
-  { id: 'sales', name: 'Sales & Revenue', code: 'D04', description: 'Pipeline, proposals, contracts and revenue operations.', capabilities: 9, color: '#f2a17d', children: ['CRM & pipeline', 'Proposals & pricing', 'Revenue operations'] },
-  { id: 'customer', name: 'Customer Experience', code: 'D05', description: 'Onboarding, support, success and retention.', capabilities: 8, color: '#8fc9d7', children: ['Customer onboarding', 'Support operations', 'Success & retention'] },
-  { id: 'operations', name: 'Operations & Delivery', code: 'D06', description: 'Service delivery, quality, logistics and continuous improvement.', capabilities: 14, color: '#a8c5a1', children: ['Service operations', 'Quality & SOPs', 'Supply chain'] },
-  { id: 'finance', name: 'Finance & Administration', code: 'D07', description: 'Accounting, cash, procurement and business administration.', capabilities: 11, color: '#e4cf82', children: ['Financial planning', 'Accounting & billing', 'Procurement'] },
-  { id: 'people', name: 'People & Culture', code: 'D08', description: 'Talent, organization, learning and people operations.', capabilities: 7, color: '#e6a9b9', children: ['Talent & recruiting', 'People operations', 'Learning & development'] },
-  { id: 'legal', name: 'Legal & Compliance', code: 'D09', description: 'Contracts, risk, privacy and regulatory controls.', capabilities: 6, color: '#b5b9c8', children: ['Contract lifecycle', 'Privacy & compliance', 'Risk register'] },
-  { id: 'technology', name: 'Technology & Data', code: 'D10', description: 'Infrastructure, software, data and cybersecurity.', capabilities: 13, color: '#92b5e8', children: ['Engineering & delivery', 'Data platform', 'Security & infrastructure'] },
-  { id: 'knowledge', name: 'Knowledge & Intelligence', code: 'D11', description: 'Knowledge systems, research, documentation and AI enablement.', capabilities: 8, color: '#a9c9bd', children: ['Knowledge graph', 'Research operations', 'AI enablement'] },
-  { id: 'ecosystem', name: 'Ecosystem & Partnerships', code: 'D12', description: 'Partners, suppliers, channels and external ecosystems.', capabilities: 6, color: '#d6b7a0', children: ['Partner network', 'Supplier relations', 'Ecosystem programs'] },
+const businessDepartments: Domain[] = [
+  { id: 'product-ip', name: 'Product & IP', code: 'B2.1', axis: 'department', description: 'Product portfolios, intellectual property, research and offer design.', role: 'Create and steward the assets and capabilities the Marketplace brings to market.', color: '#e6a04b' },
+  { id: 'growth-distribution', name: 'Growth & Distribution', code: 'B2.2', axis: 'department', description: 'Brand, demand generation, audience, channels and distribution systems.', role: 'Create reach, discoverability and repeatable demand across the ecosystem.', color: '#b58ae0' },
+  { id: 'people-talent', name: 'People & Talent', code: 'B2.3', axis: 'department', description: 'Talent, people operations, roles, learning and human-agent collaboration.', role: 'Compose the human and agent capabilities required to operate the business.', color: '#79ad76' },
+  { id: 'legal-trust', name: 'Legal & Trust', code: 'B2.4', axis: 'department', description: 'Legal structure, contracts, privacy, trust, risk and compliance.', role: 'Establish the rules, protections and legitimacy under which value is exchanged.', color: '#c7c9c1' },
+  { id: 'tech-intelligence', name: 'Tech & Intelligence', code: 'B2.5', axis: 'department', description: 'Platform engineering, data, compute, inference, memory and intelligence systems.', role: 'Build and operate the technical and intelligence substrate.', color: '#555b57' },
+  { id: 'operations-delivery', name: 'Operations & Delivery', code: 'B2.6', axis: 'department', description: 'Service operations, production, fulfillment, quality and continuous improvement.', role: 'Turn offers and commitments into reliable delivered outcomes.', color: '#78a9d8' },
+  { id: 'finance-capital', name: 'Finance & Capital', code: 'B2.7', axis: 'department', description: 'Financial operations, capital allocation, accounting, treasury and unit economics.', role: 'Measure, allocate and steward the economic resources of the Marketplace.', color: '#d6bd59' },
+  { id: 'sales-partnerships', name: 'Sales & Partnerships', code: 'B2.8', axis: 'department', description: 'Sales, commercial relationships, alliances, suppliers and strategic partnerships.', role: 'Convert qualified demand into durable commercial relationships.', color: '#d56e64' },
 ];
+
+const areasPortfolios: Domain[] = [
+  { id: 'ld01-business', name: 'Business', code: 'LD01', axis: 'area', description: 'Career, enterprise creation, business systems and value production.', role: 'Mission portfolio for building and operating ventures and business capabilities.', color: '#e6a04b' },
+  { id: 'ld02-finances', name: 'Finances', code: 'LD02', axis: 'area', description: 'Financial sovereignty, capital, resources and long-term stewardship.', role: 'Mission portfolio for financial resilience and capital allocation.', color: '#d6bd59' },
+  { id: 'ld03-blue-life', name: 'Blue Life', code: 'LD03', axis: 'area', description: 'Life, vitality and the conditions that sustain human flourishing.', role: 'Life portfolio; detailed substructure remains governed by the Life OS specification.', color: '#78a9d8' },
+  { id: 'ld04-meta-cognition', name: 'Meta Cognition', code: 'LD04', axis: 'area', description: 'Learning, reflection, cognition, knowledge and personal evolution.', role: 'Mission portfolio for improving the quality of thinking and learning.', color: '#b58ae0' },
+  { id: 'ld05-sovereign-triangle', name: 'Sovereign Triangle', code: 'LD05', axis: 'area', description: 'Sovereignty, autonomy and the systems that protect independent agency.', role: 'Mission portfolio for personal and systemic sovereignty.', color: '#c7c9c1' },
+  { id: 'ld06-solarpunk-habitat', name: 'Solarpunk Habitat', code: 'LD06', axis: 'area', description: 'Habitat, ecology, circularity and regenerative living systems.', role: 'Mission portfolio for regenerative environments and infrastructure.', color: '#79ad76' },
+  { id: 'ld07-mc-sandbox', name: 'MC Sandbox', code: 'LD07', axis: 'area', description: 'Experimental space for prototypes, exploration and controlled simulations.', role: 'Mission portfolio for experimentation without contaminating operational systems.', color: '#d56e64' },
+  { id: 'ld08-civilizer', name: 'Civilizer / ABC OS', code: 'LD08', axis: 'area', description: 'Civilizational systems, collective coordination and ABC OS initiatives.', role: 'Meta-project portfolio for long-horizon civilizational design and coordination.', color: '#555b57' },
+];
+
+const domains = [...businessDepartments, ...areasPortfolios];
 
 const adapterFamilies = [
   ['Identity & access', 'Google Workspace · Microsoft 365 · Auth0 · Clerk', 'ShieldCheck'],

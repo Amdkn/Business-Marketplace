@@ -1624,34 +1624,13 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - The code paths are implemented and structurally tested; real tenant and provider E2E remains blocked until Auth onboarding, an organization, and a payment/payout provider are connected.
 
 
-### 13.23 Garden Dashboard tenant data foundation — 2026-11-26
+### 13.23 Dashboard tenant data foundation — 2026-11-26
 
-- Corrected the live tenant inventory: the first real Auth user and tenant have now been provisioned. The previous 13.22 zero-user/zero-organization statement is historical and superseded.
-- Verified the first tenant: organization `A'Space Digital Garden` (`47735c82-818d-4794-ac67-1e302173897b`), one ACTIVE membership, B1_CEO role binding, and workspace `Garden` (`c987607d-1c53-42a4-84e5-cb070764dafa`).
-- Reproduced the Garden Dashboard failure from source: `src/components/saas/config/mode.ts` defaulted to `internal`, selecting the non-existent `omk_internal` schema. The Garden repositories query `clients` and `agents` in the selected schema.
-- Applied additive migration `marketplace_garden_dashboard_tenant_data`; canonical source is `supabase/migrations/20261126080000_marketplace_garden_dashboard_tenant_data.sql`.
-- Created `omk_saas.clients` and `omk_saas.agents` using the exact fields expected by the inherited Garden UI, including optional Hermes telemetry fields. These are tenant-owned compatibility tables for the Garden surface; they do not replace the canonical Marketplace identity/enterprise/areas model.
-- Both tables have RLS enabled, four policies each (member read; B1/S0/B2/B2.2 operator writes), org/time indexes, authenticated-only grants, and no anon/public grants. Policies derive tenant membership from `identity.organization_memberships` and role bindings; no browser-provided org id is trusted as authorization.
-- Exposed `omk_saas` alongside `public` to PostgREST via the `authenticator` role setting and issued a PostgREST config reload.
-- Updated Garden mode default from `internal` to `saas`, so the inherited Digital Garden data client selects `omk_saas` unless an explicit internal override is supplied.
-- Live verification: both tables exist, RLS is enabled on both, four policies are present per table, and both tables contain **0 rows**. No fake clients or agents were seeded.
-- Remaining acceptance gates: verify the Vercel production environment does not override `VITE_APP_MODE=internal`; verify the deployed bundle uses `omk_saas`; authenticate in browser and confirm the real user's JWT/RLS reads; then implement durable Dashboard activity/tasks and profile-backed Sidebar identity. This migration alone does not constitute full Dashboard E2E acceptance.
-
-
-### 13.24 Garden Dashboard regression and demo-data cleanup — 2026-11-26
-
-- Added `supabase/tests/marketplace_garden_dashboard.sql`; executed its assertions against the live project successfully. It verifies both tables, RLS enabled, four policies per table, no anon SELECT, authenticated SELECT and schema USAGE.
-- Executed a transaction-scoped authenticated RLS probe using the first tenant's actual user/organization. The user could insert and read one temporary client row; the transaction was rolled back. No probe data remains.
-- Verified the authenticated user can see exactly their own organization membership and active role binding through the existing identity RLS boundary.
-- Updated `DashboardView.tsx` to remove the three fabricated Wind Direction alert cards. The empty state now says no pending validations until real approval/activity records exist.
-- The first deployment for the mode/schema correction reached Vercel state **READY** at commit `c5a22992498bd637f45eb8631dd8d2380341e36d`. Subsequent UI/docs/test commits are newer than that deployment and still need a matching deployment/build check.
-- Vercel environment inventory contained only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; there is no `VITE_APP_MODE` override. The new default therefore selects `saas`.
-- Dashboard data tables remain empty by design. Full browser E2E, profile-backed Sidebar identity, persisted pending approvals/tasks, and agent provisioning/runtime telemetry remain open.
-
-
-### 13.25 Vercel deployment gate — 2026-11-26
-
-- Attempted a preview deployment for the latest branch head after the Dashboard data and mock-alert changes.
-- Vercel rejected the deployment with HTTP 402 `api-deployments-free-per-day`: more than 100 deployments in the current 24-hour quota window; retryAfter 86400 seconds.
-- No billing, plan, or team settings were changed. The existing READY deployment at commit `c5a22992498bd637f45eb8631dd8d2380341e36d` predates the Dashboard mock-alert cleanup and final handoff/test commits.
-- Therefore, the latest source is committed to the PR branch but is **not yet deployed or browser-E2E verified**. Resume deployment after Vercel's quota window resets or after the account owner resolves the reported quota limit.
+- The first real tenant is organization `A'Space Digital Garden` (`47735c82-818d-4794-ac67-1e302173897b`), with one ACTIVE membership, B1_CEO role binding, and workspace `Garden` (`c987607d-1c53-42a4-84e5-cb070764dafa`).
+- The Garden Dashboard reads tenant-scoped operational records from `dashboard.clients` and `dashboard.agents`. Both tables are empty until real records are created.
+- Both tables have RLS enabled, four policies per table (member read; authorized operator writes), authenticated-only grants, and organization/time indexes. Tenant membership and role checks use the canonical `identity` schema.
+- The frontend defaults to the `dashboard` schema. The organization display lookup reads from `identity.organizations`.
+- The dashboard SQL regression verifies both tables, RLS, policies and grants. An authenticated insert/read probe succeeded in a rolled-back transaction; no test row remains.
+- Fabricated Dashboard alert cards were removed. The empty state now reports no pending validations until real operational records exist.
+- The earlier preview deployment was READY at commit `c5a2299`. Latest source changes require a new deployment; Vercel previously returned HTTP 402 `api-deployments-free-per-day` (retry after 24 hours).
+- Remaining acceptance gates: deploy the latest branch, verify the real user's JWT and RLS reads in the browser, and implement durable Dashboard activity/tasks and profile-backed Sidebar identity.

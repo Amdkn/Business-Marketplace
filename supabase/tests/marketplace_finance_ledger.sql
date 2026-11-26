@@ -81,3 +81,37 @@ BEGIN
   RAISE NOTICE 'PASS: Marketplace finance chart provisioning baseline';
 END
 $chart_test$;
+
+DO $fee_engine_test$
+DECLARE v_count integer; v_fee numeric; v_net numeric;
+BEGIN
+ SELECT count(*) INTO v_count FROM information_schema.tables
+ WHERE table_schema='finance' AND table_name IN ('fee_policies','order_fee_snapshots');
+ IF v_count<>2 THEN RAISE EXCEPTION 'Fee engine tables missing'; END IF;
+ SELECT count(*) INTO v_count FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='finance' AND c.relname IN ('fee_policies','order_fee_snapshots') AND c.relrowsecurity;
+ IF v_count<>2 THEN RAISE EXCEPTION 'Fee engine RLS missing'; END IF;
+ IF has_table_privilege('anon','finance.fee_policies','SELECT,INSERT,UPDATE,DELETE')
+ OR has_table_privilege('authenticated','finance.fee_policies','SELECT,INSERT,UPDATE,DELETE')
+ OR has_table_privilege('anon','finance.order_fee_snapshots','SELECT,INSERT,UPDATE,DELETE')
+ OR has_table_privilege('authenticated','finance.order_fee_snapshots','SELECT,INSERT,UPDATE,DELETE')
+ THEN RAISE EXCEPTION 'Browser role has fee engine table access'; END IF;
+ IF has_function_privilege('anon','api.create_fee_policy(uuid,uuid,text,integer,text,text,uuid,character,integer,numeric,numeric,numeric,smallint,timestamp with time zone,timestamp with time zone)','EXECUTE')
+ OR has_function_privilege('authenticated','api.activate_fee_policy(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.apply_order_fee_policy(uuid,uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.create_fee_policy(uuid,uuid,text,integer,text,text,uuid,character,integer,numeric,numeric,numeric,smallint,timestamp with time zone,timestamp with time zone)','EXECUTE')
+ THEN RAISE EXCEPTION 'Fee API grants are unsafe'; END IF;
+ SELECT count(*) INTO v_count FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+ JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='finance' AND c.relname IN ('fee_policies','order_fee_snapshots') AND NOT t.tgisinternal;
+ IF v_count<>2 THEN RAISE EXCEPTION 'Fee immutability triggers missing'; END IF;
+ v_fee:=round(100.00*1250/10000+0.30,2);
+ IF v_fee<>12.80 THEN RAISE EXCEPTION 'Fee arithmetic failed'; END IF;
+ v_fee:=least(greatest(v_fee,2.00),10.00);
+ IF v_fee<>10.00 THEN RAISE EXCEPTION 'Fee cap arithmetic failed'; END IF;
+ v_fee:=least(greatest(round(5.00*2500/10000,2),0),5.00);
+ v_net:=5.00-v_fee;
+ IF v_fee<>1.25 OR v_net<>3.75 OR v_fee+v_net<>5.00 THEN RAISE EXCEPTION 'Seller net arithmetic failed'; END IF;
+ RAISE NOTICE 'PASS: Fee policy, immutable snapshot, access controls and arithmetic';
+END
+$fee_engine_test$;

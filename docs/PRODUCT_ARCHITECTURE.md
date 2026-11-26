@@ -47,7 +47,7 @@ These are platform foundations, not Business Departments and not Areas OS missio
 
 Canonical tenant hierarchy:
 
-`Organization → Workspace → Installed structure → Domain/Department → Capability → Installation`
+`Organization → Workspace → Installed structure → (Business Department OR tenant Domain) → Capability → Installation`
 
 The Marketplace UI must preserve two separate taxonomic axes:
 

@@ -426,7 +426,7 @@ function toWorkspaceRow(
     workspace_id: context.workspaceId,
     created_by_user_id: context.userId,
     title: item[shape.title] ?? null,
-    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'id')),
+    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) => !['id', 'tenant_id', 'createdAt', 'updatedAt', 'orgId'].includes(key))),
     updated_at: new Date().toISOString(),
   };
   for (const field of shape.fields) row[toSnake(field)] = item[field] ?? null;

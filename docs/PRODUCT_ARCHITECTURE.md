@@ -297,3 +297,12 @@ The next vertical slice separates global blueprints from organization-owned inst
 - Capability linking and executable agent/runtime provisioning.
 
 The schema/API/UI changes are committed to the open draft PRs only. They have not been applied to the hosted database, and no production deployment has been promoted.
+
+
+## 14. Current backend execution status — 2026-11-26
+
+This section supersedes the historical "not yet applied" status in §13. The tenant installation, workspace membership/holon integrity, ownership/dependency/capability engines, adapter execution engine, OAuth runtime, Google Drive draft manifest and capability entitlement migrations have since been applied to the existing Marketplace cloud project. The corresponding four Edge Functions are ACTIVE and their source is now tracked in this repository under `supabase/functions/`.
+
+This is infrastructure and structural implementation evidence, not end-to-end acceptance. The live project currently has zero Auth users, organizations, memberships, workspaces, tenant installations, tenant connections, active provider manifests, published listings or orders. Google Drive remains DRAFT / PLANNED until a real authorized OAuth and provider operation round-trip passes. Day 1, Day 2 and Day 3 remain OPEN.
+
+See [`supabase/README.md`](../supabase/README.md) and the [Day 1–3 handoff](./handoffs/2026-11-26-marketplace-day1-day3-handoff.md).

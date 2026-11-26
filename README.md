@@ -134,16 +134,16 @@ Rules:
 - [x] Eight Marketplace operating departments and eight Areas OS portfolios persisted in Supabase and served through a read-only API; LD01 B1/B2/B3 holarchy is shown separately from the V5 source specification.
 - [x] Public published-listing read path connected; current catalogue correctly returns zero published offers.
 - [x] Four platform-core foundations represented in the Control Plane.
-- [ ] Tenant-owned domain/department installation, ownership and dependency graph. Installation tables, idempotent API actions and a first Control Plane flow are now committed in the draft tranche; ownership assignment and explicit dependency edges remain pending.
+- [x] Tenant-owned domain/department/holon installation, ownership assignment, dependency graph and capability installation engines are cloud-applied; live tenant E2E remains blocked because the project currently has zero Auth users and tenant rows.
 - [x] Global registry of 20 adapter families persisted in Supabase and served through a public read-only API; every family remains explicitly PLANNED.
 - [x] 73 provider-level blueprint records persisted from the 20 adapter families; all remain PLANNED with auth contracts UNSPECIFIED and no operations falsely declared.
 - [x] LD01 B1 OwnerBook, 8 B2 tactical DC Managers and 8 B3 Marvel squads persisted as a separate holon blueprint hierarchy and loaded by the Control Plane from the read-only API.
-- [ ] Executable provider manifests, reviewed auth/scope contracts, tenant connections, secret references and health checks.
-- [ ] Organization/workspace provisioning and authorization verified end-to-end. Authenticated create/list flows and workspace-scoped structure reads are implemented in draft; hosted migration, runtime authorization tests and E2E verification remain pending.
-- [ ] Marketplace capability installation and order lifecycle connected to the frontend.
-- [ ] Production signup/email delivery and browser authentication verified.
+- [ ] Provider execution runtime and OAuth/PKCE lifecycle are deployed. Google Drive v1.0.0 is DRAFT with six declared metadata operations; no ACTIVE provider manifest, tenant connection or real provider round-trip exists.
+- [ ] Organization/workspace provisioning and authorization E2E. The migrations and authenticated APIs are cloud-applied/deployed, but no Auth user, organization or workspace exists yet.
+- [ ] Full commercial lifecycle E2E. Capability installation and order-linked entitlements have backend foundations; publication, payment, ledger, payout and reconciliation acceptance remain open.
+- [ ] Production signup/email delivery and browser authentication verified. Email/password is enabled, but SMTP is not configured and a real signup/sign-in journey has not been accepted.
 - [ ] E2E tests for tenant isolation, adapter permissions and install lifecycle.
-- [x] Draft tenant installation contract: workspace registry, domain/department/LD01 holon installation records, idempotency ledger and append-only installation events; frontend provisioning and install UI added, not yet deployed against the hosted backend.
+- [x] Tenant installation contract, ownership/dependency/capability engines and idempotent frontend flow are implemented; the matching migrations and Edge Function are applied/deployed. No production tenant rows have been created.
 
 ## Engineering principles
 
@@ -166,3 +166,15 @@ bun run build
 ```
 
 See [PRODUCT_ARCHITECTURE.md](./docs/PRODUCT_ARCHITECTURE.md) for the initial control-plane contracts and implementation sequence. The read-only backend inventory is documented in [SUPABASE_SCHEMA_AUDIT_2026-11-24.md](./docs/SUPABASE_SCHEMA_AUDIT_2026-11-24.md). Production Auth URL and redirect configuration are recorded in [AUTH_CONFIGURATION_2026-11-26.md](./docs/AUTH_CONFIGURATION_2026-11-26.md).
+
+
+## Backend source of truth — 2026-11-26
+
+The canonical Marketplace backend source now lives in this repository under `supabase/` (migrations, Edge Functions, SQL regression tests and project configuration). The implementation was ported from Aspace OS V5 PR #63; V5 remains architectural provenance, not the active Marketplace backend repository.
+
+- Supabase project: `swegnrvaxxgfrnshdpxx` — Aspace MarketPlace, ACTIVE_HEALTHY.
+- Live migration registry: 25 entries; 24 source migration files are tracked here. One historical cloud-only migration (`revoke_public_execution_rls_auto_enable`) still needs exact source recovery before source/cloud parity can be called complete.
+- Active functions: `marketplace-api` v16, `adapter-api` v7, `adapter-worker` v7, `adapter-oauth-callback` v1.
+- The project currently has zero Auth users, organizations, memberships, workspaces, tenant installations, provider connections, ACTIVE provider manifests, published listings and orders. Infrastructure deployment is not the same as end-to-end product acceptance.
+
+See [Supabase backend inventory](./supabase/README.md) and the [Day 1–3 handoff](./docs/handoffs/2026-11-26-marketplace-day1-day3-handoff.md) for exact evidence and continuation gates.

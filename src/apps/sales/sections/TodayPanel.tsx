@@ -8,7 +8,7 @@ import { CalendarDays, CheckCheck, CircleDashed, PhoneCall, Target } from 'lucid
 import { useCmsStore } from '../../../lib/cms/cms.store';
 import { listWorkspaceActivity, type WorkspaceActivityEvent } from '../sales.repo';
 import type { DetailItem } from '../SalesDetailPage';
-import { ACCENT, Eyebrow, FONT_DISPLAY, FONT_MONO, Frame, RELANCE, WIN } from './Primitives';
+import { ACCENT, Eyebrow, FONT_DISPLAY, Frame, RELANCE, WIN } from './Primitives';
 
 function taskDetail(task: Record<string, unknown>): DetailItem {
   const title = String(task.label ?? task.title ?? 'Untitled task');

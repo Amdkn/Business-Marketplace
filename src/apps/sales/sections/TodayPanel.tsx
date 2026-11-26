@@ -28,6 +28,15 @@ function taskDetail(task: Record<string, unknown>): DetailItem {
   };
 }
 
+function formatDealValue(value: unknown, currency: string): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 'Value unknown';
+  if (/^[A-Z]{3}$/.test(currency)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount); } catch { /* unknown currency code */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
+}
+
 function dealDetail(deal: Record<string, unknown>): DetailItem {
   const title = String(deal.client ?? deal.title ?? 'Untitled deal');
   return {
@@ -39,7 +48,7 @@ function dealDetail(deal: Record<string, unknown>): DetailItem {
     summary: 'Workspace deal record.',
     fields: [
       { label: 'Offer', value: String(deal.offer ?? 'Not specified') },
-      { label: 'Value', value: deal.value == null ? 'Not specified' : String(deal.value) },
+      { label: 'Value', value: deal.value == null ? 'Not specified' : formatDealValue(deal.value, String(deal.currency ?? '')) },
       { label: 'Stage', value: String(deal.stage ?? 'Open') },
     ],
   };
@@ -191,7 +200,7 @@ export function TodayPanel({ onSelect }: { onSelect: (item: DetailItem) => void 
                 <span className="mt-1 block text-xs" style={{ color: 'var(--theme-text-muted)' }}>{String(deal.offer ?? 'Offer not specified')}</span>
                 <span className="mt-3 flex items-center justify-between gap-2 text-[10px] font-mono uppercase">
                   <span style={{ color: 'var(--theme-text-muted)' }}>{String(deal.stage ?? 'Open')}</span>
-                  <span style={{ color: ACCENT }}>{deal.value == null ? 'Value unknown' : String(deal.value)}</span>
+                  <span style={{ color: ACCENT }}>{formatDealValue(deal.value, String(deal.currency ?? ''))}</span>
                 </span>
               </button>
             ))}

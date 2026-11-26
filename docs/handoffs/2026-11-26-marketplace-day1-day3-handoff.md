@@ -1661,7 +1661,7 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Added `workspace_data` with 34 dedicated tables derived from the real collection field definitions: clients, articles, team, people_agents, runbooks, incidents, services, it_experiments, deploys, tasks, marketplace_listings, product_items, product_releases, growth_channels, growth_experiments, deals, invoices, contracts, policies, session_notes, legal_ai_act_checks, legal_frameworks, legal_controls, legal_compliance_policies, legal_evidence, legal_risks, legal_vendors, legal_gaps, personas, memory, codex, approval_decisions, squads and content.
 - Added `workspace_data.activity_events`.
 - Every collection table has typed declared fields, tenant organization FK, optional workspace FK, creator, timestamps, RLS, four policies, organization/workspace index and tenant-key immutability trigger. Reads require active membership; writes require S0_SOVEREIGN/B1_CEO/B2_MANAGER/B2.2. Anonymous schema/table access is revoked.
-- Added source migration `supabase/migrations/20261126080300_marketplace_interface_persistence.sql`.
+- Added source migration `supabase/migrations/20261126083638_marketplace_interface_persistence.sql`.
 - Rewired `src/lib/cms/repository.ts` to use the matching `workspace_data.<collection>` table for hydrate/upsert/delete; collection definitions remain source-controlled. Organization lookup now uses `identity.organization_memberships`.
 - Changed `src/lib/cms/cms.store.ts` so an empty live table replaces bundled demo rows. No fake rows are inserted into Supabase.
 - Added `supabase/tests/marketplace_interface_persistence.sql`; executed against the hosted project successfully.
@@ -1671,6 +1671,7 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - 138 RLS policies; 0 tables with RLS disabled; 0 anon table grants.
 - PostgREST exposed schemas include `public, dashboard, identity, workspace_data`.
 - Authenticated insert/read/update probe against the real Garden tenant succeeded inside a transaction and was rolled back; the table remains empty.
+- Cloud migration ledger now records `20261126083638 / marketplace_interface_persistence`; source filename matches the hosted migration version.
 - No demo business records or test rows were persisted.
 
 **Not yet complete — next session must continue**

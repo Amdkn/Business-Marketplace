@@ -136,7 +136,8 @@ Rules:
 - [x] Four platform-core foundations represented in the Control Plane.
 - [ ] Tenant-owned domain/department installation, ownership and dependency graph.
 - [x] Global registry of 20 adapter families persisted in Supabase and served through a public read-only API; every family remains explicitly PLANNED.
-- [ ] Provider-specific manifests, connection lifecycle, secret references, scopes and health checks.
+- [x] 73 provider-level blueprint records persisted from the 20 adapter families; all remain PLANNED with auth contracts UNSPECIFIED and no operations falsely declared.
+- [ ] Executable provider manifests, reviewed auth/scope contracts, tenant connections, secret references and health checks.
 - [ ] Organization/workspace provisioning and authorization verified end-to-end.
 - [ ] Marketplace capability installation and order lifecycle connected to the frontend.
 - [ ] Production signup/email delivery and browser authentication verified.

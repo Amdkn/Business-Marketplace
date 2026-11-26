@@ -62,4 +62,49 @@ export const agentsRepo = {
     });
     if (error) throw error;
   },
+
+  async register(input: {
+    agentKey: string;
+    displayName: string;
+    agentClass: string;
+    runtime: string;
+    permissionCodes: string[];
+  }): Promise<void> {
+    const organizationId = getActiveOrgId();
+    const workspaceId = getActiveWorkspaceId();
+    if (!SUPABASE_READY || !organizationId || !workspaceId) {
+      throw new Error('An authenticated active workspace is required to register an agent.');
+    }
+    const { error } = await supabase.functions.invoke('marketplace-api', {
+      body: {
+        action: 'register_agent',
+        organization_id: organizationId,
+        scope_type: 'WORKSPACE',
+        scope_id: workspaceId,
+        agent_key: input.agentKey,
+        display_name: input.displayName,
+        agent_class: input.agentClass,
+        runtime: input.runtime,
+        permission_codes: input.permissionCodes,
+      },
+    });
+    if (error) throw error;
+  },
+
+  async revoke(delegationId: string): Promise<void> {
+    const organizationId = getActiveOrgId();
+    const workspaceId = getActiveWorkspaceId();
+    if (!SUPABASE_READY || !organizationId || !workspaceId) {
+      throw new Error('An authenticated active workspace is required to revoke an agent.');
+    }
+    const { error } = await supabase.functions.invoke('marketplace-api', {
+      body: {
+        action: 'revoke_agent_delegation',
+        organization_id: organizationId,
+        workspace_id: workspaceId,
+        delegation_id: delegationId,
+      },
+    });
+    if (error) throw error;
+  },
 };

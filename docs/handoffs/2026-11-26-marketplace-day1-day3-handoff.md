@@ -2329,3 +2329,12 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - PR #1 remains OPEN / DRAFT. Days 1–3 remain OPEN; this continuation is not a Day 1, Day 2 or Day 3 acceptance declaration.
 - Still open: authenticated browser acceptance for settings/client/document flows; real signup/email confirmation and SMTP verification; browser cross-workspace denial; Google Drive OAuth round-trip and adapter runtime; provider credentials/secret references; payment checkout/capture/refund/payout E2E; e-sign provider; agent inference/execution runtime; full tenant installation and Control Tower acceptance; Vercel build/preview validation.
 - Next session should first restore build-validation capacity (Vercel build quota or an enabled GitHub Actions runner), then run Bun install/typecheck/tests/build/benches and authenticated browser acceptance before closing any Day 1–3 gate.
+
+
+## 13.45 — Settings persistence test and final Garden action sweep
+
+- Added `supabase/tests/marketplace_settings_write.sql`, a rollback-only round-trip test for the exact profile upsert and organization rename targets used by `get_settings` / `update_settings`.
+- The test passed. A follow-up read confirmed the pre-test profile and organization values remained unchanged; no synthetic identity or organization data was persisted.
+- Re-ran the enabled-button audit after the private-storage UI changes across all 31 Garden view files. No enabled `<button>` without an `onClick`/submit handler remains in the audited set.
+- Private storage and legal archive actions now have actual handlers; Marketplace purchase, e-signature and agent chat remain intentionally disabled until their external payment/e-sign/inference providers exist.
+- No storage objects or client activity events were created by the SQL tests. The authenticated browser flows remain unverified because the latest Vercel build is still rate-limited and the connected Amd-PC runner is offline.

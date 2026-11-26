@@ -141,7 +141,7 @@ All four deployed `index.ts` files were compared with their corresponding reposi
 - Client create/update/delete operations now append atomic events to `workspace_data.activity_events` through a SECURITY DEFINER trigger with a pinned search path. The trigger records client ID, title and operation; the client detail timeline reads those events.
 - The authenticated rollback integration test exercised create → update → delete and verified all three event types. The transaction left no test client or activity event.
 - Settings profile display name and organization name now use authenticated `marketplace-api` actions. Profile updates are self-scoped; organization renames require `requireOrgRole`. Email remains Supabase Auth-managed and read-only.
-- Authenticated browser acceptance for these UI flows has not yet been run.
+- `supabase/tests/marketplace_settings_write.sql` passed a rollback-only profile upsert + organization rename round-trip; the post-rollback profile and organization values were unchanged. Authenticated browser acceptance for these UI flows has not yet been run.
 
 ## Current tenant and provider state
 

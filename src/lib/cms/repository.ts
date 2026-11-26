@@ -546,6 +546,12 @@ export async function hydrateCollection(collectionId: string): Promise<CmsItem[]
 export async function upsertCollectionDef(_def: CmsCollectionDef): Promise<void> { /* definitions are versioned with the app */ }
 
 /** Persist one item. A configured production client must never silently drop a write. */
+/** Strict write path for UI actions that must not report success without cloud persistence. */
+export async function upsertItemRequired(collectionId: string, item: CmsItem): Promise<void> {
+  if (!supabaseConfigured) throw new Error('[cms] Supabase is not configured; persistent write refused.');
+  await upsertItem(collectionId, item);
+}
+
 export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
   if (!supabaseConfigured) {
     setMode('unconfigured');
@@ -602,6 +608,12 @@ export async function upsertItem(collectionId: string, item: CmsItem): Promise<v
 }
 
 /** Delete only the matching row within the resolved tenant; never report a silent success. */
+/** Strict delete path for UI actions that must not report success without cloud persistence. */
+export async function removeItemRequired(collectionId: string, id: string): Promise<void> {
+  if (!supabaseConfigured) throw new Error('[cms] Supabase is not configured; persistent delete refused.');
+  await removeItem(collectionId, id);
+}
+
 export async function removeItem(collectionId: string, id: string): Promise<void> {
   if (!supabaseConfigured) {
     setMode('unconfigured');

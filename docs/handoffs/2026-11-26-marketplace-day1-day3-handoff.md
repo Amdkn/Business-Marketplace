@@ -1867,7 +1867,7 @@ This section supersedes earlier checkpoints that reported 37 tables / 146 polici
 - `workspace_data.invoices` now has typed `client_id`, `currency`, `issued_at`, `due_at` and `paid_at` columns. Currency is checked as a three-letter uppercase code when supplied; there is no USD default. The client FK includes organization/workspace scope.
 - Garden `membersRepo` and `agentsRepo` now use authenticated Marketplace API read actions `list_workspace_members` and `list_workspace_agents`. The former reads active workspace memberships and profile display names; the latter returns canonical `identity.agent_principals` only when an active delegation exists for the current workspace.
 - Garden People and People/Agents views now render the distinct human-membership and delegated-agent read models. They no longer create a human row in the AI agent directory or infer humans from agent role values. The agent list is expected to be empty until real agents are registered and delegated.
-- `marketplace-api` deployed ACTIVE v25 with `verify_jwt=true`; added `list_workspace_members` and `list_workspace_agents`.
+- `marketplace-api` deployed ACTIVE v26 with `verify_jwt=true`; added `list_workspace_members` and `list_workspace_agents`.
 - Garden invoice mapping no longer fabricates USD. Dashboard copy no longer references `dashboard.clients` / `dashboard.agents`.
 - Repository code search returned no active `OMK`, `omk_internal` or `omk_saas` references. The retired `dashboard` namespace is documented as historical only; no new code may use it.
 
@@ -1908,3 +1908,11 @@ All six SQL suites were executed against the connected hosted project after the 
 - Re-executed all six hosted SQL suites after the new migrations and Edge Function changes; all six passed with no exceptions.
 - The broader Supabase Performance Advisor still reports unindexed foreign keys outside `workspace_data`; these are not part of the Garden/Web Desktop persistence layer and remain a separate schema-by-schema review.
 
+
+
+### 13.37 Agent and member read model deployment — 2026-11-26
+
+- Garden People and AI Agents are now separate projections: human memberships are read through `list_workspace_members`; AI principals are read through `list_workspace_agents` and only when actively delegated to the selected workspace.
+- Both actions are served by the JWT-verified `marketplace-api` Edge Function. Latest deployment: **ACTIVE v26**, `verify_jwt=true`. The v26 update adds the delegation ID to the agent projection.
+- Garden `agentsRepo` no longer treats `workspace_data.people_agents` as the canonical agent identity source. It maps the canonical `identity.agent_principals` + `identity.agent_delegations` projection. `membersRepo` maps active human workspace memberships and profile display names.
+- The People and People/Agents screens are now read-only canonical views; invitation acceptance and agent provisioning/configuration UI remain separate next work. No member or agent was created by this change.

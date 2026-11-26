@@ -1647,3 +1647,11 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - The first deployment for the mode/schema correction reached Vercel state **READY** at commit `c5a22992498bd637f45eb8631dd8d2380341e36d`. Subsequent UI/docs/test commits are newer than that deployment and still need a matching deployment/build check.
 - Vercel environment inventory contained only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; there is no `VITE_APP_MODE` override. The new default therefore selects `saas`.
 - Dashboard data tables remain empty by design. Full browser E2E, profile-backed Sidebar identity, persisted pending approvals/tasks, and agent provisioning/runtime telemetry remain open.
+
+
+### 13.25 Vercel deployment gate — 2026-11-26
+
+- Attempted a preview deployment for the latest branch head after the Dashboard data and mock-alert changes.
+- Vercel rejected the deployment with HTTP 402 `api-deployments-free-per-day`: more than 100 deployments in the current 24-hour quota window; retryAfter 86400 seconds.
+- No billing, plan, or team settings were changed. The existing READY deployment at commit `c5a22992498bd637f45eb8631dd8d2380341e36d` predates the Dashboard mock-alert cleanup and final handoff/test commits.
+- Therefore, the latest source is committed to the PR branch but is **not yet deployed or browser-E2E verified**. Resume deployment after Vercel's quota window resets or after the account owner resolves the reported quota limit.

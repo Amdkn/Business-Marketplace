@@ -103,14 +103,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <Card className="p-5">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-slate-500">Active Agents</p>
+              <p className="text-sm font-medium text-slate-500">Enabled Agent Principals</p>
               <h3 className="text-2xl font-bold text-slate-900 mt-2">{activeAgents}</h3>
             </div>
             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
               <Cpu className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-xs text-slate-400 mt-4">of {agents.length} total</p>
+          <p className="text-xs text-slate-400 mt-4">of {agents.length} delegated · runtime state not reported</p>
         </Card>
         <Card className="p-5">
           <div className="flex justify-between items-start">
@@ -148,9 +148,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <span className="text-sm text-slate-500 italic">Things requiring validation</span>
             </div>
             <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 px-5 py-8 text-center">
-              <p className="text-sm font-medium text-slate-700">No pending validations</p>
+              <p className="text-sm font-medium text-slate-700">Validation feed not connected</p>
               <p className="text-xs text-slate-500 mt-1">
-                Real approvals and operational alerts will appear here when records are created in this workspace.
+                Connect the approval and incident event sources to show verified pending actions here.
               </p>
             </div>
           </Card>

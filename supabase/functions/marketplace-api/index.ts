@@ -856,6 +856,43 @@ async function createOrder(user: User, body: Record<string, unknown>) {
     return rows[0];
   });
 }
+function financeLines(value: unknown) {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 100) throw new Error('Invalid journal lines');
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`Invalid journal line ${index + 1}`);
+    const line = item as Record<string, unknown>;
+    const accountId = requiredString(line.account_id, 'account_id', 64);
+    const decimal = (v: unknown, field: string) => {
+      if (typeof v !== 'string' || !/^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$/.test(v)) throw new Error(`Invalid ${field}`);
+      return v;
+    };
+    const debit = decimal(line.debit_amount, 'debit_amount');
+    const credit = decimal(line.credit_amount, 'credit_amount');
+    if ((Number(debit) > 0) === (Number(credit) > 0)) throw new Error('Each journal line must contain exactly one positive debit or credit');
+    const description = line.description === undefined ? null : requiredString(line.description, 'line description', 500);
+    return { account_id: accountId, debit_amount: debit, credit_amount: credit, description };
+  });
+}
+async function postFinanceJournalEntry(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id');
+  const entryNumber = requiredString(body.entry_number, 'entry_number', 100);
+  const idempotencyKey = requiredString(body.idempotency_key, 'idempotency_key', 200);
+  const sourceType = requiredString(body.source_type, 'source_type', 40);
+  const sourceId = body.source_id === undefined || body.source_id === null ? null : requiredString(body.source_id, 'source_id', 64);
+  const description = requiredString(body.description, 'description', 1000);
+  const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  const lines = financeLines(body.lines);
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, organizationId);
+    const rows = await tx`SELECT api.post_finance_journal_entry(
+      ${user.id}::uuid,${organizationId}::uuid,${entryNumber},${idempotencyKey},${sourceType},
+      ${sourceId}::uuid,${description},${currency}::char(3),${JSON.stringify(lines)}::jsonb
+    ) AS journal_entry_id`;
+    return rows[0];
+  });
+}
+
 async function transitionOrder(user: User, body: Record<string, unknown>) {
   const orderId = requiredString(body.order_id, 'order_id');
   const orgId = requiredString(body.actor_organization_id, 'actor_organization_id');
@@ -915,6 +952,7 @@ Deno.serve(async (req: Request) => {
       case 'publish_listing': data = await publishListing(user, body); break;
       case 'create_order': data = await createOrder(user, body); break;
       case 'transition_order': data = await transitionOrder(user, body); break;
+      case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
       default: return response({ error: 'Unknown action', action }, 404);
     }
     return response({ data, actor_user_id: user.id });

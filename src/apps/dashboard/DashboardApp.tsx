@@ -31,7 +31,7 @@
  * rendu sans crash si la collection `clients` est vide ; chaque mutation
  * pousse un toast (succès ou erreur) via `useShellStore.addToast`.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle, BarChart3, Bot, Building2, Compass, GitBranch,
   History, LayoutDashboard, ListChecks, MessageSquare, Pin, ScrollText,
@@ -136,7 +136,8 @@ export function DashboardApp() {
   const clientsDef = useCmsStore(s => s.collections['clients']);
   const deals = useCmsStore(s => s.items['deals']) ?? [];
   const invoices = useCmsStore(s => s.items['invoices']) ?? [];
-  const updateItem = useCmsStore((s) => s.updateItem);
+  const updateItem = useCmsStore((s) => s.updateItemPersisted);
+  const [mutatingClientId, setMutatingClientId] = useState<string | null>(null);
   const activeCount = clients.filter(c => c.status === 'Active').length;
   const onboardingCount = clients.filter(c => c.status === 'Onboarding').length;
   const churnCount = clients.filter(c => c.status === 'Churn' || c.status === 'AtRisk').length;
@@ -160,9 +161,9 @@ export function DashboardApp() {
   const prevClient = openClientIndex > 0 ? clients[openClientIndex - 1] : undefined;
   const nextClient = openClientIndex >= 0 && openClientIndex < clients.length - 1 ? clients[openClientIndex + 1] : undefined;
 
-  /** Toggle the `pinned` flag on a client. Persists via the CMS store.
-   *  Toast on success and on error (mutation ratée → revert + message visible). */
-  const togglePin = (clientId: string): void => {
+  /** Toggle a persisted workspace client's pipeline pin. */
+  const togglePin = async (clientId: string): Promise<void> => {
+    if (mutatingClientId) return;
     const current = clients.find((c) => c.id === clientId);
     if (!current) {
       addToast({ source: 'Dashboard', type: 'warning', message: 'Client introuvable — refresh.' });
@@ -170,36 +171,45 @@ export function DashboardApp() {
     }
     const previous = Boolean((current as Record<string, unknown>).pinned);
     const next = !previous;
-    // Optimistic update — `updateItem` writes to the partition + mirror synchronously;
-    // if the underlying repository rejects, the toast surfaces the error and the
-    // caller can refresh (no silent revert path because the store doesn't track
-    // rejected writes yet — we surface the failure instead of swallowing it).
-    updateItem('clients', clientId, { pinned: next, pinnedAt: next ? new Date().toISOString() : null });
-    addToast({
-      source: 'Dashboard',
-      type: next ? 'success' : 'info',
-      message: next
-        ? `Pinned ${String(current.name ?? clientId)} to your pipeline.`
-        : `Unpinned ${String(current.name ?? clientId)}.`,
-    });
+    setMutatingClientId(clientId);
+    try {
+      const result = await updateItem('clients', clientId, {
+        pinned: next,
+        pinnedAt: next ? new Date().toISOString() : null,
+      });
+      if (result.ok) {
+        addToast({
+          source: 'Dashboard',
+          type: next ? 'success' : 'info',
+          message: next
+            ? `Pinned ${String(current.name ?? clientId)} to your pipeline.`
+            : `Unpinned ${String(current.name ?? clientId)}.`,
+        });
+      } else {
+        addToast({ source: 'Dashboard', type: 'warning', message: result.error ?? 'Client pin was not saved.' });
+      }
+    } finally {
+      setMutatingClientId(null);
+    }
   };
 
-  /** Validation card handler: route to client (drill open) or to a sibling app.
-   *  Also marks the validation as acknowledged on the linked client, so the
-   *  dashboard reacts to its own actions. */
-  const openValidation = (v: ValidationCard): void => {
-    addToast({ source: 'Dashboard', type: 'info', message: `Opened validation: ${v.title}` });
+  /** Acknowledge a validation on its linked client before opening the detail. */
+  const openValidation = async (v: ValidationCard): Promise<void> => {
     if (v.clientId) {
       const exists = clients.some((c) => c.id === v.clientId);
       if (exists) {
-        updateItem('clients', v.clientId, { lastValidatedAt: new Date().toISOString() });
+        const result = await updateItem('clients', v.clientId, { lastValidatedAt: new Date().toISOString() });
+        if (result.ok) {
+          addToast({ source: 'Dashboard', type: 'success', message: `Validation recorded: ${v.title}` });
+        } else {
+          addToast({ source: 'Dashboard', type: 'warning', message: result.error ?? 'Validation marker was not saved.' });
+        }
         clientsDrill.open(v.clientId);
         return;
       }
     }
-    if (v.targetApp) {
-      openApp(v.targetApp, v.targetSection ?? v.targetApp);
-    }
+    addToast({ source: 'Dashboard', type: 'info', message: `Opened validation: ${v.title}` });
+    if (v.targetApp) openApp(v.targetApp, v.targetSection ?? v.targetApp);
   };
 
   // Wind Direction derives only from persisted workspace records.
@@ -242,7 +252,7 @@ export function DashboardApp() {
               accent={v.tone === 'warn' ? '#f59e0b' : v.tone === 'danger' ? '#dc2626' : '#3b82f6'}
               icon={v.tone === 'warn' ? <AlertTriangle className="w-5 h-5" /> : v.tone === 'danger' ? <AlertTriangle className="w-5 h-5" /> : <Compass className="w-5 h-5" />}
               meta={`Reported ${v.when}`}
-              onClick={() => openValidation(v)}
+              onClick={() => { void openValidation(v); }}
             />
           ))}
         </FleetItemGrid>
@@ -603,9 +613,10 @@ export function DashboardApp() {
                   type="button"
                   aria-label={pinned ? `unpin ${name}` : `pin ${name}`}
                   aria-pressed={pinned}
+                  disabled={mutatingClientId === id}
                   onClick={(e) => {
                     e.stopPropagation();
-                    togglePin(id);
+                    void togglePin(id);
                   }}
                   className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:scale-105 active:scale-95"
                   style={{

@@ -232,7 +232,7 @@ export const RATE_LIMITS: RateLimitRow[] = [
 
 export const POSTURE_CRITERIA: PostureCriterion[] = [
   { id: 'access.rls',       category: 'access-control',  label: 'Row-level security on every tenant table', level: 'conform', note: 'org_id claim wired through JWT hook, 28/28 tables enforce.' },
-  { id: 'access.roles',     category: 'access-control',  label: '5-tier role hierarchy (viewer / analyst / operator / admin / owner)', level: 'conform', note: 'All five roles provisioned in omk_saas.memberships.' },
+  { id: 'access.roles',     category: 'access-control',  label: '5-tier role hierarchy (viewer / analyst / operator / admin / owner)', level: 'conform', note: 'All five roles provisioned in identity.organization_memberships.' },
   { id: 'audit.write-once', category: 'audit-trail',     label: 'Write-once audit trail (7-year hold)',       level: 'partial', note: 'Hot copy in Postgres is on; S3 Object Lock mirror in progress.' },
   { id: 'audit.breakglass', category: 'audit-trail',     label: 'Break-glass events always audited',          level: 'conform', note: 'panic, auth-failure, role-change all hit audit_suppression = true path.' },
   { id: 'enc.at-rest',      category: 'encryption',      label: 'Data at rest encrypted with managed keys',  level: 'conform', note: 'Postgres TDE + Supabase Storage default encryption; rotation 90d.' },

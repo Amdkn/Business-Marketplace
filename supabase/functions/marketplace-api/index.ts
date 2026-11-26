@@ -51,6 +51,22 @@ async function requireOrgRole(tx: Tx, userId: string, orgId: string) {
   `;
   if (!rows.length) throw new Error('Active organization role required');
 }
+async function requireFinanceRole(tx: Tx, userId: string, orgId: string) {
+  const rows = await tx`
+    SELECT rb.role_code
+    FROM identity.organization_memberships m
+    JOIN identity.role_bindings rb
+      ON rb.organization_id = m.organization_id AND rb.subject_user_id = m.user_id
+    JOIN identity.organizations o ON o.id = m.organization_id
+    WHERE o.status = 'ACTIVE' AND m.organization_id = ${orgId}::uuid AND m.user_id = ${userId}::uuid
+      AND m.membership_status = 'ACTIVE' AND rb.binding_status = 'ACTIVE'
+      AND rb.starts_at <= now() AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND rb.role_code IN ('S0_SOVEREIGN','B1_CEO','B2_MANAGER','B2.2')
+    LIMIT 1
+  `;
+  if (!rows.length) throw new Error('Active Finance organization role required');
+}
+
 async function listOrganizations(user: User) {
   return await withServiceRole(async (tx) => await tx`
     SELECT o.id,o.organization_key,o.name,o.organization_type,o.status
@@ -880,7 +896,7 @@ async function provisionFinanceChartOfAccounts(user: User, body: Record<string, 
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
   if (!/^\d{4}[.]\d+$/.test(chartVersion)) throw new Error('Invalid chart_version');
   return await withServiceRole(async (tx) => {
-    await requireOrgRole(tx, user.id, organizationId);
+    await requireFinanceRole(tx, user.id, organizationId);
     const rows = await tx`SELECT api.provision_finance_chart_of_accounts(
       ${user.id}::uuid,${organizationId}::uuid,${currency}::char(3),${chartVersion}
     ) AS chart`;
@@ -899,7 +915,7 @@ async function postFinanceJournalEntry(user: User, body: Record<string, unknown>
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
   const lines = financeLines(body.lines);
   return await withServiceRole(async (tx) => {
-    await requireOrgRole(tx, user.id, organizationId);
+    await requireFinanceRole(tx, user.id, organizationId);
     const rows = await tx`SELECT api.post_finance_journal_entry(
       ${user.id}::uuid,${organizationId}::uuid,${entryNumber},${idempotencyKey},${sourceType},
       ${sourceId}::uuid,${description},${currency}::char(3),${JSON.stringify(lines)}::jsonb

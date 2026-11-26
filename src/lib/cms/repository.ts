@@ -184,7 +184,12 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
     "fields": [
       "amount",
       "due",
-      "status"
+      "status",
+      "clientId",
+      "currency",
+      "issuedAt",
+      "dueAt",
+      "paidAt"
     ]
   },
   "contracts": {

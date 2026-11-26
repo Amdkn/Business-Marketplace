@@ -1,5 +1,5 @@
 // src/components/ProtectedRoute.tsx
-// ADR-OMK-005 (Phase E) — auth-gated route wrapper.
+// ADR-DASHBOARD-005 (Phase E) — auth-gated route wrapper.
 // Reads useAuth() + useOrg(). Redirects to /login if no session.
 // Shows a "no org" banner inside the protected layout if saas mode but no org claim.
 
@@ -56,7 +56,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Defensive: log a one-time marker so we can grep deploy logs for missing-org traffic.
   if (IS_SAAS && isMissing) {
     // eslint-disable-next-line no-console
-    console.warn(`[omk] orgId missing at ${location.pathname}`);
+    console.warn(`[marketplace] orgId missing at ${location.pathname}`);
   }
 
   return <>{children}</>;

@@ -200,6 +200,6 @@ Important scope boundary: this is the shared CMS persistence foundation, not yet
 
 Both user-facing interfaces use the tenant-owned workspace_data schema. Garden repositories must use the explicit table mapping documented in docs/PRODUCT_ARCHITECTURE.md and implemented in src/components/saas/data/repository.ts; the Web Desktop CMS uses the same collection tables. Do not add new Garden reads or writes to the legacy dashboard schema.
 
-The Garden Documents and Legal Data Room modules have dedicated tables: workspace_data.documents and workspace_data.legal_documents. Migration: 20261126090500_workspace_document_records.sql. Both tables have RLS, member-read and role-gated operator write policies, creator attribution and organization/workspace indexes.
+The Garden Documents and Legal Data Room modules have dedicated tables: workspace_data.documents and workspace_data.legal_documents. Migration: 20261126090124_workspace_document_records.sql. Both tables have RLS, member-read and role-gated operator write policies, creator attribution and organization/workspace indexes.
 
 Cloud checkpoint after this migration: 37 workspace_data base tables, 146 policies. The first real tenant exists (one Auth user, organization, organization membership, workspace and workspace membership). No demonstration business records were inserted.

@@ -37,6 +37,15 @@ BEGIN
  AND (SELECT array_agg(k.attnum ORDER BY k.ord) FROM unnest(i.indkey::smallint[]) WITH ORDINALITY k(attnum,ord)
  WHERE k.ord<=cardinality(c.conkey))=c.conkey);
  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Finance foreign keys lack covering indexes: %',v_bad; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='api' AND p.proname='post_finance_journal_entry' AND p.prosecdef
+ AND p.proconfig @> ARRAY['search_path=pg_catalog, identity, finance, api']::text[]) THEN
+  RAISE EXCEPTION 'Finance posting API function missing or unsafe';
+ END IF;
+ IF has_function_privilege('anon','api.post_finance_journal_entry(uuid,uuid,text,text,text,uuid,text,character,jsonb)','EXECUTE')
+ OR has_function_privilege('authenticated','api.post_finance_journal_entry(uuid,uuid,text,text,text,uuid,text,character,jsonb)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.post_finance_journal_entry(uuid,uuid,text,text,text,uuid,text,character,jsonb)','EXECUTE') THEN
+  RAISE EXCEPTION 'Finance posting API grants are unsafe';
+ END IF;
  RAISE NOTICE 'PASS: Marketplace finance ledger baseline';
 END
 $test$;

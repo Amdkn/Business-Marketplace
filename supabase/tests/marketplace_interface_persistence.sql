@@ -49,6 +49,29 @@ begin
   if not exists(select 1 from pg_trigger where tgrelid='workspace_data.missions'::regclass and tgname='missions_agent_delegation_guard' and not tgisinternal) then
     raise exception 'Mission agent delegation guard is missing';
   end if;
+  if exists (
+    with fk as (
+      select c.conrelid,c.conkey
+      from pg_constraint c
+      join pg_class t on t.oid=c.conrelid
+      join pg_namespace n on n.oid=t.relnamespace
+      where c.contype='f' and n.nspname='workspace_data'
+    )
+    select 1 from fk
+    where not exists (
+      select 1 from pg_index i
+      where i.indrelid=fk.conrelid and i.indisvalid and i.indisready
+        and i.indpred is null and i.indexprs is null
+        and i.indnkeyatts >= cardinality(fk.conkey)
+        and (
+          select array_agg(k.attnum::smallint order by k.ord)
+          from unnest(i.indkey) with ordinality k(attnum,ord)
+          where k.ord <= cardinality(fk.conkey)
+        ) = fk.conkey
+    )
+  ) then
+    raise exception 'workspace_data contains an unindexed foreign key';
+  end if;
   if exists(select 1 from information_schema.tables where table_schema='workspace_data' and table_name like 'demo_coach_%') then
     raise exception 'demo-only collections must not have tenant persistence tables';
   end if;

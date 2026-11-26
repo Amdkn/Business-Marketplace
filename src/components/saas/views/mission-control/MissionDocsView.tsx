@@ -15,7 +15,7 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'overview',
     title: 'Overview · /agent-root',
     body:
-      'The Mission Control hub. Live fleet stats: total tasks, average success rate, fast-routing percentage. Reads from omk_saas.agents and surfaces Hermes telemetry derived from agent status until the ingest pipeline is live.',
+      'The Mission Control hub. Live fleet stats: total tasks, average success rate, fast-routing percentage. Reads from dashboard.agents and surfaces Hermes telemetry derived from agent status until the ingest pipeline is live.',
   },
   {
     id: 'agents',
@@ -27,7 +27,7 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'tasks',
     title: 'Tasks · /agent-root/tasks',
     body:
-      'Kanban with three columns (To do / In progress / Done). Drag-and-drop powered by @dnd-kit. New-mission form, priority filter (P1/P2/P3), title search. Backed by the omk_saas.missions table (sql/08_hermes_missions.sql) with RLS by org_id.',
+      'Kanban with three columns (To do / In progress / Done). Drag-and-drop powered by @dnd-kit. New-mission form, priority filter (P1/P2/P3), title search. Mission persistence is not yet connected to a canonical tenant table.',
   },
   {
     id: 'office',
@@ -39,7 +39,7 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'content',
     title: 'Content · /agent-root/content',
     body:
-      'Document library. Reads omk_saas.documents. Title-scoped search. Stats strip showing total docs, agents writing, latest published. Each card opens the document via its fileUrl.',
+      'Document library. Document persistence is not yet connected to a canonical tenant table. Title-scoped search. Stats strip showing total docs, agents writing, latest published. Each card opens the document via its fileUrl.',
   },
   {
     id: 'schedule',
@@ -72,7 +72,7 @@ export const MissionDocsView = (): React.ReactElement => {
           Docs<span className="text-ember">.</span>
         </h1>
         <p className="font-sans text-[14px] text-her-muted mt-3 max-w-2xl">
-          Eight surfaces wired to the OMK SaaS Dashboard. Each route reads from a single
+          Eight surfaces in the A’Space Marketplace Mission Control. Each route reads from a single
           Supabase table, scoped by org_id through Row-Level Security.
         </p>
       </header>
@@ -103,7 +103,7 @@ export const MissionDocsView = (): React.ReactElement => {
         <h3 className="font-display text-[20px]">Schema</h3>
         <ul className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-[12px]">
           <li className="rounded-2xl bg-cream/8 border border-cream/15 p-3">
-            <code className="text-ember">sql/02_omk_saas_schema.sql</code>
+            <code className="text-ember">Marketplace schema migrations</code>
             <p className="text-cream/65 mt-1">agents table — 8 columns, RLS by org_id.</p>
           </li>
           <li className="rounded-2xl bg-cream/8 border border-cream/15 p-3">

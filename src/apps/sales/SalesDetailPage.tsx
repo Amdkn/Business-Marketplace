@@ -98,6 +98,7 @@ function readAmount(item: DealDetail): number | undefined {
 export function SalesDetailPage({ item, onBack, onNavigate }: SalesDetailPageProps) {
   const addItem = useCmsStore((s) => s.addItemPersisted);
   const clientsItems = useCmsStore((s) => s.items['clients']) ?? [];
+  const invoicesItems = useCmsStore((s) => s.items['invoices']) ?? [];
   const addToast = useShellStore((s) => s.addToast);
 
   const isWonDeal = item.kind === 'deal' && /won/i.test(item.status);
@@ -119,12 +120,20 @@ export function SalesDetailPage({ item, onBack, onNavigate }: SalesDetailPagePro
       addToast({ source: 'Sales', type: 'warning', message: 'This deal is not linked to an existing workspace client. Link the client before invoicing.' });
       return;
     }
+    const sourceKey = `deal:${String(item.id)}:full`;
+    const existingInvoice = invoicesItems.find((invoice) => String(invoice.sourceKey ?? '') === sourceKey);
+    if (existingInvoice) {
+      addToast({ source: 'Sales', type: 'info', message: `An invoice is already linked to this deal (${String(existingInvoice.id)}).` });
+      return;
+    }
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
     const clientName = String(client.name ?? client.title ?? client.id);
     const invoiceResult = await addItem('invoices', {
       client: clientName,
       clientId,
+      dealId: String(item.id),
+      sourceKey,
       number: `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(item.id).slice(-4)}`,
       amount,
       currency,

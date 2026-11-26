@@ -121,9 +121,9 @@ function Overview() {
   }, []);
 
   const steps: { n: string; title: string; body: string }[] = [
-    { n: '1', title: 'Standup at 9am',       body: 'Your agents post overnight work to your inbox.' },
-    { n: '2', title: 'Agents ship work',      body: 'Specialists run on autopilot inside the boundaries you set.' },
-    { n: '3', title: 'You approve in 10 min', body: 'Yes or no on the queue. Ship or kill. Move on.' },
+    { n: '1', title: 'Verify identity', body: 'Every agent has one canonical principal in the organization registry.' },
+    { n: '2', title: 'Delegate authority', body: 'Workspace access is explicit, scoped, and revocable.' },
+    { n: '3', title: 'Plan persisted missions', body: 'Schedule work against active workspace delegations.' },
   ];
 
   return (
@@ -165,7 +165,7 @@ function Overview() {
       {/* Today's Standup — Border Beam on the hero card */}
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— TODAY'S STANDUP</span>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— WORKSPACE CONTROL</span>
           <span className="text-[10px] font-mono text-[var(--theme-text-dim)]">· {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
         </div>
         <div className="relative rounded-2xl p-[2px] overflow-hidden" style={{ background: 'linear-gradient(120deg, transparent 0%, rgba(16,185,129,0.0) 30%, #10b981 50%, rgba(16,185,129,0.0) 70%, transparent 100%)', backgroundSize: '200% 200%', animation: 'border-beam 4s linear infinite' }}>
@@ -185,7 +185,7 @@ function Overview() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-bold text-[var(--theme-text)]">B1 Gatekeeper standing by</span>
+                  <span className="text-[15px] font-bold text-[var(--theme-text)]">B1 · Workspace governance</span>
                   <span
                     className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
                     style={{ color: '#15803d', background: 'rgba(22,163,74,0.12)', border: '1px solid #86efac' }}
@@ -430,13 +430,13 @@ function Schedule() {
     return () => window.clearTimeout(handle);
   }, [confirmDeleteId]);
 
-  const agentOptions = useMemo(() => agents.map((agent) => ({ id: agent.id, name: agent.displayName })), [agents]);
+  const agentOptions = useMemo(() => agents.filter((agent) => agent.principalStatus === 'ACTIVE').map((agent) => ({ id: agent.id, name: agent.displayName })), [agents]);
   const filteredTasks = picked
     ? tasks.filter((task) =>
         task.day === picked.day &&
         picked.hour >= task.startHour &&
         picked.hour < task.endHour &&
-        (agentFilter === 'all' || task.agent === agentFilter))
+        (agentFilter === 'all' || task.agentPrincipalId === agentFilter))
     : [];
 
   const hourCounts = useMemo(
@@ -573,7 +573,7 @@ function Schedule() {
             className="ml-auto px-2 py-1 rounded-lg text-[10.5px] font-semibold outline-none"
             style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)', border: '1px solid var(--panel-border)' }}>
             <option value="all">Tous les agents</option>
-            {agentOptions.map((agent) => <option key={agent.id} value={agent.name}>{agent.name}</option>)}
+            {agentOptions.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
           </select>
           <button type="button" onClick={() => { setPicked(null); setAgentFilter('all'); setConfirmDeleteId(null); setComposerOpen(false); }}
             className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-[11px] font-semibold" data-cadence-close>Fermer</button>

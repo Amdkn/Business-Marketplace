@@ -1,9 +1,9 @@
-/** CMS store — generic collections registry (Zustand), the same pattern any app
- *  can reuse: register a collection definition + seed items once, then bind
- *  <CollectionRepeater> + <DynamicPageView> to that collection id anywhere.
- *  Phase 1: hydrates from Supabase when a coach is signed in (org_id resolved),
- *  otherwise transparently keeps the bundled seed — no auth UI exists yet, so
- *  today this always falls back to seed, but the live path is wired and ready.
+/** Marketplace CMS store — shared collection registry and tenant-partitioned
+ *  in-memory projection for the Web Desktop apps.
+ *  Collection definitions are source-controlled. The explicit demo tenant may
+ *  use bundled sample rows; authenticated Marketplace tenants start empty and
+ *  hydrate only from their active workspace_data tables. Remote failures are
+ *  surfaced and never converted into demo content.
  *
  *  Brief-F (couche d'écriture, 2026-08-07) — `updateItem` n'était plus seul.
  *  `addItem` et `removeItem` suivent exactement la même voie : set optimiste,

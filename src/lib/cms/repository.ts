@@ -67,6 +67,7 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
     "fields": [
       "segment",
       "ticket",
+      "currency",
       "openThreads",
       "nextSession",
       "health",

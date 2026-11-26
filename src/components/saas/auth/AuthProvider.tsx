@@ -76,11 +76,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     const claims = decodeJwtClaims(session.access_token);
+    const userId = claims.sub ?? session.user.id;
+
+    // Resolve the tenant from canonical membership rows, not only a custom JWT
+    // claim. This keeps the Marketplace compatible with sessions minted before
+    // the org_id hook was installed and prevents stale claims selecting a tenant.
+    const { data: memberships, error: membershipError } = await supabase
+      .schema('identity')
+      .from('organization_memberships')
+      .select('organization_id')
+      .eq('user_id', userId)
+      .eq('membership_status', 'ACTIVE');
+    if (membershipError) throw membershipError;
+
+    const activeOrgIds = (memberships ?? []).map((row) => row.organization_id as string);
+    const claimedOrgId = claims.org_id && activeOrgIds.includes(claims.org_id) ? claims.org_id : null;
+    const orgId = claimedOrgId ?? (activeOrgIds.length === 1 ? activeOrgIds[0] : null);
+    if (APP_MODE === 'saas' && activeOrgIds.length > 1 && !claimedOrgId) {
+      throw new Error('Multiple active organizations require an explicit organization selector.');
+    }
+
+    let role = claims.role && claims.role !== 'authenticated' ? claims.role : 'authenticated';
+    if (orgId && role === 'authenticated') {
+      const { data: roleBindings, error: roleError } = await supabase
+        .schema('identity')
+        .from('role_bindings')
+        .select('role_code, scope_type, scope_id')
+        .eq('organization_id', orgId)
+        .eq('subject_user_id', userId)
+        .eq('binding_status', 'ACTIVE');
+      if (roleError) throw roleError;
+      const binding = (roleBindings ?? []).find((row) =>
+        row.scope_type === 'ORGANIZATION' && row.scope_id === null
+      );
+      if (binding?.role_code) role = binding.role_code as string;
+    }
+
     const authUser: AuthUser = {
-      id: claims.sub ?? session.user.id,
+      id: userId,
       email: claims.email ?? session.user.email ?? '',
-      orgId: claims.org_id ?? null,
-      role: claims.role ?? 'authenticated',
+      orgId,
+      role,
       isAuthenticated: true,
     };
     setUser(authUser);
@@ -104,7 +140,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (workspaceError) throw workspaceError;
       if (workspaceMemberships?.length === 1) {
-        setActiveWorkspaceIdCache(workspaceMemberships[0].workspace_id as string);
+        const workspaceId = workspaceMemberships[0].workspace_id as string;
+        const { data: workspace, error: workspaceLookupError } = await supabase
+          .schema('enterprise')
+          .from('workspaces')
+          .select('workspace_status')
+          .eq('id', workspaceId)
+          .eq('organization_id', authUser.orgId)
+          .maybeSingle();
+        if (workspaceLookupError) throw workspaceLookupError;
+        if (!workspace || workspace.workspace_status !== 'ACTIVE') {
+          throw new Error('The active workspace is unavailable.');
+        }
+        setActiveWorkspaceIdCache(workspaceId);
       } else if (APP_MODE === 'saas') {
         throw new Error(
           workspaceMemberships?.length
@@ -114,8 +162,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } else {
       setOrganization(null);
+      setActiveWorkspaceIdCache(null);
       if (APP_MODE === 'saas' && import.meta.env.DEV) {
-        console.warn('[marketplace] saas mode but no org_id in JWT — RLS will return 0 rows');
+        console.warn('[marketplace] no unique active organization membership — tenant repositories remain closed');
       }
     }
     setIsLoading(false);

@@ -243,6 +243,69 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
       "notes"
     ]
   },
+  "growth_strategie": {
+    "title": "name",
+    "fields": [
+      "phase",
+      "objective",
+      "duration",
+      "criteria",
+      "state",
+      "focus"
+    ]
+  },
+  "growth_aeo": {
+    "title": "query",
+    "fields": [
+      "intent",
+      "position",
+      "cited",
+      "trackedSince",
+      "history",
+      "competitor"
+    ]
+  },
+  "product_rankings": {
+    "title": "name",
+    "fields": [
+      "tier",
+      "body",
+      "score",
+      "area",
+      "owner",
+      "source",
+      "reviewedOn",
+      "nextStep"
+    ]
+  },
+  "product_launches": {
+    "title": "name",
+    "fields": [
+      "stage",
+      "state",
+      "cohort",
+      "body",
+      "startedAt",
+      "eta",
+      "owner",
+      "metric"
+    ]
+  },
+  "product_ideas": {
+    "title": "name",
+    "fields": [
+      "trend",
+      "opportunity",
+      "demand",
+      "economicSize",
+      "summary",
+      "body",
+      "source",
+      "raisedBy",
+      "raisedOn",
+      "ask"
+    ]
+  },
   "deals": {
     "title": "client",
     "fields": [

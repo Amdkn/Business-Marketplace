@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The live project returned **29 applied migration entries**. Twenty-nine source files are tracked in this repository, including the three new Finance & Capital migrations. The 20261126041718 historical event-trigger ACL migration remains a catalog-derived reconstruction, not byte-identical original SQL:
+The live project returned **30 applied migration entries**. Thirty source files are tracked in this repository, including the three new Finance & Capital migrations. The 20261126041718 historical event-trigger ACL migration remains a catalog-derived reconstruction, not byte-identical original SQL:
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -47,7 +47,7 @@ The live project returned **29 applied migration entries**. Twenty-nine source f
 | 20261126051720 | adapter_oauth_runtime_guards | migrations/20261126050000_adapter_oauth_runtime_guards.sql |
 | 20261126052043 | google_drive_adapter_manifest_draft | migrations/20261126052200_google_drive_adapter_manifest_draft.sql |
 | 20261126052132 | google_drive_blueprint_contract_status | migrations/20261126052300_google_drive_blueprint_contract_status.sql |
-| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |\n| 20261126061930 | finance_double_entry_foundation | migrations/20261126061930_finance_double_entry_foundation.sql |\n| 20261126062124 | finance_integrity_guards | migrations/20261126062124_finance_integrity_guards.sql |\n| 20261126062317 | finance_payment_fact_immutability | migrations/20261126062317_finance_payment_fact_immutability.sql |\n| 20261126062541 | finance_foreign_key_indexes | migrations/20261126062541_finance_foreign_key_indexes.sql |
+| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |\n| 20261126061930 | finance_double_entry_foundation | migrations/20261126061930_finance_double_entry_foundation.sql |\n| 20261126062124 | finance_integrity_guards | migrations/20261126062124_finance_integrity_guards.sql |\n| 20261126062317 | finance_payment_fact_immutability | migrations/20261126062317_finance_payment_fact_immutability.sql |\n| 20261126062541 | finance_foreign_key_indexes | migrations/20261126062541_finance_foreign_key_indexes.sql |\n| 20261126062749 | finance_journal_posting_api | migrations/20261126062749_finance_journal_posting_api.sql |
 
 The first column is the actual cloud migration registry version; the source filename is the versioned migration name authored in Git. These timestamps differ because the cloud migration runner recorded its own application timestamp. Preserve both values in future audits. The 20261126041718 source file reproduces the verified live ACL but is explicitly a reconstruction, not recovered original SQL.
 
@@ -71,7 +71,7 @@ The reserved `operations`, `trust`, `finance` and `api` namespaces currently hav
 
 | Function | Version | Gateway JWT | Boundary |
 |---|---:|---|---|
-| `marketplace-api` | 16 | enabled | Authenticated tenant API; public read-only catalog actions are explicitly scoped |
+| `marketplace-api` | 17 | enabled | Authenticated tenant API; public read-only catalog actions are explicitly scoped |
 | `adapter-api` | 7 | enabled | Authenticated workspace connection and OAuth initiation API |
 | `adapter-worker` | 7 | disabled | Handler enforces exact server-only service-role bearer validation |
 | `adapter-oauth-callback` | 1 | disabled | Public provider callback validates one-time state and PKCE transaction |
@@ -103,7 +103,7 @@ The platform has deployed schema and runtime foundations. It has not passed auth
 - `functions/adapter-api/` — connection lifecycle, OAuth initiation and execution control.
 - `functions/adapter-worker/` — Vault-backed provider execution, retries, refresh and manifest validation.
 - `functions/adapter-oauth-callback/` — one-time OAuth callback and PKCE exchange.
-- `tests/` — security baseline, OAuth, Google Drive manifest, capability entitlement and Finance ledger regression SQL.\n- `../docs/FINANCE_LEDGER_CONTRACT.md` — accounting, payment, refund, payout and dispute contract.
+- `tests/` — security baseline, OAuth, Google Drive manifest, capability entitlement and Finance ledger regression SQL. The authenticated `post_finance_journal_entry` action is now deployed in `marketplace-api` v17.\n- `../docs/FINANCE_LEDGER_CONTRACT.md` — accounting, payment, refund, payout and dispute contract.
 - `config.toml` — project binding and Edge Function gateway JWT settings.
 
 ## Continuation

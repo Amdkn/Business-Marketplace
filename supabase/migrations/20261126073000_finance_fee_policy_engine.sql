@@ -19,7 +19,8 @@ CREATE TABLE finance.fee_policies (
  activated_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
  CHECK((scope_type='PLATFORM' AND scope_organization_id IS NULL) OR (scope_type='SELLER_ORGANIZATION' AND scope_organization_id IS NOT NULL)),
  CHECK(effective_to IS NULL OR effective_to>effective_from),
- CHECK(maximum_fee_amount IS NULL OR minimum_fee_amount IS NULL OR maximum_fee_amount>=minimum_fee_amount)
+ CHECK(maximum_fee_amount IS NULL OR minimum_fee_amount IS NULL OR maximum_fee_amount>=minimum_fee_amount),
+ CHECK(minimum_fee_amount IS NULL OR minimum_fee_amount<=fixed_fee_amount+1000000000000)
 );
 CREATE UNIQUE INDEX fee_policies_version_scope_uidx ON finance.fee_policies
 (owner_organization_id,policy_key,version,scope_type,

@@ -847,20 +847,72 @@ async function registerAgent(user: User, body: Record<string, unknown>) {
   return await withServiceRole(async (tx) => {
     await requireOrgRole(tx, user.id, orgId);
     if (scopeType === 'WORKSPACE') await requireWorkspaceMember(tx, user.id, orgId, scopeId!);
-    const rows = await tx`
+
+    // Agent keys identify one canonical principal per organization. Re-registering
+    // the same key updates that principal and adds/refreshes its scope delegation;
+    // it never creates a second identity for a second workspace.
+    const principals = await tx`
       INSERT INTO identity.agent_principals
         (organization_id,agent_key,display_name,agent_class,runtime,created_by_user_id)
       VALUES (${orgId}::uuid,${agentKey},${displayName},${agentClass},${runtime},${user.id}::uuid)
+      ON CONFLICT (organization_id,agent_key) DO UPDATE
+        SET display_name=EXCLUDED.display_name,
+            agent_class=EXCLUDED.agent_class,
+            runtime=EXCLUDED.runtime
+        WHERE identity.agent_principals.principal_status='ACTIVE'
       RETURNING id,organization_id,agent_key,display_name,agent_class,runtime,principal_status,created_at
     `;
-    const agent = rows[0];
-    const delegations = await tx`
-      INSERT INTO identity.agent_delegations
-        (organization_id,agent_principal_id,delegator_user_id,scope_type,scope_id,permission_codes)
-      VALUES (${orgId}::uuid,${agent.id}::uuid,${user.id}::uuid,${scopeType},${scopeId}::uuid,${permissions})
-      RETURNING id AS delegation_id
+    if (!principals.length) {
+      throw new Error('An agent principal with this key already exists but is not ACTIVE; reactivate it through governance before delegating it.');
+    }
+    const agent = principals[0];
+
+    // Expired rows must leave the active-delegation uniqueness boundary before
+    // an assignment can be renewed.
+    await tx`
+      UPDATE identity.agent_delegations
+      SET delegation_status='EXPIRED'
+      WHERE organization_id=${orgId}::uuid
+        AND agent_principal_id=${agent.id}::uuid
+        AND scope_type=${scopeType}
+        AND scope_id IS NOT DISTINCT FROM ${scopeId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+        AND expires_at IS NOT NULL
+        AND expires_at <= now()
     `;
-    return { ...agent, delegation_id: delegations[0].delegation_id, permission_codes: permissions };
+
+    const existing = await tx`
+      SELECT id
+      FROM identity.agent_delegations
+      WHERE organization_id=${orgId}::uuid
+        AND agent_principal_id=${agent.id}::uuid
+        AND scope_type=${scopeType}
+        AND scope_id IS NOT DISTINCT FROM ${scopeId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    let delegationId: string;
+    if (existing.length) {
+      const updated = await tx`
+        UPDATE identity.agent_delegations
+        SET permission_codes=${permissions}
+        WHERE id=${existing[0].id}::uuid
+        RETURNING id
+      `;
+      delegationId = updated[0].id;
+    } else {
+      const created = await tx`
+        INSERT INTO identity.agent_delegations
+          (organization_id,agent_principal_id,delegator_user_id,scope_type,scope_id,permission_codes)
+        VALUES (${orgId}::uuid,${agent.id}::uuid,${user.id}::uuid,${scopeType},${scopeId}::uuid,${permissions})
+        RETURNING id
+      `;
+      delegationId = created[0].id;
+    }
+    return { ...agent, delegation_id: delegationId, permission_codes: permissions };
   });
 }
 async function revokeAgentDelegation(user: User, body: Record<string, unknown>) {

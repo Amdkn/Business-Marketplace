@@ -80,7 +80,7 @@ Still required:
 |---|---|
 | `20261126061930` | `finance_double_entry_foundation` |
 | `20261126062124` | `finance_integrity_guards` |
-| `20261126062317` | `finance_payment_fact_immutability` |\n| `20261126062541` | `finance_foreign_key_indexes` |
+| `20261126062317` | `finance_payment_fact_immutability` |\n| `20261126062541` | `finance_foreign_key_indexes` |\n| `20261126062749` | `finance_journal_posting_api` |
 
 ## Verification
 

@@ -30,11 +30,41 @@ Do not collapse these boundaries:
 | Policy | Authorization and execution constraints | Server-enforced; explicit; auditable |
 | Event | State transition record | Actor; tenant; correlation ID; timestamp; causality |
 
-## 3. Domain hierarchy
+## 3. Structural taxonomy and domain hierarchy
 
-Canonical hierarchy:
+Canonical tenant hierarchy:
 
-`Organization → Workspace → Domain → Subdomain → Capability → Installation`
+`Organization → Workspace → Installed structure → Domain/Department → Capability → Installation`
+
+The Marketplace UI must preserve two separate taxonomic axes:
+
+### 3.1 Business Departments — B2.1 to B2.8
+
+1. B2.1 Product & IP
+2. B2.2 Growth & Distribution
+3. B2.3 People & Talent
+4. B2.4 Legal & Trust
+5. B2.5 Tech & Intelligence
+6. B2.6 Operations & Delivery
+7. B2.7 Finance & Capital
+8. B2.8 Sales & Partnerships
+
+These eight departments describe the Marketplace business operating model and its value-producing functions.
+
+### 3.2 Areas OS mission portfolios — LD01 to LD08
+
+1. LD01 Business
+2. LD02 Finances
+3. LD03 Blue Life
+4. LD04 Meta Cognition
+5. LD05 Sovereign Triangle
+6. LD06 Solarpunk Habitat
+7. LD07 MC Sandbox
+8. LD08 Civilizer / ABC OS
+
+These eight Areas OS portfolios describe the A’Space mission/portfolio layer. They are not Marketplace departments and must not be represented as children of the B2 departments. LD01 is the Business mission portfolio; B2.1–B2.8 are the department taxonomy within the Marketplace business model.
+
+The two axes can connect through explicit project, ownership, capability and reporting relationships, but must retain independent identities and lifecycle semantics.
 
 Domains can also depend on other domains and capabilities. Dependencies form a directed graph; parent/child hierarchy and dependency edges are different relations and must not be conflated.
 

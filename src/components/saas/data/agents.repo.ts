@@ -6,7 +6,7 @@ import type { Agent } from '../lib/types';
 
 export const agentsRepo = {
   async list(): Promise<Agent[]> {
-    if (!SUPABASE_READY) return [];
+    if (!SUPABASE_READY) throw new Error('Marketplace Supabase is not configured.');
     const organizationId = getActiveOrgId();
     const workspaceId = getActiveWorkspaceId();
     if (!organizationId || !workspaceId) throw new Error('Active workspace context required.');

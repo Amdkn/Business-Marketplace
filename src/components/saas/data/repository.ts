@@ -104,7 +104,11 @@ export function makeRepository<T extends { id: string }>(collection: string, see
       },
       async update(id,patch) {
         const orgId = tenant();
-        const row = mapper.toDb(patch);
+        const { data: current,error: readError } = await table().select('*').eq('organization_id',orgId).eq('id',id).maybeSingle();
+        if (readError) throw new Error(`[${collection}] ${readError.message}`);
+        if (!current) throw new Error(`[${collection}] not found: ${id}`);
+        const merged = { ...mapper.fromDb(current as Record<string,unknown>), ...patch } as Partial<T>;
+        const row = mapper.toDb(merged);
         delete row.id; delete row.organization_id; delete row.created_by_user_id;
         const { data,error } = await table().update({ ...row, updated_at:new Date().toISOString() }).eq('organization_id',orgId).eq('id',id).select().single();
         if (error) throw new Error(`[${collection}] ${error.message}`);

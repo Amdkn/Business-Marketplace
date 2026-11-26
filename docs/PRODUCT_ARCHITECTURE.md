@@ -14,7 +14,20 @@ Do not collapse these boundaries:
 - Business Office runtime: desktop, executive garden and mobile operational surfaces.
 - Installed business: tenant-scoped domain model, applications, workflows, agents, data and policies.
 
-## 2. Control-plane objects
+## 2. Sovereign platform core
+
+Four foundational cores sit beneath the Marketplace departments, capabilities, adapters, agents and workflows:
+
+| Core | Responsibility | Boundary |
+|---|---|---|
+| Compute Core | Execution capacity, runtimes, scheduling and resource governance | Provider capacity is not assumed connected |
+| Inference Core | Model routing, inference endpoints, context budgets, fallbacks and evaluation | Model providers and inference policies require explicit configuration |
+| Memory Core | Persistent memory, knowledge retrieval, provenance, retention and portability | No tenant memory store is implied by the platform blueprint |
+| CEL Security Core | Identity, authorization, policy enforcement, secret boundaries, sandboxing and audit | Policy contracts must be enforced server-side, not only in the UI |
+
+These are platform foundations, not Business Departments and not Areas OS mission portfolios. The Tech & Intelligence department (B2.5) is the operating department responsible for building and stewarding technical/intelligence capabilities; it is not a replacement for the four cross-cutting cores.
+
+## 3. Control-plane objects
 
 | Object | Responsibility | Required invariants |
 |---|---|---|
@@ -30,7 +43,7 @@ Do not collapse these boundaries:
 | Policy | Authorization and execution constraints | Server-enforced; explicit; auditable |
 | Event | State transition record | Actor; tenant; correlation ID; timestamp; causality |
 
-## 3. Structural taxonomy and domain hierarchy
+## 4. Structural taxonomy and domain hierarchy
 
 Canonical tenant hierarchy:
 
@@ -78,7 +91,7 @@ A domain record should eventually expose:
 - governance: policies, data classification and audit references;
 - measurement: outcomes, KPIs and health signals.
 
-## 4. Adapter contract
+## 5. Adapter contract
 
 An adapter definition is a reusable platform capability. A connection is a tenant-specific configured instance.
 
@@ -120,7 +133,7 @@ Connection state machine:
 
 Additional terminal/administrative states: `revoked`, `error`. A successful OAuth callback alone does not mean the adapter is healthy; run a scoped health check.
 
-## 5. Agent and workflow governance
+## 6. Agent and workflow governance
 
 An agent is not granted ambient access because it exists in a workspace. Every run resolves:
 
@@ -135,7 +148,7 @@ An agent is not granted ambient access because it exists in a workspace. Every r
 
 Workflow steps must support human approval, retries, idempotency keys, cancellation and compensation where a provider supports it.
 
-## 6. Tenancy and security
+## 7. Tenancy and security
 
 - Supabase Auth identifies the principal; organization membership and role bindings determine tenant access.
 - RLS protects tenant-owned records in exposed schemas.
@@ -146,7 +159,7 @@ Workflow steps must support human approval, retries, idempotency keys, cancellat
 - All cross-tenant operations require an explicit privileged policy path and audit record.
 - Demo mode is an explicit environment/product mode, never an implicit fallback that resembles a live customer workspace.
 
-## 7. Existing implementation caveats
+## 8. Existing implementation caveats
 
 The inherited frontend currently includes Coach OS concepts such as `demo-coach`, `coach-os:*` local-storage keys, Coach onboarding copy and Coach-oriented seed collections. Those are legacy implementation details, not canonical Marketplace entities.
 
@@ -159,7 +172,7 @@ Before routing real users into the inherited Desktop:
 
 Existing Marketplace UI is an integration catalog with local install toggles. It is not yet the provider adapter control plane described here.
 
-## 8. Implementation sequence
+## 9. Implementation sequence
 
 ### Wave 0 — identity and safety
 - Product naming, metadata, README and deployment identity.
@@ -191,7 +204,7 @@ Existing Marketplace UI is an integration catalog with local install toggles. It
 - Digital Garden: executive portfolio and outcomes.
 - Mobile Edge: approvals, field actions and alerts.
 
-## 9. Acceptance gates
+## 10. Acceptance gates
 
 A feature is not complete because it renders. For every vertical slice:
 

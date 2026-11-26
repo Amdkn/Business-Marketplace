@@ -202,10 +202,10 @@ export function DashboardApp() {
     }
   };
 
-  // Wind Direction: derive from live state, fall back to seed and label it.
+  // Wind Direction derives only from persisted workspace records.
   const validations = useMemo(() => deriveValidations(clients, invoices, deals), [clients, invoices, deals]);
 
-  /* ─────────────────────────── Wind Direction (live or seed) ────────────────────── */
+  /* ─────────────────────────── Wind Direction (persisted signals) ─────────────── */
 
   const Validation = () => (
     <div className="p-7">
@@ -524,7 +524,7 @@ export function DashboardApp() {
   /* ─────────────────────────── Client Pipeline (kept) ─────────────────────────── */
 
   const sortedClients = useMemo(() => {
-    // Pinned clients float to the top; otherwise preserve seed order.
+    // Pinned clients float to the top; otherwise preserve workspace order.
     const pinnedFirst = [...clients].sort((a, b) => {
       const ap = Boolean((a as Record<string, unknown>).pinned);
       const bp = Boolean((b as Record<string, unknown>).pinned);
@@ -545,7 +545,7 @@ export function DashboardApp() {
     <div className="p-7">
       <SectionHead
         title="Client ledger"
-        subtitle="Every account, every weight. Click a card to open the client detail; use the pin to keep it on top of your pipeline."
+        subtitle="Every persisted account. Open a client record or pin it to keep it visible in your pipeline."
       />
       {sortedClients.length === 0 ? (
         <div
@@ -561,7 +561,7 @@ export function DashboardApp() {
           </div>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed">
             Once a client is added in the Clients app, they show up here with their
-            segment, status, and weight. Use the pin to keep important accounts on top.
+            segment and status. Use the pin to keep important accounts on top.
           </p>
           <button
             type="button"

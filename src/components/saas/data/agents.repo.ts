@@ -1,5 +1,5 @@
 // Canonical AI agent directory. Identity and delegation remain in identity.*;
-// this repository reads only the workspace-scoped, permission-filtered API model.
+// the browser consumes only the workspace-scoped Marketplace API projection.
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 import { getActiveOrgId, getActiveWorkspaceId } from '../lib/tenant';
 import type { Agent } from '../lib/types';
@@ -18,7 +18,7 @@ export const agentsRepo = {
     const rows = Array.isArray(data?.data) ? data.data : [];
     return rows.map((row: Record<string, unknown>) => ({
       id: String(row.id),
-      delegationId: String(row.delegation_id ?? ''),
+      delegationId: row.delegation_id ? String(row.delegation_id) : undefined,
       name: String(row.display_name ?? row.agent_key ?? 'Unnamed agent'),
       role: 'operator' as const,
       email: null,
@@ -29,10 +29,16 @@ export const agentsRepo = {
       agentClass: String(row.agent_class ?? ''),
       runtime: String(row.runtime ?? ''),
       permissionCodes: Array.isArray(row.permission_codes) ? row.permission_codes.map(String) : [],
-      delegationId: row.delegation_id ? String(row.delegation_id) : undefined,
     } as Agent));
   },
-  async register(input: { agentKey: string; displayName: string; agentClass: string; runtime: string; permissionCodes: string[] }): Promise<void> {
+
+  async register(input: {
+    agentKey: string;
+    displayName: string;
+    agentClass: string;
+    runtime: string;
+    permissionCodes: string[];
+  }): Promise<void> {
     if (!SUPABASE_READY) throw new Error('Marketplace API is not configured.');
     const organizationId = getActiveOrgId();
     const workspaceId = getActiveWorkspaceId();
@@ -52,51 +58,12 @@ export const agentsRepo = {
     });
     if (error) throw error;
   },
+
   async revoke(delegationId: string): Promise<void> {
     if (!SUPABASE_READY) throw new Error('Marketplace API is not configured.');
     const organizationId = getActiveOrgId();
     const workspaceId = getActiveWorkspaceId();
     if (!organizationId || !workspaceId) throw new Error('Active workspace context required.');
-    const { error } = await supabase.functions.invoke('marketplace-api', {
-      body: { action: 'revoke_agent_delegation', organization_id: organizationId, workspace_id: workspaceId, delegation_id: delegationId },
-    });
-    if (error) throw error;
-  },
-
-  async register(input: {
-    agentKey: string;
-    displayName: string;
-    agentClass: string;
-    runtime: string;
-    permissionCodes: string[];
-  }): Promise<void> {
-    const organizationId = getActiveOrgId();
-    const workspaceId = getActiveWorkspaceId();
-    if (!SUPABASE_READY || !organizationId || !workspaceId) {
-      throw new Error('An authenticated active workspace is required to register an agent.');
-    }
-    const { error } = await supabase.functions.invoke('marketplace-api', {
-      body: {
-        action: 'register_agent',
-        organization_id: organizationId,
-        scope_type: 'WORKSPACE',
-        scope_id: workspaceId,
-        agent_key: input.agentKey,
-        display_name: input.displayName,
-        agent_class: input.agentClass,
-        runtime: input.runtime,
-        permission_codes: input.permissionCodes,
-      },
-    });
-    if (error) throw error;
-  },
-
-  async revoke(delegationId: string): Promise<void> {
-    const organizationId = getActiveOrgId();
-    const workspaceId = getActiveWorkspaceId();
-    if (!SUPABASE_READY || !organizationId || !workspaceId) {
-      throw new Error('An authenticated active workspace is required to revoke an agent.');
-    }
     const { error } = await supabase.functions.invoke('marketplace-api', {
       body: {
         action: 'revoke_agent_delegation',

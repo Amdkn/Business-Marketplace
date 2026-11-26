@@ -18,6 +18,7 @@ export const agentsRepo = {
     const rows = Array.isArray(data?.data) ? data.data : [];
     return rows.map((row: Record<string, unknown>) => ({
       id: String(row.id),
+      delegationId: String(row.delegation_id ?? ''),
       name: String(row.display_name ?? row.agent_key ?? 'Unnamed agent'),
       role: 'operator',
       email: null,
@@ -29,5 +30,35 @@ export const agentsRepo = {
       runtime: String(row.runtime ?? ''),
       permissionCodes: Array.isArray(row.permission_codes) ? row.permission_codes.map(String) : [],
     }));
+  },
+  async register(input: { agentKey: string; displayName: string; agentClass: string; runtime: string; permissionCodes: string[] }): Promise<void> {
+    if (!SUPABASE_READY) throw new Error('Marketplace API is not configured.');
+    const organizationId = getActiveOrgId();
+    const workspaceId = getActiveWorkspaceId();
+    if (!organizationId || !workspaceId) throw new Error('Active workspace context required.');
+    const { error } = await supabase.functions.invoke('marketplace-api', {
+      body: {
+        action: 'register_agent',
+        organization_id: organizationId,
+        agent_key: input.agentKey.trim().toUpperCase(),
+        display_name: input.displayName.trim(),
+        agent_class: input.agentClass,
+        runtime: input.runtime.trim(),
+        scope_type: 'WORKSPACE',
+        scope_id: workspaceId,
+        permission_codes: input.permissionCodes,
+      },
+    });
+    if (error) throw error;
+  },
+  async revoke(delegationId: string): Promise<void> {
+    if (!SUPABASE_READY) throw new Error('Marketplace API is not configured.');
+    const organizationId = getActiveOrgId();
+    const workspaceId = getActiveWorkspaceId();
+    if (!organizationId || !workspaceId) throw new Error('Active workspace context required.');
+    const { error } = await supabase.functions.invoke('marketplace-api', {
+      body: { action: 'revoke_agent_delegation', organization_id: organizationId, workspace_id: workspaceId, delegation_id: delegationId },
+    });
+    if (error) throw error;
   },
 };

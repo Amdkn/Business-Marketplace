@@ -86,4 +86,16 @@ begin
   if exists(select 1 from information_schema.tables where table_schema='workspace_data' and table_name like 'demo_coach_%') then
     raise exception 'demo-only collections must not have tenant persistence tables';
   end if;
+  if position('new.created_by_user_id := old.created_by_user_id' in pg_get_functiondef('workspace_data.guard_tenant_row()'::regprocedure)) = 0 then
+    raise exception 'Workspace row guard does not preserve immutable creator attribution';
+  end if;
+  if not exists(
+    select 1 from pg_policies
+    where schemaname='workspace_data'
+      and tablename='activity_events'
+      and cmd='SELECT'
+      and qual like '%is_active_workspace_member%'
+  ) then
+    raise exception 'Activity events are missing workspace-member read isolation';
+  end if;
 end $$;

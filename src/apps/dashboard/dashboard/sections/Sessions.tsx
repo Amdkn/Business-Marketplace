@@ -9,11 +9,12 @@ import { SESSIONS } from '../seed';
 import type { DashboardSession } from '../seed';
 import { useDashboardAgents } from '../cmsAgents';
 import { ACCENT, IconChip, Panel, Pill, SectionTitle } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
 type OutcomeFilter = 'all' | 'completed' | 'escalated' | 'failed' | 'flagged';
 type ChannelFilter = 'all' | 'in-app' | 'email' | 'slack' | 'telegram' | 'webhook';
 
-export function Sessions() {
+function DemoSessions() {
   // Sessions themselves are system-side and stay on the seed; the agent
   // dropdown tracks the CMS list so a newly-created agent is filterable.
   const agents = useDashboardAgents();
@@ -192,4 +193,12 @@ function Select({
       </select>
     </label>
   );
+}
+
+
+export function Sessions() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoSessions />
+    : <RuntimeUnavailable title="Sessions" description="Agent sessions and outcomes require runtime session events. No session telemetry table or ingestion feed is connected." />;
 }

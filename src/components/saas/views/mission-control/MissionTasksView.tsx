@@ -1,8 +1,7 @@
 // src/components/views/mission-control/MissionTasksView.tsx
 // Hermes — Tasks sub-page (route /agent-root/tasks)
 // Kanban with 3 columns (todo / doing / done), @dnd-kit drag-and-drop,
-// new-mission form, search + priority filter, live data from
-// Marketplace mission persistence (schema connection pending).
+// new-mission form, search + priority filter, and workspace-backed mission persistence.
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -124,6 +123,7 @@ export const MissionTasksView = (): React.ReactElement => {
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState(initialNewMission());
   const [submitting, setSubmitting] = useState(false);
+  const [savingMove, setSavingMove] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -173,49 +173,63 @@ export const MissionTasksView = (): React.ReactElement => {
 
   const handleDragEnd = async (event: DragEndEvent): Promise<void> => {
     const { active, over } = event;
-    if (!over || !missions) return;
+    if (!over || !missions || savingMove) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
-
-    // Find source and destination columns
     let sourceCol: Column | null = null;
     let targetCol: Column | null = null;
     for (const col of COLUMN_ORDER) {
-      if (grouped[col].some((m) => m.id === activeId)) sourceCol = col;
-      if (grouped[col].some((m) => m.id === overId)) targetCol = col;
+      if (grouped[col].some((mission) => mission.id === activeId)) sourceCol = col;
+      if (grouped[col].some((mission) => mission.id === overId)) targetCol = col;
     }
-    // Drop on column body (over.id === column key)
     if (!targetCol && COLUMN_ORDER.includes(overId as Column)) targetCol = overId as Column;
     if (!sourceCol || !targetCol) return;
 
-    if (sourceCol === targetCol) {
-      const oldIndex = grouped[sourceCol].findIndex((m) => m.id === activeId);
-      const newIndex = grouped[targetCol].findIndex((m) => m.id === overId);
-      if (oldIndex === -1 || newIndex === -1) return;
-      const reordered = arrayMove(grouped[sourceCol], oldIndex, newIndex);
-      setMissions((prev) => {
-        if (!prev) return prev;
-        return prev.map((m) => {
-          const idx = reordered.findIndex((r) => r.id === m.id);
-          if (idx === -1) return m;
-          return { ...m, status: targetCol!, position: idx };
+    const sourceItems = grouped[sourceCol];
+    const moving = sourceItems.find((mission) => mission.id === activeId);
+    if (!moving) return;
+
+    setSavingMove(true);
+    setError(null);
+    try {
+      if (sourceCol === targetCol) {
+        const oldIndex = sourceItems.findIndex((mission) => mission.id === activeId);
+        const newIndex = sourceItems.findIndex((mission) => mission.id === overId);
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+        const reordered = arrayMove(sourceItems, oldIndex, newIndex);
+        await Promise.all(reordered.map((mission, position) =>
+          missionsRepo.update(mission.id, { position })
+        ));
+        const positions = new Map(reordered.map((mission, position) => [mission.id, position]));
+        setMissions((previous) => previous
+          ? previous.map((mission) => positions.has(mission.id)
+            ? { ...mission, position: positions.get(mission.id)! }
+            : mission)
+          : previous);
+      } else {
+        const targetItems = grouped[targetCol];
+        const nextPosition = targetItems.length;
+        const updated = await missionsRepo.update(activeId, {
+          status: targetCol,
+          position: nextPosition,
         });
-      });
-      // Persist positions
-      const mission = missions.find((m) => m.id === activeId);
-      if (mission) {
-        const idx = reordered.findIndex((r) => r.id === activeId);
-        await missionsRepo.update(activeId, { position: idx }).catch(() => undefined);
+        setMissions((previous) => previous
+          ? previous.map((mission) => mission.id === activeId ? updated : mission)
+          : previous);
       }
-    } else {
-      const moving = missions.find((m) => m.id === activeId);
-      if (!moving) return;
-      setMissions((prev) => {
-        if (!prev) return prev;
-        return prev.map((m) => (m.id === activeId ? { ...m, status: targetCol! } : m));
-      });
-      await missionsRepo.update(activeId, { status: targetCol }).catch(() => undefined);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Mission move was not saved.';
+      try {
+        const latest = await missionsRepo.list();
+        setMissions(latest);
+        setError(`${message} The board was refreshed from the workspace register.`);
+      } catch (reloadReason) {
+        setMissions(missions);
+        setError(`${message} Workspace refresh also failed: ${reloadReason instanceof Error ? reloadReason.message : 'unknown error'}`);
+      }
+    } finally {
+      setSavingMove(false);
     }
   };
 

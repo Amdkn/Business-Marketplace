@@ -1839,3 +1839,61 @@ A deeper read of the actual People/Agents interfaces found additional non-persis
 - The Supabase information_schema, pg_constraint, pg_policies and role privilege queries above were executed against the connected Marketplace project.
 - No browser-authenticated CRUD or cross-workspace test was run. No TypeScript, Vitest, build, deployment or browser smoke test was run after these code changes.
 - Latest branch head and PR checks must be refreshed before any acceptance decision. Day 1–3 remain OPEN / PR #1 remains DRAFT.
+
+
+### 13.35 Shared tenant context, canonical People/Agents read models and typed Garden records — 2026-11-26
+
+This section supersedes earlier checkpoints that reported 37 tables / 146 policies or stated that Garden still reads `dashboard.clients` / `dashboard.agents`. The current hosted state is 38 tables / 150 policies, and the Garden People/Agents reads now use canonical server-side identity projections.
+
+**Live Supabase state**
+- Project: `swegnrvaxxgfrnshdpxx`.
+- `workspace_data`: 38 base tables; all 38 have `workspace_id NOT NULL`; 150 RLS policies; all tables have RLS enabled.
+- First real tenant remains: 1 Auth user, 1 profile, 1 organization, 1 active organization membership, 1 workspace, 1 active workspace membership. No agent principals exist yet.
+- First tenant: organization `47735c82-818d-4794-ac67-1e302173897b`; workspace `c987607d-1c53-42a4-84e5-cb070764dafa`; role `B1_CEO`.
+- No demo business records, fake agent principals, mission rows, invoices, payments, refunds or payouts were created.
+- The temporary task CRUD probe was run inside a transaction and rolled back; follow-up query confirmed 0 persisted probe rows.
+
+**Critical private-schema correction**
+- `enterprise` is a private schema and must not be queried directly from browser clients.
+- Added `identity.get_current_workspace_context()`, an authenticated, caller-bound SECURITY DEFINER RPC with pinned `search_path`. It returns only the caller's unique active organization/workspace names and IDs plus the active organization role; it returns no context when the user has zero or multiple active memberships/workspaces.
+- Tested under PostgreSQL role `authenticated` using the real user subject. It returned the expected organization, workspace and `B1_CEO` role.
+- Garden AuthProvider, `useTenantStore.bootstrap()` and the Web Desktop CMS repository now use this RPC instead of querying `enterprise.workspace_memberships` / `enterprise.workspaces` from the browser.
+- Garden and Web Desktop now import the same `src/lib/supabase.ts` client singleton. A real Supabase session overrides a stale local demo marker.
+- RLS policy helpers `identity.is_active_workspace_member` and `identity.can_manage_workspace` remain fixed-search-path SECURITY DEFINER predicates, execute granted only to authenticated, denied to anon/PUBLIC. The mission delegation trigger function is SECURITY DEFINER with fixed search_path and no browser EXECUTE.
+
+**Garden records and People/Agents**
+- Garden repositories filter reads, updates and deletes by both `organization_id` and `workspace_id`; creates write both IDs.
+- Garden `missions` now maps to a dedicated `workspace_data.missions` table, not the generic CMS `tasks` table. Mission rows have priority/status/position/notes and optional `agent_principal_id`; a trigger rejects assigning an agent without an active workspace delegation.
+- `workspace_data.invoices` now has typed `client_id`, `currency`, `issued_at`, `due_at` and `paid_at` columns. Currency is checked as a three-letter uppercase code when supplied; there is no USD default. The client FK includes organization/workspace scope.
+- Garden `membersRepo` and `agentsRepo` now use authenticated Marketplace API read actions `list_workspace_members` and `list_workspace_agents`. The former reads active workspace memberships and profile display names; the latter returns canonical `identity.agent_principals` only when an active delegation exists for the current workspace.
+- Garden People and People/Agents views now render the distinct human-membership and delegated-agent read models. They no longer create a human row in the AI agent directory or infer humans from agent role values. The agent list is expected to be empty until real agents are registered and delegated.
+- `marketplace-api` deployed ACTIVE v25 with `verify_jwt=true`; added `list_workspace_members` and `list_workspace_agents`.
+- Garden invoice mapping no longer fabricates USD. Dashboard copy no longer references `dashboard.clients` / `dashboard.agents`.
+- Repository code search returned no active `OMK`, `omk_internal` or `omk_saas` references. The retired `dashboard` namespace is documented as historical only; no new code may use it.
+
+**Hosted migration ledger / exact source filenames**
+- `20261126091538_workspace_scoped_data_access.sql`
+- `20261126092009_workspace_data_access_hardening.sql`
+- `20261126092033_workspace_policy_predicate_definer_boundary.sql`
+- `20261126092835_garden_invoice_and_mission_records.sql`
+- `20261126093031_current_workspace_context_rpc.sql`
+- The source filenames were reconciled to the exact versions assigned by the hosted Supabase migration ledger; provisional filenames were removed.
+
+**SQL verification**
+All six SQL suites were executed against the connected hosted project after the current schema/code changes; all returned no exceptions:
+1. `marketplace_security_baseline.sql`
+2. `marketplace_interface_persistence.sql`
+3. `adapter_oauth_runtime.sql`
+4. `google_drive_adapter_manifest.sql`
+5. `marketplace_capability_entitlements.sql`
+6. `marketplace_finance_ledger.sql`
+
+**Not accepted / remaining work**
+- The new Edge actions are deployed but have not yet been invoked through a live browser JWT. The RPC context was tested under authenticated SQL role; this is not a full browser E2E.
+- TypeScript, Vitest, Vite build and CI have not been executed from a local project checkout in this session.
+- No new Vercel deployment or browser smoke test has been confirmed; refresh the latest PR check and deployment status before claiming UI delivery.
+- Human invitation/acceptance and agent registration/configuration UI still need to be wired to authorized Marketplace API commands. People/Agents list views are now read-only canonical projections.
+- Web Desktop PeopleApp still needs its hardcoded local fleet/schedule fixtures reconciled with the canonical read models. Continue auditing every app for local stores, synthetic metrics and unpersisted controls.
+- Continue the remaining Garden/Web Desktop modules through real CRUD, contract tests, browser JWT validation and cross-workspace denial. Day 1–3 remain OPEN; PR #1 remains DRAFT until acceptance gates pass.
+
+**Continuation rule:** continue in `Amdkn/Business-Marketplace`, branch `foundation/marketplace-product-identity`, linked Supabase project `swegnrvaxxgfrnshdpxx`. Do not return to V5 for Marketplace code, do not recreate OMK namespaces, do not seed fake tenants/agents/business data, and do not claim E2E acceptance from SQL-only tests.

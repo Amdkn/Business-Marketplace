@@ -18,7 +18,7 @@ The commerce order lifecycle and capability entitlement lifecycle remain separat
 
 ## Persisted schema
 
-All objects are in the private `finance` schema. RLS is enabled on all nine tables. Browser roles have neither schema USAGE nor table privileges; the service role is the only database gateway.
+All objects are in the private `finance` schema. RLS is enabled on all current Finance tables (12 at this checkpoint). Browser roles have neither schema USAGE nor table privileges; the service role is the only database gateway.
 
 | Table | Responsibility |
 |---|---|

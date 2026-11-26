@@ -325,7 +325,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
                 value={composerValue}
                 onChange={(e) => setComposerValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitNewDeal();
+                  if (e.key === 'Enter') void submitNewDeal();
                   if (e.key === 'Escape') cancelComposer();
                 }}
                 placeholder="1200"

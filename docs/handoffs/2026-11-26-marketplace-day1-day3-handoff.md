@@ -1408,3 +1408,25 @@ The migration source files are historical records for the already-applied cloud 
 7. Continue Day 2 commercial lifecycle (publication, order, entitlement, payments, double-entry ledger, payouts, reconciliation) and Day 3 platform cores, agent runtime, workflows, Control Tower and enterprise replication.
 8. Keep PR #1 Draft and all Day 1–3 acceptance gates OPEN until real integrated evidence exists.
 
+
+
+### 13.5 Consolidation verification — 2026-11-26
+
+- Port commit: `5de0251aad83982c238d626808920373e1233e8e` on `foundation/marketplace-product-identity`.
+- PR #1 remains OPEN / DRAFT; 47 changed files are now included.
+- All four live Edge Function sources were fetched from the cloud and compared byte-for-byte with the canonical files in this repository:
+  - `marketplace-api` v16 — exact match.
+  - `adapter-api` v7 — exact match.
+  - `adapter-worker` v7 — exact match.
+  - `adapter-oauth-callback` v1 — exact match.
+- All four committed SQL regression suites were executed against the existing cloud project and returned no assertion exceptions:
+  - `marketplace_security_baseline.sql`
+  - `adapter_oauth_runtime.sql`
+  - `google_drive_adapter_manifest.sql`
+  - `marketplace_capability_entitlements.sql`
+- The live inventory query returned 36 application tables; all 36 have RLS enabled.
+- The 25-entry migration registry still has one source-parity gap: cloud version `20261126041718`, migration `revoke_public_execution_rls_auto_enable`, has no exact SQL source file in the V5 PR #63 tree. The repository tracks the other 24 applied migration sources.
+- Vercel deployment for commit `5de0251` was observed in state `BUILDING` at the last check. No READY/build-success claim is made.
+- GitHub PR-triggered workflow lookup returned no runs for this commit at the last poll; the combined commit status showed Vercel `pending`. Recheck after the deployment completes.
+
+These checks establish deployed-source parity and structural SQL regression status. They do not establish authenticated tenant lifecycle, live OAuth provider operations, payments or Day 1–3 acceptance.

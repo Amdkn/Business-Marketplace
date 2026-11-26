@@ -441,7 +441,7 @@ function toWorkspaceRow(
     created_by_user_id: context.userId,
     title: item[shape.title] ?? null,
     extra_data: Object.fromEntries(Object.entries(item).filter(([key]) =>
-      !['id', 'tenant_id', 'createdAt', 'updatedAt', 'orgId'].includes(key) &&
+      !['id', 'tenant_id', 'orgId', 'organizationId', 'workspaceId', 'organization_id', 'workspace_id', 'created_by_user_id', 'createdAt', 'updatedAt', 'created_at', 'updated_at'].includes(key) &&
       !(collectionId === 'invoices' && ['clientId', 'currency', 'issuedAt', 'dueAt', 'paidAt'].includes(key))
     )),
     updated_at: new Date().toISOString(),

@@ -306,6 +306,225 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
       "ask"
     ]
   },
+  "plancher_marges": {
+    "title": "offer",
+    "fields": [
+      "category",
+      "unit",
+      "realCost",
+      "floor",
+      "price",
+      "gap",
+      "marginPct",
+      "status",
+      "note"
+    ]
+  },
+  "courbe_demande": {
+    "title": "offer",
+    "fields": [
+      "category",
+      "scenarios",
+      "elasticity",
+      "sweetSpot",
+      "sensitivity",
+      "notes"
+    ]
+  },
+  "budget_tokens": {
+    "title": "use",
+    "fields": [
+      "category",
+      "monthlyTokens",
+      "modelCost",
+      "fteRole",
+      "fteSalary",
+      "coverage",
+      "ratio",
+      "monthlySaving",
+      "status",
+      "notes"
+    ]
+  },
+  "formes_prix": {
+    "title": "shape",
+    "fields": [
+      "offer",
+      "pricing",
+      "cashflow",
+      "commitment",
+      "risk",
+      "bestFor"
+    ]
+  },
+  "dods": {
+    "title": "name",
+    "fields": [
+      "context",
+      "owner",
+      "status",
+      "lastEdited",
+      "dod",
+      "signal"
+    ]
+  },
+  "comparators": {
+    "title": "name",
+    "fields": [
+      "compared",
+      "against",
+      "verdict",
+      "delta",
+      "reviewer",
+      "reviewed"
+    ]
+  },
+  "exposed_actions": {
+    "title": "name",
+    "fields": [
+      "audience",
+      "channel",
+      "shippedAt",
+      "owner",
+      "summary",
+      "metric"
+    ]
+  },
+  "processes": {
+    "title": "name",
+    "fields": [
+      "owner",
+      "category",
+      "inputs",
+      "outputs",
+      "dependsOn",
+      "cadence",
+      "edgeCases"
+    ]
+  },
+  "benchmarks": {
+    "title": "title",
+    "fields": [
+      "target",
+      "difficulty",
+      "passRate",
+      "lastRun",
+      "status",
+      "failureMode"
+    ]
+  },
+  "audit_arbitrage": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_contexte": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_donnees": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_automatabilite": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_arbitrage_roi": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "it_journal": {
+    "title": "title",
+    "fields": [
+      "actor",
+      "action",
+      "entity",
+      "ts",
+      "outcome",
+      "projects",
+      "note"
+    ]
+  },
+  "it_loops": {
+    "title": "name",
+    "fields": [
+      "state",
+      "metric",
+      "capteur",
+      "consigne",
+      "controleur",
+      "actionneur",
+      "target",
+      "tolerance",
+      "lastAction",
+      "lastActionAt",
+      "note"
+    ]
+  },
+  "it_drift": {
+    "title": "name",
+    "fields": [
+      "metric",
+      "severity",
+      "reference",
+      "current",
+      "detected",
+      "threshold",
+      "unit",
+      "method",
+      "note"
+    ]
+  },
+  "it_evals": {
+    "title": "name",
+    "fields": [
+      "rate",
+      "evalType",
+      "trials",
+      "distribution",
+      "failures",
+      "ranAt",
+      "note"
+    ]
+  },
+  "settings_integrations": {
+    "title": "name",
+    "fields": [
+      "description",
+      "status",
+      "scope"
+    ]
+  },
   "deals": {
     "title": "client",
     "fields": [

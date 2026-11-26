@@ -74,7 +74,6 @@ export const LegalView: React.FC = () => {
         category: 'Corporate',
         status: 'Draft',
         fileUrl: storagePath,
-        notes: null,
       });
       await load();
     } catch (reason) {

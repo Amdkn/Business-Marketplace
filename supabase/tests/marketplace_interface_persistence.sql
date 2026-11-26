@@ -108,4 +108,4 @@ begin
      or position('NEW.created_by_user_id := OLD.created_by_user_id' in pg_get_functiondef('workspace_data.guard_change_request_update()'::regprocedure)) = 0 then
     raise exception 'Change request guard does not preserve tenant and creator attribution';
   end if;
-end $;
+end $$;

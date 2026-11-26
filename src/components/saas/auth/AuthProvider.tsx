@@ -3,7 +3,7 @@
 // Reads 'org_id' + 'role' claims from Supabase session JWT (Phase A: custom_access_token_hook).
 // In saas mode, missing org_id → RLS will silently return 0 rows (warn per ADR-SUPABASE-001).
 // signUp() invokes the Edge Function `sign-up-organization` (Phase F) to atomically
-// create auth.users + omk_saas.organizations + omk_saas.memberships in one request.
+// create auth.users + identity.organizations + identity.organization_memberships in one request.
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { supabase, SUPABASE_READY } from '../lib/supabase';
@@ -44,7 +44,7 @@ function decodeJwtClaims(token: string): { org_id?: string; role?: string; sub?:
 
 async function fetchUserOrg(orgId: string): Promise<Organization | null> {
   if (!SUPABASE_READY) return null;
-  const { data, error } = await supabase.from('organizations').select('*').eq('id', orgId).maybeSingle();
+  const { data, error } = await supabase.schema('identity').from('organizations').select('*').eq('id', orgId).maybeSingle();
   if (error) {
     if (import.meta.env.DEV) {
       console.warn('[auth] failed to fetch organization', error.message);
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setOrganization(null);
       if (APP_MODE === 'saas' && import.meta.env.DEV) {
-        console.warn('[omk] saas mode but no org_id in JWT — RLS will return 0 rows');
+        console.warn('[marketplace] saas mode but no org_id in JWT — RLS will return 0 rows');
       }
     }
     setIsLoading(false);

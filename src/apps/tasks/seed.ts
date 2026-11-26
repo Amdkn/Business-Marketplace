@@ -135,7 +135,7 @@ const comparatorsItems: CmsItem[] = [
     id: 'comp-onboarding-mockup',
     name: 'Onboarding tour — mockup vs. shipped',
     compared: 'Figma mockup v3.2 (Anna Bauer)',
-    against: 'Live /onboarding on omk-svc-os, EU region',
+    against: 'Live /onboarding on Marketplace runtime, EU region',
     verdict: 'match',
     delta: '4 visual drifts: icon weight (-1 step in mockup), card spacing 8px vs 12px (intentional simplification), two illustrations dropped. All four are documented in the design review PR — verdict is match-with-deliberate-edits.',
     reviewer: 'Anna Bauer',

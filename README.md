@@ -135,7 +135,8 @@ Rules:
 - [x] Public published-listing read path connected; current catalogue correctly returns zero published offers.
 - [x] Four platform-core foundations represented in the Control Plane.
 - [ ] Tenant-owned domain/department installation, ownership and dependency graph.
-- [ ] Adapter registry, connection lifecycle, secrets references and health model.
+- [x] Global registry of 20 adapter families persisted in Supabase and served through a public read-only API; every family remains explicitly PLANNED.
+- [ ] Provider-specific manifests, connection lifecycle, secret references, scopes and health checks.
 - [ ] Organization/workspace provisioning and authorization verified end-to-end.
 - [ ] Marketplace capability installation and order lifecycle connected to the frontend.
 - [ ] Production signup/email delivery and browser authentication verified.

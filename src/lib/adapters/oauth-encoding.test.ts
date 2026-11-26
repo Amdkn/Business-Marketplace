@@ -17,6 +17,6 @@ describe('base64Url', () => {
   it('produces URL-safe output for arbitrary byte values', () => {
     const encoded = base64Url(new Uint8Array([0, 255, 239, 190, 173, 251, 255]));
     expect(encoded).not.toMatch(/[+/=]/);
-    expect(encoded).toBe('AP_vuq37_w');
+    expect(encoded).toBe('AP_vvq37_w');
   });
 });

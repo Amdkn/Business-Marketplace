@@ -319,3 +319,21 @@ Vercel Preview [dpl_DdLLvP5GZv3FhoCZMZPfStFHghmF](https://vercel.com/amd-lab/bus
 Non-blocking warnings: Vite native config loader reports `__dirname`; CMS seed module is imported both statically and dynamically; main JavaScript chunk is approximately 2.96 MB (772.75 KB gzip); Bun reports the `core-js` postinstall script is not explicitly allowlisted. Track chunking/config cleanup separately.
 
 The IT Software Kernel view no longer reports fabricated live connections, latency/uptime or a sovereignty score. It now distinguishes the target stack and P10–P18 control objectives from verified runtime evidence. Preview is not production and authenticated browser acceptance remains open.
+
+
+## Fresh hosted project/security snapshot — 2026-11-26 20:58 UTC
+
+Project `swegnrvaxxgfrnshdpxx` is ACTIVE_HEALTHY on PostgreSQL 17.12.0.000. The live migration ledger contains 69 entries. Current application schemas contain 117 tables, all with RLS enabled: integration 8, content 2, commerce 3, areas 4, finance 13, enterprise 8, identity 7, dashboard 2, workspace_data 66, catalog 4.
+
+The current PostgREST authenticator role configuration explicitly exposes `public, dashboard, identity, workspace_data`; `public` has zero application tables. This matches the app's `DB_SCHEMA = 'workspace_data'`. The exposed-schema list is configured in the hosted project, not inferred from local `supabase/config.toml`.
+
+Authenticated SELECT grants are confined to the intended user-facing schemas; no anon table SELECT grants were found. The 42 RLS-enabled/no-policy INFO findings are private server-owned tables without anon/authenticated table grants, not missing public policies. The current advisor snapshot is:
+- Security: 42 INFO `rls_enabled_no_policy`; one WARN `auth_leaked_password_protection`.
+- Performance: 63 INFO unindexed foreign keys; 272 INFO unused indexes.
+- Health: zero findings.
+
+The Dashboard currently identifies the project as **Free** and reports **No backups**. Supabase's current password-security documentation says leaked-password protection is available on Pro and above: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection. This remains a plan-gated hardening item. No backup/restore drill has been completed; recoverability remains a Day 3 launch gate.
+
+Live records: 1 Auth user/profile/org/org membership/workspace/workspace membership; zero domain/department/holon installations, agent principals/delegations, tenant connections, OAuth transactions, execution jobs, listings, orders, payment intents, refunds, payout batches, journal entries, clients and document records. One provider manifest exists and remains DRAFT. No synthetic records were inserted.
+
+Latest source truth: commit `2fe574f` corrects IT Software Kernel to show architectural targets and unverified P10–P18 objectives instead of fabricated connected statuses, latency/uptime or a sovereignty score. Latest branch head `97cc906` has a Vercel Preview QUEUED; the last fully verified Preview is `ae81359` (548/548 tests, full typecheck/build and 102/102 runtime benchmarks).

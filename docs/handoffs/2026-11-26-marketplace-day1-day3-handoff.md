@@ -1461,3 +1461,12 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - GitHub PR-triggered workflow lookup for this exact commit returned no workflow runs. No separate GitHub CI success is claimed.
 - PR #1 remains OPEN / DRAFT. The current concrete Day 1 blocker remains real Auth signup/confirmation/sign-in: email/password and confirmation are enabled, but no custom SMTP is configured and there are no Auth users. No synthetic user or tenant was created.
 - Next implementation sequence: inspect Auth/email configuration and application error handling; establish the real signup delivery path using owner-provided SMTP credentials or a supported provider connection; then run the authenticated organization → workspace → domain/department/holon installation journey. Continue Day 2 commercial lifecycle and Day 3 cores/runtime/workflows/Control Tower without reducing scope.
+
+### 13.9 Auth setup documentation corrected — 2026-11-26
+
+- Replaced the inherited Coach OS OAuth setup guide at src/apps/auth/FOURNISSEURS.md with a Marketplace-specific Auth runbook.
+- Corrected the Supabase project URL and Auth provider callback URI, recorded the currently applied redirect allowlist, and documented the verified provider states.
+- Added the missing email SMTP setup and signup-confirmation acceptance steps. SMTP remains unconfigured; no secrets were requested or committed.
+- Explicitly separated Supabase Google Sign-In credentials from the tenant-scoped Google Drive adapter OAuth credentials. They are different OAuth clients and trust boundaries.
+- Added the rule that user-editable user_metadata must never authorize roles, tenant access or delegated permissions.
+- This is documentation and governance progress only. It does not enable SMTP or OAuth providers and does not unblock the real-user E2E gate until a real email confirmation/sign-in succeeds.

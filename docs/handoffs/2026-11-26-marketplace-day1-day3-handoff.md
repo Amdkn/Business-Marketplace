@@ -1967,3 +1967,13 @@ All six SQL suites were executed against the connected hosted project after the 
 - Persisted mission assignment contract: structurally and rollback-integration verified.
 - Garden/Web Desktop UI wiring: implemented, not browser-E2E accepted.
 - Day 1–3 remain OPEN; PR #1 remains DRAFT until frontend CI/build and authenticated browser CRUD/cross-workspace tests pass.
+
+
+### 13.36 Preview deployment quota gate — 2026-11-26
+
+- Inspected the Vercel project linked to `Amdkn/Business-Marketplace`: project `business-marketplace`, Vite, team `team_d3JjRK4fJUE9ACohbdlhv9Gc`, project ID `prj_82qsF3EPY75T4hpC19JFJ4ApZ6zL`.
+- Queried the exact working branch and commit `058abafc1744d62c20d149aa0a070fc933cbc6d0`: no Vercel preview deployment exists for this commit.
+- Attempted a preview deployment from that exact Git source and target project. Vercel rejected deployment creation with HTTP 402 `api-deployments-free-per-day`, message: resource limit exceeded (more than 100 deployments; retry after 86400 seconds). No deployment was created.
+- GitHub combined status on this head still reports the Vercel context as failure with target `build-rate-limit`; this is a platform quota signal, not a verified application build failure. No GitHub Actions workflow run was returned for this commit.
+- Do not retry the deployment API until the 24-hour quota window resets or the team resolves its Vercel deployment allowance. No plan, billing or team security settings were changed.
+- PR #1 remains OPEN / DRAFT and mergeable. Do not mark frontend deployment or Day 1–3 E2E acceptance complete.

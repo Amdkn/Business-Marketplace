@@ -1,11 +1,11 @@
 // src/components/views/ProductView.tsx
 // Sidebar V2 — Triptyque 2 BLOOM — Product (angle mort avant V2, sister canon plan-L2 §13.4).
-// D6 #NEW: route /product — Coach premium spearhead (omk-nexus-coaching-premium).
+// D6 #NEW: route /product — Executive Coaching product portfolio.
 //
 // Doctrine: Product = Business OS Niveau Produit (Holdings → Filiales par ICP).
 // Sister canon: ADR-ICP-NEXUS-001 (Pilier 1-5) · ADR-L2-AAAS-001 (3 variants AaaS)
 //                 · plan-L2-business-os.md §13.4 (Coach spearhead)
-//                 · plan-minimax-l1-book-lune/03_guides-ld01-picard/PROPOSAL_omk-nexus-coaching-premium.md
+//                 · Marketplace product strategy records
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -30,7 +30,7 @@ interface Variant {
 const VARIANTS: Variant[] = [
   {
     id: 'nexus',
-    name: 'Nexus OMK · Coach premium',
+    name: 'Nexus · Executive Coaching',
     icp: 'Executive & Leadership Coaching',
     tier: '$7.5K–$25K one-shot + $750+/an recurring',
     status: 'live',
@@ -82,7 +82,7 @@ export const ProductView: React.FC = () => {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Product — AaaS Variants</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Triptyque 2 — Holding OMK Business OS expose 3 AaaS variants (Nexus / Solaris / Orbiter)
+          A’Space Marketplace structures three product variants (Nexus / Solaris / Orbiter)
         </p>
       </div>
 

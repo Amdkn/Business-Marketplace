@@ -1634,3 +1634,16 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Fabricated Dashboard alert cards were removed. The empty state now reports no pending validations until real operational records exist.
 - The earlier preview deployment was READY at commit `c5a2299`. Latest source changes require a new deployment; Vercel previously returned HTTP 402 `api-deployments-free-per-day` (retry after 24 hours).
 - Remaining acceptance gates: deploy the latest branch, verify the real user's JWT and RLS reads in the browser, and implement durable Dashboard activity/tasks and profile-backed Sidebar identity.
+
+
+### 13.24 Dashboard namespace correction — 2026-11-26
+
+- Removed the temporary legacy namespace from the live database by renaming it to the canonical `dashboard` schema. No rows were dropped; both tables were empty at the time of the rename.
+- Live catalog now contains `dashboard.clients` and `dashboard.agents`; no schema name containing the legacy product label remains.
+- PostgREST schema exposure is now `public, dashboard, identity`.
+- The Dashboard frontend defaults directly to `dashboard`; local development cache keys use `marketplace_dashboard_*`.
+- The tenant organization lookup now reads `identity.organizations`, not a shadow organization table. Added authenticated SELECT grant protected by the existing `organizations_read_active_member` RLS policy.
+- Removed legacy product branding from the login, signup and Sidebar surfaces; cleaned the data client, tenant guard, auth provider, shell components, Dashboard test, README and handoff.
+- Live verification: no legacy schema found; both Dashboard tables remain empty; eight tenant policies remain in place; anon has no SELECT; authenticated insert/read probe for the real tenant succeeded inside a rolled-back transaction.
+- Added source migrations `20261126080100_replace_legacy_namespace_with_dashboard.sql` and `20261126080200_expose_tenant_identity_context_for_dashboard.sql`.
+- Deployment of the latest branch remains blocked by the Vercel 24-hour deployment quota. Browser E2E is therefore still pending.

@@ -1690,4 +1690,4 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Replaced the old mock service identity with `Supabase — Marketplace`; updated the historical mock references to the current Marketplace runtime/schema labels.
 - Rechecked those five source files: zero remaining matches.
 - Live Supabase schema inventory had already confirmed no schema name containing the legacy label. Historical applied migration files and handoff provenance are retained; do not rewrite applied migration history merely to erase historical references.
-- PR #1 remains OPEN / DRAFT. Latest branch head at this checkpoint: `fd0c8a2cae9c2378fce75ee240cf6a639a01173f`. Vercel status on that head: `failure` with description `Deployment rate limited — retry in 24 hours`; no GitHub Actions check runs.
+- PR #1 remains OPEN / DRAFT. Re-fetch the branch HEAD before continuation; the handoff update itself advances the branch. Vercel status on the preceding code head: `failure` with description `Deployment rate limited — retry in 24 hours`; no GitHub Actions check runs.

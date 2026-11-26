@@ -33,8 +33,10 @@ import type { CmsCollectionDef, CmsItem } from './types';
 import {
   hydrateCollection,
   upsertItem as repoUpsertItem,
+  upsertItemRequired as repoUpsertItemRequired,
   upsertCollectionDef,
   removeItem as repoRemoveItem,
+  removeItemRequired as repoRemoveItemRequired,
 } from './repository';
 import type {
   CmsItemTenant,
@@ -251,7 +253,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     });
 
     const updated = get().itemsByTenant[tenantId]?.[collectionId]?.find((it) => it.id === id);
-    if (updated) {
+    if (updated && tenantId !== TENANT_DEMO_COACH) {
       void repoUpsertItem(collectionId, updated).catch((err: unknown) => {
         console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
       });
@@ -269,7 +271,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     if (!current) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
     const updated: CmsItemTenant = { ...current, ...patch, tenant_id: tenantId };
     try {
-      await repoUpsertItem(collectionId, updated);
+      await repoUpsertItemRequired(collectionId, updated);
       set((state) => {
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];
@@ -310,7 +312,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoUpsertItem(collectionId, item).catch((err: unknown) => {
+    if (tenantId !== TENANT_DEMO_COACH) void repoUpsertItem(collectionId, item).catch((err: unknown) => {
       console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
     });
     return { ok: true, item };
@@ -328,7 +330,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const id = makeId(collectionId);
     const item: CmsItemTenant = { id, tenant_id: tenantId, ...partial };
     try {
-      await repoUpsertItem(collectionId, item);
+      await repoUpsertItemRequired(collectionId, item);
       set((state) => {
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];
@@ -373,7 +375,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoRemoveItem(collectionId, id).catch((err: unknown) => {
+    if (tenantId !== TENANT_DEMO_COACH) void repoRemoveItem(collectionId, id).catch((err: unknown) => {
       console.error(`[cms] delete failed for "${collectionId}/${id}"`, err);
     });
     return { ok: true };
@@ -391,7 +393,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const current = get().itemsByTenant[tenantId]?.[collectionId] ?? [];
     if (!current.some((item) => item.id === id)) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
     try {
-      await repoRemoveItem(collectionId, id);
+      await repoRemoveItemRequired(collectionId, id);
       set((state) => {
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];

@@ -2441,3 +2441,12 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 4. Configure real Google OAuth credentials and callback URL before activating the Google Drive manifest; execute a real provider operation.
 5. Configure a real PSP sandbox and complete checkout/capture/webhook/refund/payout plus ledger reconciliation.
 6. Continue tenant installation, agent runtime, Compute/Inference/Memory/CEL, durable workflows, Control Tower, backup/restore and failure/release drills. Days 1–3 remain OPEN until these acceptance gates pass.
+
+
+## 13.51 — Day 1/2 matrix reconciliation — 2026-11-26
+
+- Refreshed the Day 1 matrix to remove stale CI-blocker language: run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) is fully green on application commit `dfc3554` (548 Vitest tests, app/API typechecks, Vite build, 102/102 benchmarks). The latest Vercel Preview remains blocked separately by `build-rate-limit`.
+- Corrected the deployed adapter version in D1.07 to `adapter-api` v8.
+- Reconciled migration accounting conservatively: 69 cloud migration-ledger entries versus 68 exact executable repository migration sources. A catalog-derived reconstruction exists for the historical RLS ACL migration, but it is not byte-identical recovery of the original SQL. Do not claim 69/69 exact source parity until provenance is closed.
+- Refreshed the Day 2 matrix with the same full CI evidence. OAuth Base64URL regression vectors are now confirmed in the passing Vitest suite; this does not constitute Google OAuth provider authorization or a real provider execution.
+- Day 1, Day 2 and Day 3 remain OPEN. The one real user/org/workspace membership chain is preserved; no extra test tenant or provider activity was created.

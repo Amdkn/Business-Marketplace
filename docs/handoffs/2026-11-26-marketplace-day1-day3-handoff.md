@@ -2273,3 +2273,59 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 2. Run `npm ci`, `npm run typecheck`, `npm run typecheck:api`, `npm test`, `npm run build` and runtime benches on an available local runner. The Amd-PC Desktop Commander device is confirmed OFFLINE (last seen 1096h ago), so these commands could not be run locally.
 3. Complete authenticated browser CRUD for Client edit/delete, SOP archive/restore, mission create/reorder/status transitions, document-link behavior, and agent register/revoke. Verify UI refresh and visible failure behavior.
 4. Keep PR #1 Draft and Day 1–3 OPEN until frontend CI/build and authenticated browser acceptance are demonstrated.
+
+
+## 13.44 — 2026-11-26 closeout continuation: Garden, identity, activity and private files
+
+### Repository and delivery chain
+- Canonical repository: `Amdkn/Business-Marketplace`.
+- Branch: `foundation/marketplace-product-identity`.
+- The CI workflow now uses the canonical `bun.lock`: Bun 1.3.14, `bun install --frozen-lockfile`, app/API typechecks, Vitest, build and four runtime benches. The old `npm ci` path was removed because `package-lock.json` is stale relative to the current package dependencies.
+- GitHub Actions returned no workflow runs for this branch; do not infer a passing CI result.
+- Latest Vercel combined status remains **failure: build-rate-limit**. No current frontend build, preview or browser acceptance is certified.
+- Amd-PC Desktop Commander remains OFFLINE (last seen approximately 1096 hours ago). No local npm/Bun/typecheck/build/browser execution was possible.
+
+### Supabase source-of-truth reconciliation
+- Live migration ledger: **68 applied entries**; repository executable migration directory: **68 matching SQL sources**.
+- Twenty older/unapplied migration files (19 Coach OS-era plus one duplicate Finance foundation file) were moved out of `supabase/migrations/` and preserved in `supabase/archive/legacy-unapplied-migrations/`. The CLI migration directory now mirrors the applied Marketplace ledger; archive files are not pending migrations.
+- Historical migration `20261126041718_revoke_public_execution_rls_auto_enable` remains a catalog-derived reconstruction, not a byte-identical recovery of the original SQL.
+- Live application inventory: **117 tables, 117 RLS-enabled**.
+- Edge Functions: `marketplace-api` v30 ACTIVE/JWT enabled; `adapter-api` v7 ACTIVE/JWT enabled; `adapter-worker` v7 ACTIVE/JWT disabled with its server-only bearer gate; `adapter-oauth-callback` v1 ACTIVE/JWT disabled with one-time OAuth state + PKCE. All four deployed sources were checked against repository source; parity passed.
+- `marketplace-api` v30 now exposes authenticated `get_settings` and `update_settings`. Profile display-name writes are self-scoped; organization rename requires `requireOrgRole`; email remains Supabase Auth-managed/read-only.
+- Advisor snapshot after migrations: 42 INFO RLS-enabled/no-policy notices; one WARN for leaked-password protection disabled; 63 INFO unindexed foreign keys; 272 INFO unused indexes; no Health Advisor findings. Do not add blanket policies or blindly remove/create indexes. The current Supabase management toolset does not expose the Auth configuration update needed to clear the leaked-password warning.
+
+### Client activity timeline
+- Added atomic `workspace_data.record_client_activity_event()` trigger on `workspace_data.clients` for create, update and delete.
+- The trigger writes to append-only `workspace_data.activity_events`, uses `auth.uid()`, has a pinned `search_path=pg_catalog`, and is not executable directly by PUBLIC/anon/authenticated.
+- Added the indexed client-event lookup and the Garden client-detail activity timeline.
+- `supabase/tests/marketplace_client_activity.sql` passed under the authenticated tenant role. It exercised create → update → delete and asserted the three event types. The test transaction rolled back; no client fixture or activity event remains.
+
+### Private document storage and Legal Data Room
+- Applied `20261126130516_workspace_document_storage`.
+- Created private bucket `marketplace-documents`, 10 MiB maximum, allowlist PDF/DOCX/XLSX/PPTX/PNG/JPEG/TXT/CSV.
+- Object keys are tenant-scoped: `<organization UUID>/<workspace UUID>/<document UUID>/<filename>`.
+- Storage RLS policies: read requires active workspace membership; upload and delete require `identity.can_manage_workspace`. The bucket is private; the UI requests five-minute signed URLs only after checking the active tenant prefix.
+- Added shared storage helper, strict metadata-after-upload writes, storage cleanup on metadata failure, secure-link generation and the document-vault upload/download flow.
+- Legal Data Room now supports private PDF/DOCX upload, secure file links and persisted archive/restore. It no longer shows a fabricated 100% compliance score; the assessment is explicitly “Not assessed” until evidence and an audit engine exist.
+- `supabase/tests/marketplace_storage_security.sql` passed: bucket privacy/configuration, three storage policies, active workspace membership and manager authorization. No storage object was created by the test; live object count remains zero.
+- E-signature remains unavailable because no e-sign provider is connected. The UI does not claim to send a signature request.
+
+### Garden surfaces corrected
+- Settings: display name and organization name now use the authenticated API; email is read-only; avatar upload remains disabled because no avatar workflow exists; Security/Integrations tabs make no false configuration claims.
+- Marketplace: Garden now reads the live published-listings API. Current published listing count is zero; purchase is disabled until checkout/payment is connected.
+- IT & Infrastructure: fabricated backup, database-size and API-request metrics were removed. The view now shows live Marketplace API/database health and labels unmeasured telemetry as unavailable.
+- Growth: static sample leads and revenue are shown only in unauthenticated showcase mode; authenticated workspaces see an explicit empty state, not demo pipeline data.
+- Operations & Knowledge: SOPs and document metadata load from their canonical repositories; “New Procedure” routes to SOP Library; document index routes to Document Vault.
+- Client Detail: activity timeline reads the append-only event stream.
+- Mission Chat: simulated deterministic replies and fake message history were removed. The directory remains readable; composer is disabled until a real inference/execution runtime is connected.
+- Mission Docs and Sales copy now describe the actual absence of agent runtime/log ingestion.
+- Audited the 31 Garden view files for enabled `<button>` elements lacking a handler or disabled state; no inert button candidate remains in that view set. Explicitly unavailable provider/runtime actions remain disabled.
+
+### Live state and acceptance boundary
+- One existing Auth user, one organization, one active organization membership, one workspace and one active workspace membership.
+- 0 domain/department/holon installations; 0 agent principals/delegations; 0 tenant provider connections; 0 published listings; 0 orders.
+- One Google Drive provider manifest remains DRAFT; 0 ACTIVE manifests. All 73 provider-level blueprints remain PLANNED.
+- Storage buckets: 1 private Marketplace bucket; stored objects: 0. Activity events: 0 after rollback tests.
+- PR #1 remains OPEN / DRAFT. Days 1–3 remain OPEN; this continuation is not a Day 1, Day 2 or Day 3 acceptance declaration.
+- Still open: authenticated browser acceptance for settings/client/document flows; real signup/email confirmation and SMTP verification; browser cross-workspace denial; Google Drive OAuth round-trip and adapter runtime; provider credentials/secret references; payment checkout/capture/refund/payout E2E; e-sign provider; agent inference/execution runtime; full tenant installation and Control Tower acceptance; Vercel build/preview validation.
+- Next session should first restore build-validation capacity (Vercel build quota or an enabled GitHub Actions runner), then run Bun install/typecheck/tests/build/benches and authenticated browser acceptance before closing any Day 1–3 gate.

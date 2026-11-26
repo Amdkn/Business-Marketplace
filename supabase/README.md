@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The connected Marketplace project currently reports **65 applied migration entries**. All 65 have a matching source file in this repository. The cloud version is the database runner's application timestamp; the source filename is the authored migration identity.
+The connected Marketplace project reports **68 applied migration entries**, each with one canonical source file in `supabase/migrations/`. The cloud version is the database runner's application timestamp; the source filename is the authored migration identity.
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -88,10 +88,13 @@ The connected Marketplace project currently reports **65 applied migration entri
 | 20261126111628 | growth_product_created_by_fk_indexes | migrations/20261126113300_growth_product_created_by_fk_indexes.sql |
 | 20261126112056 | growth_product_extended_collections | migrations/20261126113500_growth_product_extended_collections.sql |
 | 20261126112710 | remaining_workspace_cms_collections | migrations/20261126114000_remaining_workspace_cms_collections.sql |
+| 20261126124742 | client_activity_event_triggers | migrations/20261126120000_client_activity_event_triggers.sql |
+| 20261126124853 | client_activity_event_id | migrations/20261126120100_client_activity_event_id.sql |
+| 20261126130516 | workspace_document_storage | migrations/20261126130000_workspace_document_storage.sql |
 
-One historical source, `20261126041718_revoke_public_execution_rls_auto_enable.sql`, is a catalog-derived reconstruction of the live ACL, not a byte-identical recovery of the original SQL. It is already applied in cloud and must not be replayed.
+The source `20261126041718_revoke_public_execution_rls_auto_enable.sql` is a catalog-derived reconstruction of the live ACL, not a byte-identical recovery of the original SQL. It is already applied in cloud and must not be replayed.
 
-Twenty older/unapplied SQL files were removed from the executable `supabase/migrations/` directory and preserved under `supabase/archive/legacy-unapplied-migrations/` (19 Coach OS-era files plus one duplicate Finance foundation file). They are provenance/archive material, not pending Marketplace migrations. Do not move them back into the CLI migration path.
+Twenty older/unapplied SQL files are preserved under `supabase/archive/legacy-unapplied-migrations/` (19 Coach OS-era files plus one duplicate Finance foundation file). They are provenance/archive material, not pending Marketplace migrations. The executable migration directory contains exactly the 68 applied Marketplace sources.
 
 ## Current live database inventory
 
@@ -116,37 +119,60 @@ The `dashboard` tables remain legacy compatibility artifacts; Garden and Web Des
 
 | Function | Live version | Gateway JWT | Repository source parity |
 |---|---:|---|---|
-| `marketplace-api` | 29 | enabled | byte-identical |
+| `marketplace-api` | 30 | enabled | byte-identical |
 | `adapter-api` | 7 | enabled | byte-identical |
 | `adapter-worker` | 7 | disabled | byte-identical; server-only service-role bearer gate |
 | `adapter-oauth-callback` | 1 | disabled | byte-identical; one-time OAuth state + PKCE transaction gate |
 
-All four deployed `index.ts` files were fetched from the live Supabase project and compared to their corresponding repository files in this checkpoint. The exact equality check passed for all four.
+All four deployed `index.ts` files were compared with their corresponding repository files. The equality check passed for all four. `marketplace-api` v30 adds authenticated `get_settings` and `update_settings` actions while retaining the existing public catalogue read and tenant-scoped operations.
+
+## Private workspace document storage
+
+- Private Supabase Storage bucket: `marketplace-documents`.
+- Maximum file size: 10 MiB.
+- Allowed types: PDF, DOCX, XLSX, PPTX, PNG, JPEG, TXT and CSV.
+- Object key convention: `<organization UUID>/<workspace UUID>/<document UUID>/<filename>`.
+- `storage.objects` has separate SELECT, INSERT and DELETE policies. Reads require active workspace membership; uploads and deletes require `identity.can_manage_workspace`.
+- The bucket is private; signed URLs are generated for five minutes after verifying the active workspace prefix.
+- Current stored object count: 0. Storage configuration and tenant-policy test passed; browser upload/download acceptance is still pending.
+
+## Client activity and Settings
+
+- Client create/update/delete operations now append atomic events to `workspace_data.activity_events` through a SECURITY DEFINER trigger with a pinned search path. The trigger records client ID, title and operation; the client detail timeline reads those events.
+- The authenticated rollback integration test exercised create → update → delete and verified all three event types. The transaction left no test client or activity event.
+- Settings profile display name and organization name now use authenticated `marketplace-api` actions. Profile updates are self-scoped; organization renames require `requireOrgRole`. Email remains Supabase Auth-managed and read-only.
+- Authenticated browser acceptance for these UI flows has not yet been run.
 
 ## Current tenant and provider state
 
-Live table counts show one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. The current workspace context resolves to the existing tenant; do not create another identity or organization to manufacture test data.
+Live counts show one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. Do not create another identity or organization to manufacture test data.
 
 - Domain / department / holon installations: 0 / 0 / 0.
 - Canonical agent principals / delegations: 0 / 0.
 - Tenant provider connections / OAuth transactions: 0 / 0.
-- Provider manifests: one Google Drive v1.0.0 manifest in DRAFT; no ACTIVE provider manifest.
+- Provider manifests: one Google Drive v1.0.0 manifest in DRAFT; zero ACTIVE manifests.
 - Published listings / orders: 0 / 0.
+- Storage objects / activity events: 0 / 0 after rollback tests.
 - The 73 provider-level blueprints remain PLANNED. They are not executable integrations.
 
 ## Current Supabase advisor snapshot
 
 - Security: 42 INFO findings for RLS-enabled tables without policies; one WARN for Auth leaked-password protection being disabled.
-- Performance: 63 INFO unindexed-foreign-key findings and 271 INFO unused-index findings.
+- Performance: 63 INFO unindexed-foreign-key findings and 272 INFO unused-index findings.
 - Health: no findings.
 
-Do not silence the RLS advisor with blanket policies. Review each schema's actual grants and access boundary. Do not add or remove indexes blindly without workload evidence. The leaked-password-protection warning is an Auth configuration item; it is not a SQL migration.
+Do not silence the RLS advisor with blanket policies. Review each schema's actual grants and access boundary. Do not add or remove indexes blindly without workload evidence. The leaked-password-protection warning is an Auth configuration item, not a SQL migration; this session's Supabase management tools do not expose an Auth configuration update action.
 
-## Acceptance boundary
+## Delivery and acceptance boundary
 
-The backend source, live migrations and four deployed Edge Function sources are reconciled. This does **not** certify Day 1–3 acceptance: authenticated browser CRUD, cross-workspace browser denial, provider OAuth round-trip, payment-provider lifecycle, full workflow execution and the complete Control Tower remain separate end-to-end gates.
+The backend sources, 68 live migrations, tenant-scoped document bucket and four deployed Edge Function sources are reconciled. Garden's formerly inert actions were audited; no enabled button without a handler remains in the audited Garden view set. The Growth showcase is hidden for authenticated workspaces; the Marketplace view reads the live published-listings API; IT infrastructure displays live API/database connectivity rather than fabricated telemetry; simulated agent chat replies were removed.
+
+This does **not** certify Day 1–3 acceptance. Authenticated browser CRUD, document upload/download through the UI, cross-workspace browser denial, provider OAuth round-trip, payment-provider lifecycle, live agent inference/execution, tenant installation and the complete Control Tower remain separate end-to-end gates.
+
+The GitHub Actions workflow now installs from canonical `bun.lock` using Bun 1.3.14; `npm ci` was removed because the legacy `package-lock.json` does not describe the current dependencies. No GitHub Actions run is currently visible for the branch. The latest Vercel status is **build-rate-limit failure**; the latest frontend source has not been build-validated. The connected Amd-PC Desktop Commander remains offline, so no local typecheck/build/browser suite could be run.
 
 ## Historical implementation log
+
 
 ## Continuation
 

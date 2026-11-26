@@ -17,7 +17,6 @@ interface MakeRepositoryOptions<T> { mapper?: Mapper<T> }
 
 const COLLECTIONS: Record<string, { table: string; title: string; columns?: Record<string,string> }> = {
   clients: { table: 'clients', title: 'name', columns: { segment:'segment', ticket:'ticket', openThreads:'open_threads', nextSession:'next_session', health:'health', onboardingStep:'onboarding_step', status:'status' } },
-  agents: { table: 'people_agents', title: 'name', columns: { codename:'codename', role:'role', status:'status', task:'task', rank:'rank', domain:'domain', squad:'squad', cadence:'cadence' } },
   documents: { table: 'documents', title: 'title', columns: { clientId:'client_id', fileUrl:'file_url', mimeType:'mime_type' } },
   invoices: { table: 'invoices', title: 'title', columns: { clientId:'client_id', amount:'amount', currency:'currency', issuedAt:'issued_at', dueAt:'due_at', paidAt:'paid_at', status:'status' } },
   legal_docs: { table: 'legal_documents', title: 'title', columns: { clientId:'client_id', type:'document_type', category:'category', status:'document_status', fileUrl:'file_url', notes:'notes' } },
@@ -51,8 +50,6 @@ function makeWorkspaceMapper<T extends { id: string }>(collection: string): Mapp
       const result: Record<string,unknown> = { ...extra, id: row.id, createdAt: row.created_at, updatedAt: row.updated_at };
       if (row.title !== undefined && row.title !== null) result[shape.title] = row.title;
       for (const [dbKey,uiKey] of Object.entries(reverse)) if (row[dbKey] !== undefined && row[dbKey] !== null) result[uiKey] = row[dbKey];
-      // Compatibility aliases expected by the existing Garden components.
-      if (collection === 'agents' && result.currentTask === undefined && result.task !== undefined) result.currentTask = result.task;
       // An unset currency stays visibly unset; never fabricate USD for a tenant record.
       if (collection === 'invoices' && result.currency === undefined) result.currency = '';
       if (collection === 'documents' && result.uploadedBy === undefined) result.uploadedBy = null;

@@ -1916,3 +1916,54 @@ All six SQL suites were executed against the connected hosted project after the 
 - Both actions are served by the JWT-verified `marketplace-api` Edge Function. Latest deployment: **ACTIVE v26**, `verify_jwt=true`. The v26 update adds the delegation ID to the agent projection.
 - Garden `agentsRepo` no longer treats `workspace_data.people_agents` as the canonical agent identity source. It maps the canonical `identity.agent_principals` + `identity.agent_delegations` projection. `membersRepo` maps active human workspace memberships and profile display names.
 - The People and People/Agents screens are now read-only canonical views; invitation acceptance and agent provisioning/configuration UI remain separate next work. No member or agent was created by this change.
+
+
+### 13.35 People & Agents canonical identity, workspace delegation and persisted Cadence — 2026-11-26
+
+**Canonical assignment model**
+- Confirmed that `identity.agent_delegations` is already the correct workspace-assignment relation: `scope_type='WORKSPACE'` and `scope_id=enterprise.workspaces.id`. A second agent identity or assignment registry is not required.
+- Found and corrected a schema/API mismatch: the hosted `agent_delegations` scope check rejected WORKSPACE even though the API, workspace-agent list and mission guard already expected it.
+- Added `supabase/migrations/20261126094200_agent_workspace_delegation_scope.sql` (hosted migration ledger name `agent_workspace_delegation_scope`, version `20261126094200`). It permits WORKSPACE scope, enforces a non-null scope ID for workspace-level delegations, adds the active-workspace lookup index, and validates that a WORKSPACE delegation targets an ACTIVE workspace in the same organization.
+- Migration is applied to the connected Marketplace Supabase project. The identity tables remain private: RLS is enabled and authenticated clients still have no direct SELECT grants.
+
+**Marketplace API**
+- Updated `register_agent`: validates agent key/class/runtime/scope/permission-code shape, requires an active organization role, and for WORKSPACE scope verifies the caller's active membership in the exact organization/workspace before inserting the canonical principal and delegation in one transaction.
+- Updated `list_workspace_agents`: returns canonical principals only when an active, in-window WORKSPACE delegation exists; includes the delegation ID and permission codes. It does not query `workspace_data.people_agents`.
+- Added `revoke_agent_delegation`: requires organization authority plus active workspace membership and revokes only the matching active workspace delegation. The principal remains in the organization identity registry.
+- Cleaned a duplicate response alias in the workspace-agent query.
+- Deployed `marketplace-api` to Supabase as **version 28**, status ACTIVE, `verify_jwt=true`. Retrieved the deployed source and verified the register/revoke handlers, workspace-membership guard and single delegation response alias are present.
+
+**Garden and Mission Control**
+- `src/components/saas/views/AgentRootView.tsx` now provides the canonical agent directory, registration form and workspace-delegation revocation control. It does not derive runtime metrics from status or row index.
+- `AgentsView.tsx`, `PeopleAgentsView.tsx` and Mission Control `MissionAgentsView.tsx` now share this same directory implementation.
+- Garden `agents.repo.ts` uses the authenticated Marketplace API projection; it no longer maps agent identity to `workspace_data.people_agents`.
+- Garden `PeopleView.tsx` already resolves human identities through `identity.profiles` and workspace memberships via the API.
+- Removed the generic Garden `agents → people_agents` repository mapping and the CMS `people_agents` / `team` mappings so the old workspace tables cannot silently become competing identity registries.
+
+**Web Desktop People**
+- `src/apps/people/people.repo.ts` now resolves the signed-in user's unique workspace context, lists canonical workspace members and delegated agents through Marketplace API, and reads/writes planned missions in `workspace_data.missions`.
+- `PeopleApp.tsx` Team now displays canonical active human workspace memberships; Agents displays canonical principals and workspace delegations; Cadence loads persisted missions and supports create/delete. The schedule grid visualizes planned mission density, not runtime activity.
+- A scheduled mission stores day/hour/kind metadata in `workspace_data.missions.extra_data` and uses `agent_principal_id` when assigned. The existing composite FK and active-delegation trigger enforce organization consistency and current authority.
+- Mission Control `MissionScheduleView.tsx` now reads the same persisted schedule source; it no longer assigns day/hour buckets from `updated_at`.
+- Mission Control `MissionAgentsView.tsx` now shares the canonical directory; the old synthetic Hermes load, latency, token, task, model and fleet-share calculations are no longer used by that route.
+- Removed the fictional `people_agents` and `team` seed registries from `src/apps/people/seed.ts`. Their legacy database tables are retained untouched for compatibility; no rows were migrated or deleted.
+
+**Validation performed**
+- Applied hosted migration `20261126094200_agent_workspace_delegation_scope`; verified its constraints and trigger through PostgreSQL metadata.
+- Added `supabase/tests/agent_workspace_delegation.sql` and executed its assertions against the hosted project. It passed without exceptions. Assertions cover WORKSPACE scope shape, active-workspace guard, mission-to-agent FK, mission delegation guard, missions RLS, private identity grants and authenticated mission CRUD grants.
+- Ran a rollback-only SQL integration transaction that inserted a temporary canonical principal, a WORKSPACE delegation and an assigned mission, then rolled back. Follow-up counts confirmed 0 persisted test principals, delegations or missions.
+- Verified `workspace_data.missions` RLS: active workspace members may read; `identity.can_manage_workspace` gates insert/update/delete; insert additionally binds `created_by_user_id=auth.uid()`.
+- Verified `marketplace-api` deployed version 28 with JWT verification enabled.
+
+**Not yet validated / acceptance boundary**
+- No browser-authenticated session/JWT was available to run the real Garden or Web Desktop create/list/revoke mission CRUD flows or cross-workspace denial in the UI.
+- No local TypeScript typecheck, Vitest suite, Vite production build, Playwright/browser smoke test or frontend deployment was run after these changes.
+- Supabase Edge Function deployment succeeded; this does not by itself prove the authenticated browser workflows.
+- Permission codes are currently shape-validated by the API and stored as delegation metadata; a centrally governed permission-code catalogue/semantic validator remains future hardening. Do not claim arbitrary permission codes are backed by executable capability policies.
+- The old `workspace_data.people_agents` and `workspace_data.team` tables remain in the schema as compatibility artifacts. The active People UI and repositories no longer use them as identity sources.
+
+**Current acceptance**
+- Canonical identity + workspace delegation database contract: structurally verified.
+- Persisted mission assignment contract: structurally and rollback-integration verified.
+- Garden/Web Desktop UI wiring: implemented, not browser-E2E accepted.
+- Day 1–3 remain OPEN; PR #1 remains DRAFT until frontend CI/build and authenticated browser CRUD/cross-workspace tests pass.

@@ -1,5 +1,5 @@
 // src/components/views/DocumentsView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.documents schema.
+// Zero Bug Sprint — rewritten for the Marketplace tenant document repository.
 //
 // Schema (no `name`/`client`/`type`/`status`/`size` columns — only `title`,
 // `clientId`, `fileUrl`, `mimeType`, `uploadedBy`, `createdAt`, `updatedAt`).

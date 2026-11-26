@@ -1990,7 +1990,7 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - revoke_agent_delegation remains scoped to the exact workspace delegation; revocation does not delete the canonical principal.
 
 **Hosted migration and mission integrity**
-- Added source migration supabase/migrations/20261126103000_agent_assignment_integrity.sql and applied hosted migration 20261126103000_agent_assignment_integrity successfully.
+- Hosted migration ledger row is version 20261126101352, name 20261126103000_agent_assignment_integrity. The source file is reconciled to supabase/migrations/20261126101352_20261126103000_agent_assignment_integrity.sql. The migration was applied once; filename reconciliation did not replay it.
 - The migration adds the unique active-scope delegation index and strengthens workspace_data.validate_mission_agent_delegation(): a mission assignment now requires both an ACTIVE canonical principal and an ACTIVE, in-window, non-revoked WORKSPACE delegation matching the mission's organization and workspace.
 - The trigger function remains SECURITY DEFINER with a pinned search_path; direct EXECUTE is revoked from PUBLIC, anon and authenticated. The browser continues to use RLS-protected workspace_data.missions, not direct identity-table access.
 - workspace_data.missions RLS remains: active workspace membership for read; identity.can_manage_workspace for writes; INSERT also binds created_by_user_id=auth.uid(). The assignment trigger adds the agent-authority check that the row policy alone does not express.
@@ -2009,7 +2009,7 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - ApprovalsView.tsx now populates agent options from ACTIVE canonical workspace delegations rather than the old hardcoded fleet/CMS people_agents fixtures. Its scenario/proposal drafts remain browser-local (Zustand/localStorage); approved/rejected decision records are written to the workspace approval_decisions collection. This is explicitly disclosed in the UI and is not yet a durable server-side proposal queue.
 
 **Verification performed against the hosted project**
-- Applied migration 20261126103000_agent_assignment_integrity successfully; the migration appears in the hosted migration ledger.
+- Verified hosted ledger version 20261126101352 / name 20261126103000_agent_assignment_integrity. No second apply was performed during filename reconciliation.
 - Re-executed supabase/tests/marketplace_interface_persistence.sql after the migration; the assertion block returned no exception.
 - Ran a rollback-only authenticated SQL integration transaction using the real tenant's B1_CEO user: inserted a temporary ACTIVE principal + WORKSPACE delegation, switched to PostgreSQL role authenticated with the real JWT subject, inserted an assigned mission through workspace_data.missions, and observed it in the authenticated SELECT (1 row). Transaction rolled back.
 - Ran a rollback-only negative test: a SUSPENDED principal with an otherwise active workspace delegation was rejected by the mission trigger.

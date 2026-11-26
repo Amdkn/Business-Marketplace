@@ -48,10 +48,39 @@ BEGIN
       p.proconfig IS NULL
       OR NOT EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
       OR has_function_privilege('anon', p.oid, 'EXECUTE')
-      OR has_function_privilege('authenticated', p.oid, 'EXECUTE')
+      OR (
+        has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        AND p.oid NOT IN (
+          to_regprocedure('identity.is_active_workspace_member(uuid,uuid)'),
+          to_regprocedure('identity.can_manage_workspace(uuid,uuid)')
+        )
+      )
     );
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION 'SECURITY DEFINER function has unsafe search_path or browser execution: %', v_bad;
+  END IF;
+
+  IF to_regprocedure('identity.is_active_workspace_member(uuid,uuid)') IS NULL
+     OR to_regprocedure('identity.can_manage_workspace(uuid,uuid)') IS NULL
+     OR has_function_privilege('anon', 'identity.is_active_workspace_member(uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'identity.can_manage_workspace(uuid,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'identity.is_active_workspace_member(uuid,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'identity.can_manage_workspace(uuid,uuid)', 'EXECUTE')
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_proc p
+       WHERE p.oid=to_regprocedure('identity.is_active_workspace_member(uuid,uuid)')
+         AND p.prosecdef
+         AND p.prosrc LIKE '%auth.uid()%'
+         AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_proc p
+       WHERE p.oid=to_regprocedure('identity.can_manage_workspace(uuid,uuid)')
+         AND p.prosecdef
+         AND p.prosrc LIKE '%auth.uid()%'
+         AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+     ) THEN
+    RAISE EXCEPTION 'Workspace RLS predicates do not meet the authenticated-user / fixed-search_path contract';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='identity' AND tablename='organizations' AND cmd='SELECT')

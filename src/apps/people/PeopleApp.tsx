@@ -697,7 +697,7 @@ export function PeopleApp() {
       title: agent.displayName,
       subtitle: `${agent.agentClass} · ${agent.runtime}`,
       status: agent.principalStatus,
-      initials: agent.displayName.split(/\\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
+      initials: agent.displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
       fields: [],
       squad: [{ name: agent.agentClass, color: '#059669' }],
       meta: [

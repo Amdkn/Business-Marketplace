@@ -1,4 +1,4 @@
-/** People/Agents — fleet data (5 AI specialists) + content library + schedule.
+/** People/Agents — persisted schedule calendar constants. Agent roster and telemetry are loaded from canonical workspace repositories.
  *  Pattern forked from KomputerMechanic Hermes Mission Control template:
  *  - Fleet: 5 specialist agents (Orchestrator / Scout / Scribe / Reach / Dev)
  *    with state, load, latency, tokens, model (template: route-agents + AGENTS)

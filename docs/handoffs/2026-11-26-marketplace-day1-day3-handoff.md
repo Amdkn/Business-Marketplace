@@ -2561,3 +2561,73 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 1. Run full hosted `bun run verify` on latest application code when Vercel deployment quota resets or a Git-triggered Preview is available; expect 550 Vitest tests if no other changes.
 2. Keep Google Drive manifest DRAFT until real OAuth client credentials, callback configuration and authorization round-trip succeed.
 3. Continue with authenticated browser acceptance and the remaining provider/PSP/recovery gates.
+
+---
+
+## 13.58 — Continuation après le handoff · 2026-11-26
+
+### 1. État Git et Vercel
+
+- Branche : `foundation/marketplace-product-identity`
+- HEAD code : `c93d2cb0199e218c6371611ed3f7e6f925e51c2f`
+- PR #1 : OPEN / DRAFT
+- Dernier Preview READY : `dpl_6Bd8wBbzdxZDmrMawZYN6j2vzzoJ`, commit documentaire `d17070b`; il ne contient pas les changements de cette continuation.
+- Preview `dpl_H44cxUCk53FzRh7z3GEsUDDkRjeu`, commit `5dcdf3d` : ERROR pendant `bun run verify`, au premier `typecheck`, à cause du chemin d'import de test `TS2307`.
+- Chemin corrigé dans `24d6da6`; les commits suivants `0c4f966`, `c05f278` et `c93d2cb` n'ont pas reçu de Preview.
+- Nouvelle tentative manuelle Vercel : HTTP 402 `api-deployments-free-per-day`, `retryAfter=86400`. Aucun build ni test réussi n'est revendiqué pour les nouveaux commits.
+- Le dernier résultat complet confirmé reste celui du Preview antérieur : 548/548 Vitest, TypeScript, API TypeScript et build Vite. Il ne valide pas les modifications OAuth/onboarding ci-dessous.
+
+### 2. OAuth — amélioration du test de régression, validation en attente
+
+- Nouveau module partagé : `supabase/functions/_shared/oauth-scopes.ts`.
+- `adapter-oauth-callback` et `adapter-worker` importent désormais le même parseur et le même contrôle d'allowlist.
+- Le test `src/lib/adapters/oauth-encoding.test.ts` exécute les fonctions partagées réelles pour les séparateurs espaces/tabulations/nouvelles lignes, le fallback lorsque le fournisseur omet le scope, et le rejet d'une élévation de scope.
+- Le test vérifie aussi que les deux Edge Functions utilisent ce module.
+- Le premier build a révélé un mauvais chemin relatif d'import ; corrigé dans `24d6da6`.
+- **Non déployé** : les fonctions hébergées restent `adapter-oauth-callback v2` et `adapter-worker v8`. Aucun aller-retour fournisseur OAuth réel n'a été validé.
+
+### 3. Onboarding — correction du chemin actif
+
+Correction de diagnostic : la référence historique `sign-up-organization` se trouvait dans l'ancien `AuthProvider`, qui n'est pas le point d'entrée principal de `src/App.tsx`. Le vrai parcours commence dans `src/apps/auth/AuthPage.tsx`, puis passe par `App.tsx` et `useTenantStore.bootstrap()`. L'interface Workspaces possédait déjà des actions authentifiées de création d'organisation et de workspace.
+
+Travail réalisé :
+
+- Ajout de l'action authentifiée `marketplace-api → create_tenant`.
+- Transaction atomique et idempotente : organisation `EXTERNAL_ENTERPRISE`, membership ACTIVE, binding `B1_CEO`, workspace `main`, membership workspace OWNER et événement `WORKSPACE_CREATED`.
+- Verrou transactionnel par utilisateur et clé d'organisation déterministe pour permettre une reprise après perte de réponse.
+- `App.tsx` vérifie les memberships à la connexion et au démarrage : crée un tenant initial si aucun n'existe ; crée un workspace par défaut si une organisation existe sans workspace. Les comptes multi-organisations ou multi-workspaces ne sont pas bloqués par cette routine ; la sélection explicite reste dans la vue Workspaces.
+- L'ancien `AuthProvider`, s'il est réutilisé, appelle désormais `marketplace-api.create_tenant` plutôt qu'une fonction inexistante.
+
+**Déploiement Supabase confirmé :**
+
+- `marketplace-api v31` ACTIVE, `verify_jwt=true`.
+- Le code hébergé a été récupéré et comparé au fichier du dépôt : correspondance exacte.
+- Simulation SQL rollback-only du chemin d'insertion organisation → membership → B1_CEO → workspace → OWNER → événement : aucune exception.
+- Vérification après rollback : 0 ligne persistante de test. Aucune donnée fictive n'a été conservée.
+
+Le parcours navigateur complet avec un nouveau compte n'est pas encore validé.
+
+### 4. État Supabase après cette continuation
+
+| Fonction | Version active |
+|---|---:|
+| `marketplace-api` | **31** |
+| `adapter-api` | 8 |
+| `adapter-oauth-callback` | 2 |
+| `adapter-worker` | 8 |
+
+Aucune migration SQL supplémentaire n'a été appliquée. Les changements de schéma restent inchangés.
+
+### 5. Nouveaux points à fermer
+
+1. Après réouverture du quota Vercel, exécuter `bun run verify` sur le HEAD courant et corriger jusqu'au succès complet ; le Preview antérieur ne vaut pas preuve.
+2. Déployer `adapter-oauth-callback` et `adapter-worker` avec le module partagé seulement après validation du build et des tests.
+3. Acceptance authentifiée : nouveau compte, création tenant, refresh JWT, contexte organisation/workspace, puis parcours existant.
+4. Tester réellement les sélecteurs multi-organisations et multi-workspaces. Le RPC `get_current_workspace_context` reste conçu autour d'un contexte unique ; la vue Workspaces a ses sélecteurs, mais le contexte global n'est pas encore synchronisé avec eux.
+5. Acceptance Garden CRUD et Storage privé avec deux identités/tenants distincts ; ne pas confondre vérification des policies SQL et preuve d'isolation de bout en bout.
+6. Maintenir les deux blocages de plan Supabase : projet Free sans backups automatiques démontrés ; protection des mots de passe compromis indisponible sur ce plan.
+7. PR #1 reste DRAFT jusqu'aux preuves ci-dessus.
+
+### 6. Règle de reprise
+
+Reprendre depuis le HEAD réel de la branche, pas depuis le dernier Preview READY. Ne pas annoncer 548 tests pour les commits postérieurs à `d17070b`. Ne pas déclarer OAuth corrigé en production tant que les versions hébergées restent v2/v8. Ne pas considérer `marketplace-api v31` comme preuve du parcours d'inscription complet : seul le déploiement backend et la simulation SQL rollback-only sont confirmés.

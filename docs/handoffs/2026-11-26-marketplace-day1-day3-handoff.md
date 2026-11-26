@@ -1514,3 +1514,17 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Deployed the canonical `marketplace-api` source to the existing Supabase project. Live deployment reports **ACTIVE v18**, `verify_jwt=true`. This replaces v17; v18 includes the decimal parser correction.
 - Finance regression suite passed after verifying the API function, pinned SECURITY DEFINER search_path, service_role-only EXECUTE grant and finance FK index coverage.
 - The API is not exercised against a real organization because the hosted project still has no Auth users or tenant fixtures. No synthetic financial data was created.
+
+### 13.14 Standard Chart of Accounts and tenant provisioning — 2026-11-26
+
+- Added hosted migration finance_chart_of_accounts_provisioning and tracked source supabase/migrations/20261126070000_finance_chart_of_accounts_provisioning.sql.
+- Added private finance.chart_account_templates, enabled RLS, revoked all browser-role access and granted service-role access only.
+- Added 16 required standard account templates under version 2026.1: cash, PSP clearing, receivables, seller/refund/tax/chargeback payables, retained earnings, owner contributions, platform fee/subscription/service revenue, payment processing, refund/chargeback, compute/inference and platform operations expense.
+- Added finance.ledger_accounts.chart_version.
+- Added api.provision_finance_chart_of_accounts: active organization + active membership + Finance-capable role required; advisory transaction lock; idempotent organization/currency/version provisioning; conflict detection against existing account codes/system keys; returns the complete chart.
+- Added provision_finance_chart_of_accounts authenticated action to canonical supabase/functions/marketplace-api/index.ts.
+- Applied follow-up migration finance_chart_version_regex_fix, tracked as supabase/migrations/20261126070100_finance_chart_version_regex_fix.sql, to normalize version format checks.
+- Deployed marketplace-api ACTIVE v19, verify_jwt=true.
+- Structural SQL assertions verified 16 required templates, chart_version column, template normal-balance consistency, function SECURITY DEFINER/search_path, service-role-only EXECUTE and service-role-only template grants.
+- Live organization count remains 0. No account instance or tenant fixture was created. Runtime provisioning idempotency/collision/authorization is implemented but not tenant-E2E verified.
+- Next implementation: versioned fee policies and fee calculation, then order/payment/fee-to-ledger event mapping and settlement posting.

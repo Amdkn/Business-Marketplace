@@ -341,3 +341,5 @@ Fee policy activation is serialized by owner/key/scope/seller/currency, so concu
 Captured payment accounting now bridges provider-confirmed capture → immutable fee snapshot → double-entry journal. The posting action allocates gross to PSP clearing, seller payable and platform fee revenue and delegates to the journal's idempotent immutable posting boundary. Refunds remain separate accounting events.
 
 Finance now has a refund accounting path that reverses seller payable and platform fee revenue proportionally, credits PSP clearing for refund gross, preserves the original capture journal and uses cumulative fee allocation to avoid partial-refund rounding drift.
+
+Finance now supports the ledger side of seller payout settlement. The platform records the owning organization on each payout batch, verifies provider-confirmed paid status and available seller-payable/PSP-clearing balances, and posts an idempotent debit-to-seller-payable / credit-to-PSP-clearing journal. Journal account rows are locked in deterministic order to prevent concurrent balance races.

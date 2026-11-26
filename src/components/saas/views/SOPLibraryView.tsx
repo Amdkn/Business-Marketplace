@@ -19,7 +19,7 @@ import { useToast } from '../contexts/ToastContext';
 import { sopsRepo } from '../data/sops.repo';
 import type { Sop } from '../lib/types';
 import { SOP_STATUS_LABEL } from '../lib/statusLabels';
-import { BookOpen, PlayCircle, FileCheck, Plus, Edit2, Play } from 'lucide-react';
+import { BookOpen, PlayCircle, FileCheck, Plus, Edit2 } from 'lucide-react';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { formatDate, safeArray } from '../lib/safe';
@@ -263,9 +263,9 @@ export const SOPLibraryView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setExecuteTarget(sop)}
-                  className="flex-1 bg-slate-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 border border-stone-200 bg-stone-50 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-stone-100 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Play className="w-3.5 h-3.5" /> Execute
+                  <FileCheck className="w-3.5 h-3.5" /> Execution status
                 </button>
               </div>
             </Card>

@@ -124,7 +124,16 @@ Keep these lifecycle layers distinct:
 3. **Tenant connection:** authorized provider account, encrypted secret reference, scopes and connection state.
 4. **Runtime execution:** sync/webhook/job, idempotency, audit, health and error recovery.
 
-The first layer is now persisted. The provider manifests, tenant connections and runtime execution layers remain to be implemented and verified.
+The first layer is persisted, and the provider-example inventory has now been normalized into 73 provider-level blueprint records in `integration.provider_adapter_blueprints`. Each record is linked to one of the 20 families and has a stable key and manifest version.
+
+These provider records are deliberately not treated as executable manifests:
+- All 73 are `PLANNED`.
+- All 73 have `auth_contract_status = UNSPECIFIED`.
+- All 73 have an empty supported-operations list.
+- No authentication method, OAuth scope, endpoint, webhook, or provider permission is inferred from a provider name.
+- The public read-only `list_provider_adapter_blueprints` API can return all records or filter by `family_key`.
+
+The provider inventory is now persisted and browseable. Concrete auth/scope contracts, executable provider manifests, tenant connections, secret references and runtime execution remain to be implemented and verified.
 
 ## 7. Adapter contract
 

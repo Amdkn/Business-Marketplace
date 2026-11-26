@@ -61,12 +61,15 @@ export const AgentRootView = (): React.ReactElement => {
     }
     if (!window.confirm(`Remove ${agent.name} from this workspace? The canonical agent identity will remain in the organization registry.`)) return;
     try {
+      setSaving(true);
       setError(null);
       await agentsRepo.revoke(agent.delegationId);
       setAgents(null);
       setRevision((value) => value + 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to revoke delegation');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -134,7 +137,7 @@ export const AgentRootView = (): React.ReactElement => {
             <div><dt className="text-stone-500">Runtime state</dt><dd className="mt-1 font-medium text-stone-800">Not reported</dd></div>
             <div><dt className="text-stone-500">Telemetry</dt><dd className="mt-1 font-medium text-stone-800">Unavailable</dd></div>
           </dl>
-          <button type="button" onClick={() => void handleRevoke(agent)} className="mt-4 w-full rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Revoke workspace assignment</button>
+          <button type="button" onClick={() => void handleRevoke(agent)} disabled={saving} className="mt-4 w-full rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Revoke workspace assignment</button>
         </article>;
       })}
     </section>}

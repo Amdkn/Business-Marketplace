@@ -3,7 +3,7 @@
 // D6 #NEW: route /people-agents. Old routes /people + /agents keep working (D4 append-only).
 //
 // Doctrine: humans + AI agents ONE workspace — Team & Capacity load + Swarm Status.
-// Sister canon: _ROSTER.md (35 A3 canon) + agentsRepo (omk_saas.agents schema).
+// Sister canon: _ROSTER.md (35 A3 canon) + agentsRepo (Marketplace identity/runtime directory).
 
 import React, { useEffect, useState } from 'react';
 import { Card } from '../components/Card';

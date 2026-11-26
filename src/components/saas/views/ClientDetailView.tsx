@@ -2,7 +2,7 @@
 // Zero Bug Sprint — rewritten to match Marketplace tenant client records.
 //
 // Bug fixes (D6 #98, D6 #105a):
-//   - `client.progress` removed (no DB column). Derived from status via STATUS_PROGRESS.
+//   - Removed the synthetic status-to-progress percentage; only persisted status is shown.
 //   - `client.date` removed → use `client.createdAt` formatted via formatDate().
 //   - Hardcoded "Org ID: 00000000-…-0001" replaced with `client.orgId ?? '—'` (real value).
 //   - Hardcoded DEMO_DOCUMENTS / DEMO_TIMELINE removed (D6 #105a — they lied about data).
@@ -316,7 +316,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
               <dt className="text-slate-500 flex items-center gap-2">
                 <Hash className="w-3.5 h-3.5" /> Phone
               </dt>
-              <dd className="text-slate-400 italic text-xs">+ Add phone</dd>
+              <dd className="text-slate-900 font-medium truncate ml-3">{safeStr(client.phone, '—')}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-slate-500 flex items-center gap-2">

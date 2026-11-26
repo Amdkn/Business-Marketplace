@@ -40,7 +40,7 @@ function makeWorkspaceMapper<T extends { id: string }>(collection: string): Mapp
       const row: Record<string, unknown> = { title: source[shape.title] ?? null, extra_data: extra };
       if (source.id) row.id = source.id;
       for (const [uiKey,dbKey] of Object.entries(shape.columns ?? {})) {
-        if (source[uiKey] !== undefined) row[dbKey] = source[uiKey];
+        if (source[uiKey] !== undefined) row[dbKey] = collection === 'documents' && uiKey === 'clientId' && source[uiKey] === '' ? null : source[uiKey];
       }
       // UI invoice IDs and amounts remain strings; Postgres numeric accepts numeric strings.
       return row;
@@ -53,6 +53,7 @@ function makeWorkspaceMapper<T extends { id: string }>(collection: string): Mapp
       // An unset currency stays visibly unset; never fabricate USD for a tenant record.
       if (collection === 'invoices' && result.currency === undefined) result.currency = '';
       if (collection === 'documents' && result.uploadedBy === undefined) result.uploadedBy = null;
+      if (collection === 'documents' && result.clientId === undefined) result.clientId = '';
       return result as T;
     },
   };

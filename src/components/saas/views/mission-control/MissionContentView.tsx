@@ -4,6 +4,7 @@
 // Marketplace tenant documents. Title-scoped search filter.
 
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BookOpenText, FileText, Hexagon, Search } from 'lucide-react';
 import { documentsRepo } from '../../data/documents.repo';
 import type { Document } from '../../lib/types';
@@ -79,11 +80,11 @@ export const MissionContentView = (): React.ReactElement => {
           <h1 className="font-display leading-[0.95] tracking-tight mt-2 text-ink" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Library<span className="text-ember">.</span>
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-her-muted">Workspace document register. File upload and document authoring remain unavailable until a storage integration is connected.</p>
+          <p className="mt-2 max-w-xl text-sm text-her-muted">Workspace document register. Private file uploads are stored in the workspace-scoped document vault. Document authoring and e-signature remain separate capabilities.</p>
         </div>
-        <button type="button" disabled aria-disabled="true" title="File storage and document authoring are not connected" className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl bg-her-surface border border-her-border text-her-muted font-mono text-[11px] tracking-wider uppercase cursor-not-allowed opacity-60">
-          New Doc unavailable
-        </button>
+        <Link to="/documents" className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl bg-her-surface border border-her-border text-ink font-mono text-[11px] tracking-wider uppercase hover:border-ember transition-colors">
+          Open Document Vault
+        </Link>
       </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -154,7 +155,7 @@ export const MissionContentView = (): React.ReactElement => {
                       Seed placeholder
                     </span>
                   ) : (
-                    <a href={d.fileUrl ?? '#'} target="_blank" rel="noreferrer" className="text-ember hover:underline">Open →</a>
+                    <Link to="/documents" className="text-ember hover:underline">Open in vault →</Link>
                   )}
                 </footer>
               </article>

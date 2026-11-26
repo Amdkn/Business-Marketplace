@@ -14,7 +14,8 @@ import { legalDocsRepo } from '../data/legal-docs.repo';
 import type { LegalDoc } from '../lib/types';
 import { LEGAL_STATUS_LABEL } from '../lib/statusLabels';
 import { useOrg } from '../lib/tenant';
-import { FileText, File, CheckCircle, Clock, FileEdit, Lock, Download, RefreshCw } from 'lucide-react';
+import { FileText, File, CheckCircle, Clock, FileEdit, Lock, Download, RefreshCw, Archive, RotateCcw, Upload } from 'lucide-react';
+import { uploadWorkspaceDocument, createWorkspaceDocumentSignedUrl, removeWorkspaceDocument } from '../data/document-storage';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { formatDate, safeArray } from '../lib/safe';
@@ -30,23 +31,91 @@ export const LegalView: React.FC = () => {
   const [docs, setDocs] = useState<LegalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
-  const load = useCallback((): void => {
+  const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
-    legalDocsRepo
-      .list()
-      .then((rows) => {
-        // rows are ALREADY mapped by the default mapper. Use them directly.
-        setDocs(safeArray<LegalDoc>(rows));
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load legal docs'))
-      .finally(() => setLoading(false));
+    try {
+      const rows = await legalDocsRepo.list();
+      setDocs(safeArray<LegalDoc>(rows));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Failed to load legal docs');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    const documentId = crypto.randomUUID();
+    let storagePath: string | null = null;
+    try {
+      if (file.type !== 'application/pdf' && file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        throw new Error('Legal Data Room accepts PDF and DOCX files only.');
+      }
+      storagePath = await uploadWorkspaceDocument(file, documentId);
+      await legalDocsRepo.create({
+        id: documentId,
+        title: file.name,
+        type: file.type === 'application/pdf' ? 'PDF' : 'DOCX',
+        category: 'Corporate',
+        status: 'Draft',
+        fileUrl: storagePath,
+        notes: null,
+      });
+      await load();
+    } catch (reason) {
+      if (storagePath) {
+        try { await removeWorkspaceDocument(storagePath); } catch { /* surface the original failure */ }
+      }
+      setUploadError(reason instanceof Error ? reason.message : 'Legal document upload failed.');
+    } finally {
+      setUploading(false);
+      input.value = '';
+    }
+  };
+
+  const handleArchive = async (doc: LegalDoc): Promise<void> => {
+    setMutatingId(doc.id);
+    setError(null);
+    try {
+      await legalDocsRepo.update(doc.id, { status: doc.status === 'Archived' ? 'Draft' : 'Archived' });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to update archive status.');
+    } finally {
+      setMutatingId(null);
+    }
+  };
+
+  const handleSignedLink = async (doc: LegalDoc): Promise<void> => {
+    if (!doc.fileUrl) return;
+    setSigningId(doc.id);
+    setError(null);
+    try {
+      const url = await createWorkspaceDocumentSignedUrl(doc.fileUrl);
+      setSignedUrls((current) => ({ ...current, [doc.id]: url }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to create a secure file link.');
+    } finally {
+      setSigningId(null);
+    }
+  };
+
+
 
   const list = safeArray<LegalDoc>(docs);
 
@@ -65,14 +134,10 @@ export const LegalView: React.FC = () => {
               No orgId — tenant isolation inactive
             </span>
           )}
-          <button
-            type="button"
-            disabled
-            title="Supabase Storage upload is not configured for legal documents."
-            className="flex items-center gap-2 px-3 py-2 bg-stone-100 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
-          >
-            Upload unavailable
-          </button>
+          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors ${uploading ? 'bg-stone-100 text-slate-400 cursor-wait' : 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer'}`}>
+            <Upload className="w-4 h-4" /> {uploading ? 'Uploading…' : 'Upload Document'}
+            <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="sr-only" disabled={uploading} onChange={(event) => void handleUpload(event)} />
+          </label>
           <button
             onClick={load}
             className="flex items-center gap-2 px-3 py-2 border border-stone-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-stone-50 transition-colors"
@@ -80,16 +145,16 @@ export const LegalView: React.FC = () => {
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs font-bold shadow-sm">
-            <ShieldCheck className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             <span>Workspace RLS active</span>
           </div>
         </div>
       </div>
 
-      {error && (
+      {(error || uploadError) && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-rose-700" role="alert">
-          <p className="font-semibold">Error loading legal docs</p>
-          <p className="text-sm mt-1">{error}</p>
+          <p className="font-semibold">Legal Data Room</p>
+          <p className="text-sm mt-1">{error || uploadError}</p>
         </div>
       )}
 
@@ -152,23 +217,34 @@ export const LegalView: React.FC = () => {
                           {LEGAL_STATUS_LABEL[doc.status]}
                         </Badge>
                         <button
-                          disabled
-                          title="No private file object is connected to this document."
-                          className="text-slate-300 p-1 cursor-not-allowed"
-                          aria-label={`Download ${doc.title}`}
+                          type="button"
+                          onClick={() => void handleSignedLink(doc)}
+                          disabled={!doc.fileUrl || signingId === doc.id}
+                          title={doc.fileUrl ? 'Create a five-minute secure download link.' : 'No file is attached to this record.'}
+                          className="text-slate-500 hover:text-emerald-700 p-1 disabled:text-slate-300 disabled:cursor-not-allowed"
+                          aria-label={`Create secure download link for ${doc.title}`}
                         >
                           <Download className="w-4 h-4" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleArchive(doc)}
+                          disabled={mutatingId === doc.id}
+                          title={doc.status === 'Archived' ? 'Restore this legal document to Draft.' : 'Archive this legal document.'}
+                          className="text-slate-500 hover:text-emerald-700 p-1 disabled:text-slate-300"
+                          aria-label={doc.status === 'Archived' ? `Restore ${doc.title}` : `Archive ${doc.title}`}
+                        >
+                          {doc.status === 'Archived' ? <RotateCcw className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                        </button>
+                        {signedUrls[doc.id] && <a href={signedUrls[doc.id]} target="_blank" rel="noreferrer" className="text-xs font-semibold text-emerald-700 hover:underline">Open file</a>}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="bg-stone-50 p-3 border-t border-stone-100 text-center">
-                <button type="button" disabled title="Document archive lifecycle is not implemented." className="text-xs text-slate-400 cursor-not-allowed">
-                  Archive view unavailable
-                </button>
+              <div className="bg-stone-50 p-3 border-t border-stone-100 text-center text-xs text-slate-500">
+                Archived records remain visible here and can be restored from their row action.
               </div>
             </Card>
           </div>

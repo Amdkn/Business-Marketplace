@@ -50,7 +50,14 @@ Navigation is a target contract. Existing template applications are not automati
 
 The first-class hierarchy is:
 
-`Organization → Workspace → Domain → Subdomain → Capability → Installation`
+`Organization → Workspace → Installed structure → Domain/Department → Capability → Installation`
+
+Do not collapse the two distinct A’Space taxonomy axes:
+
+- **8 Business Departments (B2.1–B2.8):** Product & IP; Growth & Distribution; People & Talent; Legal & Trust; Tech & Intelligence; Operations & Delivery; Finance & Capital; Sales & Partnerships. These are the Marketplace's value-producing and operating departments.
+- **8 Areas OS portfolios (LD01–LD08):** Business; Finances; Blue Life; Meta Cognition; Sovereign Triangle; Solarpunk Habitat; MC Sandbox; Civilizer / ABC OS. These are A’Space mission portfolios, not Marketplace departments.
+
+The department and Areas OS registries may be related through explicit ownership, project and capability links, but they are not parent/child versions of one another. LD01 is the Business mission portfolio; the B2.1–B2.8 taxonomy belongs to the Business department structure.
 
 Cross-cutting entities:
 

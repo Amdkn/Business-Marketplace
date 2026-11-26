@@ -2413,3 +2413,31 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Dispatched CI run [45855710702](https://github.com/Amdkn/Business-Marketplace/actions/runs/45855710702) on commit `a140c27ffacf94d00d315cdfa55e70803f0206c6`. It completed SUCCESS: frozen Bun install, app+Node TypeScript, API TypeScript, Vitest 53 files / 548 tests, Vite build, kernel 27/27, bridge 20/20, adapters 39/39 and RBAC 16/16 (102/102 benchmarks).
 - Vercel full verify on `c60131d` failed only in the six audit query tests because of the environment mismatch above. The fix is now CI-green, but the latest branch has not been deployed: Vercel status remains HTTP 402 `build-rate-limit` / `api-deployments-free-per-day`. Do not weaken Preview SSO or promote production.
 - PR #1 remains OPEN / DRAFT. Day 1, Day 2 and Day 3 acceptance remain open pending latest Preview, authenticated browser E2E, real provider/payment credentials and operational tenant lifecycle.
+
+
+## 13.50 — Product portfolio truthfulness and latest full CI verification — 2026-11-26
+
+### Latest branch verification
+- Latest application commit at the start of this continuation: `dfc3554b6f35c782d23b8b7721da5a7c2264c9eb` (Product portfolio status correction).
+- GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) completed **SUCCESS** on that exact commit. All workflow steps passed: frozen Bun install; app + Node TypeScript; API TypeScript; Vitest (53 files / 548 tests); Vite build; kernel 27/27; bridge 20/20; adapters 39/39; RBAC 16/16. Total runtime benchmarks: **102/102**.
+- The Product portfolio page now uses `legacy`, `reference` and `concept` states instead of implying that portfolio cards are live Marketplace listings. Nexus is legacy, Solaris is a reference, Orbiter is a concept; pricing is explicitly indicative and not a transaction/revenue record.
+- Commit [dfc3554](https://github.com/Amdkn/Business-Marketplace/commit/dfc3554b6f35c782d23b8b7721da5a7c2264c9eb) is CI-green. This is stronger than the earlier run 45855710702 and supersedes any earlier statement that the latest branch CI was pending.
+
+### Deployment status — separate from CI
+- The combined GitHub commit status for `dfc3554` reports Vercel **failure** with target URL indicating `build-rate-limit`. This is a deployment quota failure, not a failed application build. No latest-commit Preview is verified.
+- Do not retry direct Vercel deployment inside the quota window, weaken Preview SSO, change production aliases, or promote this branch to production. The existing production domain is not an acceptance environment for this branch.
+- Authenticated browser acceptance remains blocked until a current protected Preview and an authorized browser session are both available.
+
+### Evidence freshness and tenant reality
+- The Day 3 matrix has been updated to reflect the full CI pass; the row remains **PARTIAL / ACCEPTANCE OPEN** because CI does not prove tenant lifecycle, browser authorization, provider execution, backup/restore or release readiness.
+- The live tenant inventory documented in the current hosted README is one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. This supersedes older zero-identity snapshots elsewhere in this handoff. Do not create another identity or organization for testing.
+- Operational counts remain zero for domain/department/holon installations, agent principals/delegations, provider connections/OAuth transactions, published listings/orders/payments/payouts and journal activity. The Google Drive manifest remains DRAFT; provider and agent blueprints are not executable runtime evidence.
+- No fake tenant, agent, listing, order, payment, OAuth connection or production transaction was created.
+
+### Next execution
+1. Continue source audit for any remaining UI labels or static portfolio cards that imply live/deployed/connected state without a backing operational record.
+2. Reconcile the current hosted tenant/auth counts against the older D1.03/D1.04 statements in this handoff and matrices; preserve the one real tenant, do not duplicate it.
+3. Obtain a latest-commit Preview after Vercel's quota window, then run browser acceptance with the authorized session: identity/workspace, Garden CRUD, private document Storage and cross-workspace denial.
+4. Configure real Google OAuth credentials and callback URL before activating the Google Drive manifest; execute a real provider operation.
+5. Configure a real PSP sandbox and complete checkout/capture/webhook/refund/payout plus ledger reconciliation.
+6. Continue tenant installation, agent runtime, Compute/Inference/Memory/CEL, durable workflows, Control Tower, backup/restore and failure/release drills. Days 1–3 remain OPEN until these acceptance gates pass.

@@ -6,6 +6,7 @@ DECLARE
   v_rls boolean;
   v_fn regprocedure;
   v_search_path text[];
+  v_table text;
 BEGIN
   -- One installation per workspace and blueprint.
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='areas.domain_installations'::regclass AND conname='domain_installations_workspace_id_domain_code_key' AND contype='u') THEN
@@ -59,17 +60,21 @@ BEGIN
   END IF;
 
   -- Private engine tables remain RLS-enabled and not directly readable/writable by browser roles.
-  FOREACH v_fn IN ARRAY ARRAY[
-    'areas.domain_installations'::regclass::oid::regprocedure,
-    'areas.holon_installations'::regclass::oid::regprocedure,
-    'enterprise.department_installations'::regclass::oid::regprocedure,
-    'enterprise.installation_ownership_assignments'::regclass::oid::regprocedure,
-    'enterprise.installation_dependencies'::regclass::oid::regprocedure,
-    'enterprise.structure_installation_requests'::regclass::oid::regprocedure,
-    'enterprise.structure_installation_events'::regclass::oid::regprocedure,
-    'catalog.capability_installations'::regclass::oid::regprocedure
+  FOREACH v_table IN ARRAY ARRAY[
+    'areas.domain_installations',
+    'areas.holon_installations',
+    'enterprise.department_installations',
+    'enterprise.installation_ownership_assignments',
+    'enterprise.installation_dependencies',
+    'enterprise.structure_installation_requests',
+    'enterprise.structure_installation_events',
+    'catalog.capability_installations'
   ] LOOP
-    NULL;
+    SELECT c.relrowsecurity INTO v_rls
+    FROM pg_class c WHERE c.oid=v_table::regclass;
+    IF v_rls IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'RLS must remain enabled on %', v_table;
+    END IF;
   END LOOP;
 
   IF has_table_privilege('anon','areas.domain_installations','SELECT')

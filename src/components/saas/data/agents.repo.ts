@@ -22,7 +22,7 @@ export const agentsRepo = {
       name: String(row.display_name ?? row.agent_key ?? 'Unnamed agent'),
       role: 'operator' as const,
       email: null,
-      status: row.principal_status === 'ACTIVE' ? 'active' : row.principal_status === 'PAUSED' ? 'paused' : 'archived',
+      status: row.principal_status === 'ACTIVE' ? 'active' : row.principal_status === 'SUSPENDED' ? 'paused' : 'archived',
       createdAt: String(row.created_at ?? ''),
       updatedAt: String(row.created_at ?? ''),
       agentKey: String(row.agent_key ?? ''),

@@ -78,93 +78,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const claims = decodeJwtClaims(session.access_token);
     const userId = claims.sub ?? session.user.id;
 
-    // Resolve the tenant from canonical membership rows, not only a custom JWT
-    // claim. This keeps the Marketplace compatible with sessions minted before
-    // the org_id hook was installed and prevents stale claims selecting a tenant.
-    const { data: memberships, error: membershipError } = await supabase
+    // enterprise remains private. The identity RPC returns only this caller's
+    // unique active org/workspace and role, without exposing private tables.
+    const { data: contexts, error: contextError } = await supabase
       .schema('identity')
-      .from('organization_memberships')
-      .select('organization_id')
-      .eq('user_id', userId)
-      .eq('membership_status', 'ACTIVE');
-    if (membershipError) throw membershipError;
-
-    const activeOrgIds = (memberships ?? []).map((row) => row.organization_id as string);
-    const claimedOrgId = claims.org_id && activeOrgIds.includes(claims.org_id) ? claims.org_id : null;
-    const orgId = claimedOrgId ?? (activeOrgIds.length === 1 ? activeOrgIds[0] : null);
-    if (APP_MODE === 'saas' && activeOrgIds.length > 1 && !claimedOrgId) {
-      throw new Error('Multiple active organizations require an explicit organization selector.');
-    }
-
-    let role = claims.role && claims.role !== 'authenticated' ? claims.role : 'authenticated';
-    if (orgId && role === 'authenticated') {
-      const { data: roleBindings, error: roleError } = await supabase
-        .schema('identity')
-        .from('role_bindings')
-        .select('role_code, scope_type, scope_id')
-        .eq('organization_id', orgId)
-        .eq('subject_user_id', userId)
-        .eq('binding_status', 'ACTIVE');
-      if (roleError) throw roleError;
-      const binding = (roleBindings ?? []).find((row) =>
-        row.scope_type === 'ORGANIZATION' && row.scope_id === null
-      );
-      if (binding?.role_code) role = binding.role_code as string;
-    }
+      .rpc('get_current_workspace_context');
+    if (contextError) throw contextError;
+    const context = Array.isArray(contexts) ? contexts[0] : contexts;
+    const orgId = context?.organization_id as string | undefined;
+    const workspaceId = context?.workspace_id as string | undefined;
+    const role = (context?.role_code as string | undefined)
+      ?? (claims.role && claims.role !== 'authenticated' ? claims.role : 'authenticated');
 
     const authUser: AuthUser = {
       id: userId,
       email: claims.email ?? session.user.email ?? '',
-      orgId,
+      orgId: orgId ?? null,
       role,
       isAuthenticated: true,
     };
     setUser(authUser);
     setActiveOrgIdCache(authUser.orgId);
-    setActiveWorkspaceIdCache(null);
+    setActiveWorkspaceIdCache(workspaceId ?? null);
 
     if (authUser.orgId) {
       const org = await fetchUserOrg(authUser.orgId);
       setOrganization(org);
-
-      // Resolve exactly one active workspace for the signed-in organization.
-      // Garden repositories use this id on every read/write; RLS remains the
-      // final authorization boundary and independently checks membership.
-      const { data: workspaceMemberships, error: workspaceError } = await supabase
-        .schema('enterprise')
-        .from('workspace_memberships')
-        .select('workspace_id')
-        .eq('organization_id', authUser.orgId)
-        .eq('user_id', authUser.id)
-        .eq('membership_status', 'ACTIVE');
-
-      if (workspaceError) throw workspaceError;
-      if (workspaceMemberships?.length === 1) {
-        const workspaceId = workspaceMemberships[0].workspace_id as string;
-        const { data: workspace, error: workspaceLookupError } = await supabase
-          .schema('enterprise')
-          .from('workspaces')
-          .select('workspace_status')
-          .eq('id', workspaceId)
-          .eq('organization_id', authUser.orgId)
-          .maybeSingle();
-        if (workspaceLookupError) throw workspaceLookupError;
-        if (!workspace || workspace.workspace_status !== 'ACTIVE') {
-          throw new Error('The active workspace is unavailable.');
-        }
-        setActiveWorkspaceIdCache(workspaceId);
-      } else if (APP_MODE === 'saas') {
-        throw new Error(
-          workspaceMemberships?.length
-            ? 'Multiple active workspaces require an explicit workspace selector.'
-            : 'No active workspace membership exists for this organization.',
-        );
+      if (!workspaceId && APP_MODE === 'saas') {
+        throw new Error('No unique active workspace context is available for this organization.');
       }
     } else {
       setOrganization(null);
       setActiveWorkspaceIdCache(null);
       if (APP_MODE === 'saas' && import.meta.env.DEV) {
-        console.warn('[marketplace] no unique active organization membership — tenant repositories remain closed');
+        console.warn('[marketplace] no unique active organization/workspace context — tenant repositories remain closed');
       }
     }
     setIsLoading(false);

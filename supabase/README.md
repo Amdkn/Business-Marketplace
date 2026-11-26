@@ -200,7 +200,7 @@ Migrations are tracked under `supabase/migrations/` and match the hosted migrati
 
 Workspace data foreign-key audit: **0 unindexed foreign keys** remain in `workspace_data`. The broader Supabase project still has unindexed-FK findings in other schemas; do not conflate those with the interface data layer.
 
-`marketplace-api` is ACTIVE v25 with `verify_jwt=true`. The current authenticated tenant context resolves to the first real organization/workspace and role `B1_CEO`. No agent principal or fake business record has been created.
+`marketplace-api` is ACTIVE v26 with `verify_jwt=true`. The current authenticated tenant context resolves to the first real organization/workspace and role `B1_CEO`. No agent principal or fake business record has been created.
 
 ## Shared Garden / Web Desktop persistence — live checkpoint
 

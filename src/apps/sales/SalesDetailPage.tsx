@@ -8,11 +8,9 @@
  * D4 append-only: Sales app keeps its own kind→meta table (sales-specific),
  * but the page layout is now shared with People/IT-RD/Finance/Operations.
  *
- * Cause D — chaînage deal Won : on a ajouté un panneau "Mark Paid · Create
- * invoice + client" sous le DetailPage quand le deal est au stade Won.
- * Avant, la fiche deal ne déclenchait rien — le bouton « Mark Paid »
- * vivait seulement dans la fiche drill (SalesItemDetail). Cette page
- * couvre l'autre entrée (kanban → setDetail({kind:'deal', ...})).
+ * Won-deal invoice action: the page creates one persisted invoice only when
+ * the deal already references a workspace client and a valid currency.
+ * The database source_key unique index makes the action idempotent.
  */
 
 import {

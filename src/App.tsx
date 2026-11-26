@@ -14,6 +14,7 @@ import { OAuthCallback } from './apps/auth/OAuthCallback';
 import { supabase } from './lib/supabase';
 import type { TenantLevel } from './lib/authProviders';
 import { MarketplaceControlPlane } from './apps/control-plane/MarketplaceControlPlane';
+import { useTenantStore } from './stores/tenant.store';
 
 type AuthMode = 'pending' | 'supabase' | 'demo';
 type ProductSurface = 'control-plane' | 'business-office';
@@ -70,6 +71,8 @@ export default function App() {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
         if (data.session) {
+          await useTenantStore.getState().bootstrap();
+          if (cancelled) return;
           setBoot({ mode: 'supabase', level: 'architect', email: data.session.user.email ?? undefined });
         }
       } catch {
@@ -86,6 +89,13 @@ export default function App() {
       email: session.email,
     };
     writeBootState(next);
+    if (next.mode === 'supabase') {
+      void useTenantStore.getState().bootstrap().finally(() => {
+        setSurface('control-plane');
+        setBoot(next);
+      });
+      return;
+    }
     setSurface('control-plane');
     setBoot(next);
   };

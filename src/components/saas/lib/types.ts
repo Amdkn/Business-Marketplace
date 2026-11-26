@@ -1,8 +1,8 @@
 // src/lib/types.ts
-// Zero Bug Sprint (D6 #98) — TypeScript types for the OMK dashboard, rewritten
-// to match the canonical `omk_saas.*` schema exactly (ADR-OMK-001 ratified).
+// Zero Bug Sprint (D6 #98) — TypeScript types for the A'Space Marketplace Dashboard, rewritten
+// to match the canonical canonical Marketplace tenant schema.
 //
-// Column source-of-truth: query `information_schema.columns WHERE table_schema = 'omk_saas'`
+// Column source-of-truth: query `information_schema.columns against the active Marketplace schemas`
 // on the live Supabase Cloud project. Every field on every interface below
 // exists as a DB column. If the DB schema changes, regenerate this file.
 //
@@ -42,7 +42,7 @@ export type TabType =
   | 'settings';
 
 // ─────────────────────────────────────────────────────────────────────────
-// omk_saas schema-accurate types
+// Marketplace schema-aligned types
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface Organization {

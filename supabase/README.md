@@ -99,7 +99,7 @@ The platform has deployed schema and runtime foundations. It has not passed auth
 
 ## Source layout
 
-- `migrations/` — 28 tracked source migrations for the applied Marketplace schema, including three Finance & Capital migrations.
+- `migrations/` — tracked source migrations for the applied Marketplace schema, including three Finance & Capital migrations.
 - `functions/marketplace-api/` — tenant lifecycle, structure installation, ownership/dependency/capability engines, catalog and commerce API.
 - `functions/adapter-api/` — connection lifecycle, OAuth initiation and execution control.
 - `functions/adapter-worker/` — Vault-backed provider execution, retries, refresh and manifest validation.
@@ -177,3 +177,20 @@ The Garden Dashboard uses the tenant-scoped `dashboard` schema:
 - PostgREST exposes `dashboard` alongside `public`; the frontend uses `dashboard` as its tenant-facing data schema.
 - The tables are intentionally empty until real clients and agents are created. No demo rows are seeded.
 - Canonical identity, organization, workspace, domain, catalog, commerce and finance records remain in their respective Marketplace schemas.
+
+
+## Marketplace interface persistence — 2026-11-26
+
+The two existing interfaces now have a first shared persistence layer derived from the actual CMS collection definitions in `src/lib/cms/seed.ts`:
+
+- `workspace_data` contains **34 dedicated tenant-scoped tables**, one for each persistent collection used by the Garden/Sidebar and Web Desktop CMS surfaces.
+- Each collection table has typed columns derived from its declared CMS fields, plus `organization_id`, optional `workspace_id`, creator metadata, timestamps and `extra_data` for forward-compatible fields.
+- Three `demo_coach_*` showcase collections remain local presentation fixtures and deliberately have no tenant tables.
+- `workspace_data.activity_events` provides a tenant-scoped event sink.
+- All 34 collection tables have RLS, four policies (active-member read; B1/S0/B2 operator insert/update/delete), authenticated-only table grants, organization/workspace indexes and an immutability trigger for tenant ownership and primary key. The creator is preserved on update.
+- PostgREST now exposes `workspace_data`; browser roles cannot use the schema or tables anonymously.
+- `src/lib/cms/repository.ts` now hydrates, upserts and deletes against the dedicated table for each collection. Organization resolution uses `identity.organization_memberships`, not the legacy public memberships table.
+- `src/lib/cms/cms.store.ts` now replaces the bundled sample rows with an empty live tenant result. An empty tenant no longer sees the fictional seed dataset.
+- Regression: `supabase/tests/marketplace_interface_persistence.sql` passed against the hosted project. Live catalog verification: 35 tables including activity_events, 138 policies, zero RLS-disabled tables, zero anon table grants, and zero rows inserted by the probe.
+
+Important scope boundary: this is the shared CMS persistence foundation, not yet full acceptance of every Web Desktop and Sidebar module. The separate Sidebar repository still has its own `dashboard.clients` / `dashboard.agents` data path; identity-backed People/Agent projection, workspace-level scoping, remaining app-local stores, real browser JWT E2E and deployment validation remain follow-on work. Do not claim the two interfaces are fully unified until those paths are migrated and verified.

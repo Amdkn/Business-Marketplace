@@ -115,3 +115,24 @@ BEGIN
  RAISE NOTICE 'PASS: Fee policy, immutable snapshot, access controls and arithmetic';
 END
 $fee_engine_test$;
+
+DO $fee_policy_security_test$
+DECLARE v_count integer; v_definition text;
+BEGIN
+ SELECT count(*) INTO v_count FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE n.nspname='api' AND p.proname IN ('create_fee_policy','activate_fee_policy','apply_order_fee_policy')
+ AND p.prosecdef;
+ IF v_count<>3 THEN RAISE EXCEPTION 'Expected three SECURITY DEFINER fee APIs'; END IF;
+ IF has_function_privilege('anon','api.activate_fee_policy(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.activate_fee_policy(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('anon','api.apply_order_fee_policy(uuid,uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.apply_order_fee_policy(uuid,uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.activate_fee_policy(uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.apply_order_fee_policy(uuid,uuid,uuid,uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'Fee activation/application grants are unsafe'; END IF;
+ SELECT pg_get_functiondef('api.activate_fee_policy(uuid,uuid,uuid)'::regprocedure) INTO v_definition;
+ IF position('v_policy.policy_key' in v_definition)=0 OR position('scope_organization_id' in v_definition)=0
+ THEN RAISE EXCEPTION 'Fee policy activation lock is not scoped by policy identity'; END IF;
+ RAISE NOTICE 'PASS: Fee API SECURITY DEFINER, least privilege and activation serialization';
+END
+$fee_policy_security_test$;

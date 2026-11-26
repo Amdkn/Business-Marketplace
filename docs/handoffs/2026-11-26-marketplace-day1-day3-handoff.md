@@ -2027,3 +2027,61 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - The current SQL security advisor also reports RLS-enabled/no-policy INFO findings across private schemas and leaked-password protection disabled (WARN). Review those as a separate platform-hardening task; do not add broad authenticated grants merely to silence the private-schema INFO findings.
 
 **Continuation rule:** stay in Amdkn/Business-Marketplace, branch foundation/marketplace-product-identity, Supabase project swegnrvaxxgfrnshdpxx. Next work is (1) complete browser-authenticated API and cross-workspace tests when a browser JWT is available, (2) execute frontend typecheck/Vitest/build when a local checkout or CI runner is available, (3) continue the same source-backed CRUD audit across the remaining Business departments. Do not seed fake agents or claim live runtime telemetry.
+
+### 13.39 Workspace-backed Operations queue, strict CMS writes and Finance invoice path — 2026-11-26
+
+**CMS persistence contract**
+- Added strict repository operations upsertItemRequired and removeItemRequired. These reject when Supabase is not configured; they cannot silently report a local-only no-op as cloud persistence.
+- Added updateItemPersisted, addItemPersisted and removeItemPersisted store actions. They publish the changed in-memory projection only after the repository confirms the cloud write/delete.
+- Legacy local/demo CRUD no longer sends TENANT_DEMO_COACH records to the authenticated production workspace. Demo rows remain local to the demo tenant.
+- This does not convert every legacy form in every app to strict persistence. Remaining direct updateItem / addItem call sites still require a domain-by-domain audit.
+
+**Finance**
+- Finance invoice creation now requires an existing client from the active workspace, a positive amount and an ISO 4217 currency code.
+- Real-tenant invoice creation uses addItemPersisted; the UI only reports persistence after the write succeeds. Demo invoice creation remains local and is labeled as demo.
+- Invoice mapping now includes client_id, currency, issued_at, due_at and paid_at; the hosted workspace_data.invoices columns were checked and match those fields.
+- Amounts are displayed by currency. The UI does not sum mixed currencies or synthesize MRR, burn or cash runway.
+- Payment settlement is explicitly unavailable until a real payment provider and finance-ledger workflow are connected. No payment, refund or payout was created.
+
+**Operations domain — missing persistence source repaired**
+- The existing Operations UI already used strict persistence actions for alerts and changes, but the CMS repository had no persistent mapping for either collection. Consequently, these forms could never persist in a real tenant.
+- Added repository table aliases:
+  - CMS alerts → workspace_data.incidents (typed incident columns plus JSONB extra data for alert metadata).
+  - CMS changes → workspace_data.change_requests.
+- tableFor, hydration, upsert and delete now honor collection-to-table aliases. Existing incidents and alerts views share the same incident source rather than creating duplicate alert registries.
+- Operations alert creation now persists an incident with enrichment='raw', an explicit open status, no fabricated risk score and no fabricated trace. Starting triage updates the persisted status; it does not falsely claim that runtime enrichment happened.
+- Change proposals are stored as workspace-scoped change_requests. Approval/rejection records the actor and timestamp through the database trigger; immutable ID, organization, workspace, creator and creation timestamp are protected by that trigger.
+
+**Hosted migrations**
+- Applied migration ledger version 20261126104549, name 20261126105000_operations_change_requests:
+  - creates workspace_data.change_requests;
+  - composite FK (workspace_id, organization_id) → enterprise.workspaces(id, organization_id);
+  - status/risk/decision-state checks, JSON object constraint and workspace/status index;
+  - RLS enabled with four policies: active workspace member read; can_manage_workspace insert/update/delete; insert binds created_by_user_id=auth.uid();
+  - authenticated CRUD grants only; no anon grants;
+  - update trigger pins tenant/creator identity and updates timestamps.
+- Applied migration ledger version 20261126104707, name 20261126105500_change_request_decision_audit: approval/rejection transitions set decided_at and decided_by_user_id=auth.uid(); proposed/withdrawn states clear decision fields.
+- Applied migration ledger version 20261126104811, name 20261126110000_change_request_fk_indexes: indexes for creator, decision actor and composite workspace/org FK.
+- Source migrations committed:
+  - supabase/migrations/20261126104549_20261126105000_operations_change_requests.sql
+  - supabase/migrations/20261126104707_20261126105500_change_request_decision_audit.sql
+  - supabase/migrations/20261126104811_20261126110000_change_request_fk_indexes.sql
+- Added supabase/tests/operations_change_requests.sql. Executed against the hosted project; the structural assertion block returned no exception. It verifies RLS, four policies, authenticated CRUD grants, absence of anon grants, composite workspace/org FK, decision-state constraint, pinned trigger search_path, revoked direct trigger-function execution and required indexes.
+
+**Verification performed**
+- Hosted metadata confirms workspace_data.change_requests: RLS enabled, four policies, authenticated SELECT/INSERT/UPDATE/DELETE grants, no anonymous table grants, zero persisted rows.
+- Ran a rollback-only authenticated SQL integration transaction using the real tenant OWNER identity: inserted a proposal, updated it to approved, and verified decided_by_user_id=auth.uid() plus non-null decided_at. A follow-up count confirmed zero persisted rollback-test rows.
+- Rechecked the invoice schema: client_id, currency, issued_at, due_at and paid_at exist with compatible types. Workspace data counts for clients, deals, invoices, people_agents and missions were zero at the last check; no sample business data was created.
+- Re-ran Supabase security/performance advisors. The new change_requests table did not introduce an RLS-without-policy finding. Advisor output still includes existing INFO findings for private schemas/tables intentionally closed by RLS with no browser policies, plus the existing leaked-password-protection WARN. Performance findings include many pre-existing unused/unindexed-FK indexes; the new change_requests FK indexes were added.
+- The Operations table-alias path and Finance UI source were inspected after the edits. No authenticated browser CRUD test was available.
+
+**Acceptance boundary**
+- The SQL test verifies the hosted table contract and an authenticated database-role insert/update path. It does not prove the React UI, Supabase JS schema exposure or cross-workspace browser denial.
+- TypeScript, Vitest, Vite build and browser E2E remain NOT RUN. The linked Desktop Commander device is offline, so no local checkout/test runner was available.
+- Latest observed GitHub status for commit 21224c77d869d0726d18a614aa3b20ad4df9acf4 remains Vercel build-rate-limit; no GitHub Actions workflow run was returned. This quota signal is not a source build result. No new Vercel deployment attempt was made.
+- PR #1 remains OPEN / DRAFT. Day 1–3 remain OPEN pending frontend CI/build and authenticated browser CRUD/cross-workspace acceptance.
+
+**Next continuation**
+1. Finish the source-backed CRUD conversion for remaining Operations screens and audit Sales, Product, Growth, Legal and all other Business departments for legacy best-effort mutations or collections without a canonical table.
+2. Complete a CMS collection-to-workspace_data schema compatibility test for every mapped collection, including aliases.
+3. Run frontend typecheck/Vitest/build and authenticated browser tests when a local runner and browser session are available; do not wait on Vercel quota to continue source/database work.

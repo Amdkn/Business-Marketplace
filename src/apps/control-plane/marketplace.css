@@ -46,3 +46,20 @@
 .bm-core-boundary svg{flex:0 0 auto;margin-top:1px}
 .bm-core-foot{display:flex;justify-content:space-between;gap:8px;margin-top:12px;color:#9aa496;font:7px 'DM Mono',monospace;letter-spacing:.06em}
 @media(max-width:760px){.bm-core-grid{grid-template-columns:1fr}}
+
+.bm-catalog-state,.bm-catalog-empty{min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;gap:10px}
+.bm-catalog-state>svg{color:#82927e}.bm-catalog-state strong{font-size:13px;color:#3a4a3b}.bm-catalog-state span{font-size:10px;color:#899489}
+.bm-catalog-empty-icon{width:48px;height:48px;border-radius:13px;background:#e9efe2;color:#617b5a;display:grid;place-items:center;margin-bottom:4px}
+.bm-catalog-empty .bm-eyebrow{margin:0}.bm-catalog-empty h2{font-size:20px;letter-spacing:-.04em;margin:0}.bm-catalog-empty>p{font-size:10px;line-height:1.65;color:#7d897d;max-width:540px;margin:0}
+.bm-catalog-count{display:flex;align-items:baseline;gap:8px;padding-top:12px}.bm-catalog-count strong{font-size:26px}.bm-catalog-count span{font:9px 'DM Mono',monospace;color:#8e9a8c}
+.bm-catalog-summary{display:flex;align-items:baseline;gap:8px;color:#778477;font:9px 'DM Mono',monospace}.bm-catalog-summary strong{font-size:22px;color:#26392b}
+.bm-listing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.bm-listing-card{padding:17px;display:flex;flex-direction:column;min-height:205px}
+.bm-listing-top{display:flex;justify-content:space-between;color:#8c9a88;font:8px 'DM Mono',monospace}
+.bm-listing-card h2{font-size:14px;letter-spacing:-.03em;margin:15px 0 6px}
+.bm-listing-card>p{font-size:10px;line-height:1.6;color:#7e8b7e;margin:0;flex:1}
+.bm-listing-seller{font-size:9px;color:#899489;margin-top:13px}.bm-listing-seller strong{color:#4e624f}
+.bm-listing-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #edf0e8;padding-top:11px;margin-top:12px}
+.bm-listing-bottom strong{font-size:15px}.bm-listing-bottom span{font:8px 'DM Mono',monospace;color:#829080;text-align:right}
+@media(max-width:900px){.bm-listing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.bm-listing-grid{grid-template-columns:1fr}}

@@ -1,5 +1,5 @@
 // src/components/views/DashboardView.tsx
-// Zero Bug Sprint — rewired to use new omk_saas.* schema fields.
+// Zero Bug Sprint — rewired to use Marketplace tenant schema fields.
 //
 // Bug fixes (D6 #98, D6 #102, D6 #104):
 //   - `client.progress` removed (no DB column) → use a fake "Progress" from
@@ -86,7 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Ecosystem Vitals</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Live data from omk_saas.clients and omk_saas.agents
+            Live data from dashboard.clients and dashboard.agents
           </p>
         </div>
         <button

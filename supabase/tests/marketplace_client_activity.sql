@@ -34,7 +34,6 @@ SELECT set_config(
     SELECT id::text
     FROM enterprise.workspaces
     WHERE organization_id = current_setting('app.test_organization_id')::uuid
-      AND status = 'ACTIVE'
     ORDER BY created_at
     LIMIT 1
   ),

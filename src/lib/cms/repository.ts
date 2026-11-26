@@ -61,7 +61,7 @@ function setMode(next: SupabaseMode, err?: unknown): void {
 /* Collection definitions are source-controlled; tenant records are stored in dedicated tables. */
 
 // Each persistent CMS collection has a dedicated typed table in workspace_data.
-const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
+const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table?: string }> = {
   "clients": {
     "title": "name",
     "fields": [
@@ -98,6 +98,36 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
       "severity",
       "resolution"
     ]
+  },
+  "alerts": {
+    "title": "title",
+    "fields": [
+      "when",
+      "severity",
+      "resolution",
+      "enrichment",
+      "source",
+      "riskScore",
+      "hypothesis",
+      "trace",
+      "status"
+    ],
+    "table": "incidents"
+  },
+  "changes": {
+    "title": "title",
+    "fields": [
+      "summary",
+      "why",
+      "risk",
+      "policy",
+      "status",
+      "proposedBy",
+      "decidedByUserId",
+      "decidedAt",
+      "decisionNote"
+    ],
+    "table": "change_requests"
   },
   "services": {
     "title": "name",
@@ -379,7 +409,8 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
 };
 
 export function tableFor(collectionId: string): string | null {
-  return COLLECTION_FIELDS[collectionId] ? collectionId : null;
+  const shape = COLLECTION_FIELDS[collectionId];
+  return shape ? (shape.table ?? collectionId) : null;
 }
 
 function toSnake(key: string): string {
@@ -522,14 +553,15 @@ export async function getCurrentOrgId(): Promise<string | null> {
 /** Hydrate one dedicated tenant table. null means local-only or no auth session;
  *  database/API failures reject so callers cannot mistake an outage for an empty list. */
 export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
-  if (!tableFor(collectionId)) return null;
+  const tableName = tableFor(collectionId);
+  if (!tableName) return null;
   if (!supabaseConfigured) {
     setMode('unconfigured');
     return null;
   }
   const context = await getCurrentWorkspaceContext();
   if (!context) return null;
-  const { data, error } = await supabase.schema('workspace_data').from(collectionId)
+  const { data, error } = await supabase.schema('workspace_data').from(tableName)
     .select('*')
     .eq('organization_id', context.organizationId)
     .eq('workspace_id', context.workspaceId)
@@ -569,7 +601,9 @@ export async function upsertItem(collectionId: string, item: CmsItem): Promise<v
     throw error;
   }
   try {
-    const table = supabase.schema('workspace_data').from(collectionId);
+    const tableName = tableFor(collectionId);
+    if (!tableName) throw new Error(`[cms] no persistent Marketplace table for collection: ${collectionId}`);
+    const table = supabase.schema('workspace_data').from(tableName);
     const row = toWorkspaceRow(collectionId, item, context);
     const { data: existing, error: lookupError } = await table.select('id')
       .eq('id', item.id)
@@ -630,7 +664,9 @@ export async function removeItem(collectionId: string, id: string): Promise<void
     setMode('unreachable', error);
     throw error;
   }
-  const { error } = await supabase.schema('workspace_data').from(collectionId)
+  const tableName = tableFor(collectionId);
+  if (!tableName) throw new Error(`[cms] no persistent Marketplace table for collection: ${collectionId}`);
+  const { error } = await supabase.schema('workspace_data').from(tableName)
     .delete()
     .eq('id', id)
     .eq('organization_id', context.organizationId)

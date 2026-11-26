@@ -1647,3 +1647,37 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Live verification: no legacy schema found; both Dashboard tables remain empty; eight tenant policies remain in place; anon has no SELECT; authenticated insert/read probe for the real tenant succeeded inside a rolled-back transaction.
 - Added source migrations `20261126080100_replace_legacy_namespace_with_dashboard.sql` and `20261126080200_expose_tenant_identity_context_for_dashboard.sql`.
 - Deployment of the latest branch remains blocked by the Vercel 24-hour deployment quota. Browser E2E is therefore still pending.
+
+
+### 13.25 Shared interface persistence foundation — 2026-11-26 03:xx ET
+
+**Source audit**
+- Audited both interface code paths in `src/components/saas` (Garden/Sidebar) and `src/apps` (Web Desktop), plus the central registry and CMS implementation in `src/lib/cms`.
+- `src/lib/cms/seed.ts` registers 37 collections. 34 are operational collections; `demo_coach_apps`, `demo_coach_notes`, and `demo_coach_metrics` are showcase-only and intentionally remain local.
+- Found that `src/lib/cms/repository.ts` documented 23 typed tables but actually read/wrote `cms_items` for every collection. The collection-to-table map was not active. The tenant resolver read legacy `public.memberships`.
+- Found that `src/lib/cms/cms.store.ts` only replaced seed rows when live rows were non-empty, which meant a real empty tenant continued seeing fictional sample records.
+
+**Implemented**
+- Added `workspace_data` with 34 dedicated tables derived from the real collection field definitions: clients, articles, team, people_agents, runbooks, incidents, services, it_experiments, deploys, tasks, marketplace_listings, product_items, product_releases, growth_channels, growth_experiments, deals, invoices, contracts, policies, session_notes, legal_ai_act_checks, legal_frameworks, legal_controls, legal_compliance_policies, legal_evidence, legal_risks, legal_vendors, legal_gaps, personas, memory, codex, approval_decisions, squads and content.
+- Added `workspace_data.activity_events`.
+- Every collection table has typed declared fields, tenant organization FK, optional workspace FK, creator, timestamps, RLS, four policies, organization/workspace index and tenant-key immutability trigger. Reads require active membership; writes require S0_SOVEREIGN/B1_CEO/B2_MANAGER/B2.2. Anonymous schema/table access is revoked.
+- Added source migration `supabase/migrations/20261126080300_marketplace_interface_persistence.sql`.
+- Rewired `src/lib/cms/repository.ts` to use the matching `workspace_data.<collection>` table for hydrate/upsert/delete; collection definitions remain source-controlled. Organization lookup now uses `identity.organization_memberships`.
+- Changed `src/lib/cms/cms.store.ts` so an empty live table replaces bundled demo rows. No fake rows are inserted into Supabase.
+- Added `supabase/tests/marketplace_interface_persistence.sql`; executed against the hosted project successfully.
+
+**Live verification**
+- `workspace_data`: 35 tables (34 collection tables + activity_events).
+- 138 RLS policies; 0 tables with RLS disabled; 0 anon table grants.
+- PostgREST exposed schemas include `public, dashboard, identity, workspace_data`.
+- Authenticated insert/read/update probe against the real Garden tenant succeeded inside a transaction and was rolled back; the table remains empty.
+- No demo business records or test rows were persisted.
+
+**Not yet complete — next session must continue**
+1. Reconcile the separate Sidebar repositories `src/components/saas/data/clients.repo.ts` and `agents.repo.ts` with the new shared tables and canonical Marketplace identity. Do not create a second human/agent identity: humans come from `identity.profiles` + `identity.organization_memberships`; AI principals come from `identity.agent_principals` and `identity.agent_delegations`. Runtime telemetry should be a projection/telemetry layer, not a competing principal registry.
+2. Trace each Garden Sidebar view and each Web Desktop app to its actual data source. Identify app-local seeds, hardcoded arrays, local state, and independent repositories that bypass the central CMS. Migrate each real operational surface to the shared persistence or its canonical domain schema.
+3. Resolve active workspace selection and enforce `workspace_id` scoping in repository queries/RLS. Current CMS table RLS is organization-scoped; `workspace_id` is nullable and not yet enforced.
+4. Align CMS entities with existing core Marketplace schemas where appropriate (commerce listings/orders, integration connections/jobs, finance ledger/payment records, Areas/Enterprise installations). Avoid duplicating those entities in workspace_data when a canonical table already exists.
+5. Run TypeScript/build/tests and deploy a new preview; Vercel had previously rate-limited deployment. Then perform browser E2E with the real user's JWT and verify both interfaces render empty states and persist a real record end-to-end.
+
+**Branch:** `foundation/marketplace-product-identity`. **PR:** #1 OPEN / DRAFT. Latest commit must be refreshed from the branch before continuing. Day 1–3 remain OPEN; this tranche is a persistence foundation, not full interface acceptance.

@@ -2489,3 +2489,29 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Authenticated browser acceptance still requires the authorized protected Preview session.
 - Real Google OAuth and Drive provider round-trip, PSP sandbox lifecycle, tenant installations, agent runtime, Compute/Inference/Memory/CEL, backup/restore and failure/release drills remain open.
 - No fake identities, tenants, agent executions, OAuth connections, listings or commerce records were created.
+
+
+## 13.54 — Fresh Supabase security, API exposure and recovery audit — 2026-11-26
+
+### Live schema and Data API boundary
+- Supabase project is ACTIVE_HEALTHY on PostgreSQL 17.12.0.000. Live migration ledger: 69 entries.
+- 117 application tables, all RLS-enabled: integration 8, content 2, commerce 3, areas 4, finance 13, enterprise 8, identity 7, dashboard 2, workspace_data 66, catalog 4.
+- Authenticator role explicitly sets `pgrst.db_schemas=public, dashboard, identity, workspace_data`. `public` has zero application tables. This matches the app's canonical `DB_SCHEMA = 'workspace_data'`; the October 2026 Data API opt-in default is not being assumed.
+- No anon table SELECT grants. Authenticated SELECT grants are confined to the user-facing schemas: workspace_data 66, dashboard 2, identity 4; server-owned blueprint/engine schemas have no authenticated SELECT grants. All no-policy RLS tables remain inaccessible directly to anon/authenticated roles.
+
+### Current advisors
+- Security: 42 INFO `rls_enabled_no_policy` and one WARN `auth_leaked_password_protection`.
+- Performance: 63 INFO unindexed foreign keys and 272 INFO unused indexes. These require workload-aware review; no blanket index churn.
+- Health: zero findings.
+- The project Dashboard identifies the plan as **Free**. Supabase's current password-security guide says leaked-password protection is available on Pro and above. This is a plan-gated hardening item, not a safe database SQL change. Reference: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- The project Dashboard reports **No backups**. No backup/restore drill has been completed. Recoverability remains a hard Day 3 launch gate.
+
+### Fresh record counts — no synthetic data
+- 1 Auth user, 1 profile, 1 organization, 1 organization membership, 1 workspace, 1 workspace membership.
+- 0 domain/department/holon installations, 0 agent principals/delegations, 1 provider manifest (DRAFT), 0 tenant connections/OAuth transactions/execution jobs, 0 listings/orders/payment intents/refunds/payout batches/journal entries, 0 client records and 0 document records.
+- These are live hosted SQL counts; no fixture rows were added.
+
+### Current continuation state
+- The full hosted `bun run verify` remains confirmed on Preview commit `ae81359`: 548/548 tests, app/API TypeScript, Vite build, 102/102 runtime benchmarks.
+- The later IT Software Kernel truth correction is commit `2fe574f`, included in latest branch head `97cc906`. Its Vercel Preview `dpl_51FeHAvApbk1LJEp6ABhV4ZvYskc` is still QUEUED, so this latest code change must pass hosted verify before being considered validated.
+- PR #1 body has been rewritten to remove contradictory historical status claims. It remains OPEN / DRAFT. Days 1–3 remain OPEN.

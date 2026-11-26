@@ -12,7 +12,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, foundation/marketplace-product-identity]
   pull_request:
     branches: [main]
   workflow_dispatch:

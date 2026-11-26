@@ -223,7 +223,9 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
       "currency",
       "issuedAt",
       "dueAt",
-      "paidAt"
+      "paidAt",
+      "dealId",
+      "sourceKey"
     ]
   },
   "contracts": {

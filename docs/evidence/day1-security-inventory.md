@@ -60,3 +60,27 @@ These tables are private to the Edge Function/service-role boundary. Their RLS-w
 - No full production browser penetration/tenant-isolation acceptance was run because the latest Vercel build is rate-limited and the connected Amd-PC runner is offline.
 
 **Security status:** structurally hardened and regression-tested; production acceptance remains open.
+
+
+## Fresh hosted security and platform snapshot — 2026-11-26 20:58 UTC
+
+### Current schema and Data API boundary
+- Supabase project is ACTIVE_HEALTHY on PostgreSQL 17.12.0.000.
+- The application schemas contain 117 tables: integration 8, content 2, commerce 3, areas 4, finance 13, enterprise 8, identity 7, dashboard 2, workspace_data 66 and catalog 4. All 117 have RLS enabled.
+- The authenticator role's current PostgREST config explicitly exposes only `public, dashboard, identity, workspace_data`. `public` currently has zero application tables. This is consistent with the app's explicit `DB_SCHEMA = 'workspace_data'`; the newer Data API opt-in defaults are not silently assumed.
+- Authenticated SELECT access is limited to the exposed user-facing schemas: workspace_data 66, dashboard 2, content 2 (not exposed by current `pgrst.db_schemas`) and identity 4. No anon table SELECT grants were found. Server-owned areas/catalog/commerce/enterprise/integration/finance tables have no authenticated SELECT grants.
+- The 42 RLS-enabled/no-policy tables remain deny-by-default and have no anon/authenticated table grants. Do not add blanket policies to silence INFO notices.
+
+### Current advisor snapshot
+- Security: 42 INFO `rls_enabled_no_policy`; one WARN `auth_leaked_password_protection`.
+- Performance: 63 INFO unindexed foreign keys; 272 INFO unused indexes. These are workload/performance findings, not grounds for blind index creation or deletion.
+- Health: zero findings.
+- The project Dashboard identifies the project plan as **Free**. Supabase documents leaked-password protection as available on Pro and above; it is therefore plan-gated, not an Auth toggle this session can safely activate. Remediation reference: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- The project Dashboard currently reports **No backups**. No backup/restore drill or recoverability evidence exists. Treat this as a hard Day 3 launch gate; use an independently verified export/restore procedure or enable a supported backup plan before launch.
+
+### Live business-record counts
+- 1 Auth user, 1 profile, 1 organization, 1 organization membership, 1 workspace, 1 workspace membership.
+- 0 domain/department/holon installations; 0 agent principals/delegations; 1 provider manifest (DRAFT); 0 tenant connections/OAuth transactions/execution jobs; 0 listings/orders/payment intents/refunds/payout batches/journal entries; 0 client/document records.
+- These are direct counts from the hosted database, not seeded test records.
+
+The 42 INFO notices are not a blanket RLS failure: the exposed application schemas have RLS and scoped authenticated grants; the no-policy engine tables are not directly accessible to browser roles. The one actionable security WARN is plan-gated by the current Free tier.

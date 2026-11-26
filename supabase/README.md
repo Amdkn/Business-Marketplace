@@ -64,6 +64,7 @@ Read-only live inspection returned 45 application tables, all with RLS enabled:
 | commerce | 3 | 3/3 |
 | integration | 8 | 8/8 |
 | content | 2 | 2/2 |
+| omk_saas (Garden compatibility surface) | 2 | 2/2 |
 
 The reserved `operations`, `trust`, `finance` and `api` namespaces currently have no application tables in the inspected inventory. This does not mean their Day 1–3 target scope is complete.
 
@@ -165,3 +166,14 @@ Added immutable `finance.refund_fee_allocations` and `api.post_succeeded_refund_
 ## Settled Payout Ledger Posting — 2026-11-26
 
 Payout batches now require an owning Finance organization. The new `post_paid_payout_item_finance_entry` action posts only provider-confirmed PAID batch/items with provider IDs and settlement timestamp. It checks available seller-payable and PSP-clearing balances, then debits seller payable and credits PSP clearing through the idempotent journal API. Journal posting now locks affected account rows in sorted order to serialize concurrent postings. Live Marketplace API v24; no payout or bank transfer was fabricated.
+
+
+## Garden Dashboard tenant data — 2026-11-26
+
+The inherited Digital Garden surface now has an explicit tenant-scoped data contract in `omk_saas`:
+- `omk_saas.clients` — CRM client records used by the Garden Dashboard.
+- `omk_saas.agents` — Garden agent directory and optional Hermes telemetry.
+- Both tables have RLS enabled, four tenant/role policies each, authenticated-only grants, and indexes on `(org_id, created_at)`.
+- PostgREST exposes `omk_saas` alongside `public`; the Garden frontend defaults to SaaS mode rather than the retired `omk_internal` schema.
+- The tables are intentionally empty until real clients and agents are created. No demo rows are seeded.
+- The schema is a compatibility boundary for the inherited Garden UI. Canonical Marketplace identity, tenant, workspace, domain, catalog, commerce and finance ownership remain in their respective schemas.

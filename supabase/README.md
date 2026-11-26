@@ -12,14 +12,14 @@ This directory is the canonical source for Marketplace database migrations, Edge
 1. The cloud project above is the existing Marketplace database. Do not create a replacement project.
 2. The migration files in this repository describe migrations already applied to that cloud project. **Do not replay them against the current hosted project.**
 3. Future schema changes must be additive, versioned and authored in this repository. Reconcile the cloud migration registry before applying anything.
-4. One historical cloud migration is currently missing its exact SQL source file: `20261126041718 / revoke_public_execution_rls_auto_enable`. Recover the exact source before declaring migration parity. Do not fabricate or replay it.
+4. The exact original SQL text for historical cloud migration `20261126041718 / revoke_public_execution_rls_auto_enable` was not recovered. A catalog-derived reconstruction is tracked at `migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql`; it reproduces the verified live ACL but is not byte-identical historical source. This closes source-tree coverage of the 25-entry cloud registry, not byte-for-byte provenance. Do not replay it.
 5. The older file `20261124024342_coach_schema_adoption.sql` in V5 was not the canonical applied migration. The applied entry is `20261124024550 / coach_schema_adoption_20261124`, represented here by the reconstructed canonical source file `20261124024550_coach_schema_adoption_20261124.sql`. It was reconstructed from the live catalog and is not claimed to be byte-identical to the historical original.
 6. Never put service-role credentials, OAuth client secrets, provider tokens or Vault secret values in this repository. Commit only secret references/contracts and safe configuration.
 7. Supabase CLI v3 is local-first. Any future hosted CLI command must explicitly target the remote project and follow the current confirmation semantics. Prefer the linked native Supabase connection for live verification.
 
 ## Live cloud migration registry
 
-The live project returned **25 applied migration entries**. Twenty-five source files are tracked in this repository: 24 source migrations ported from V5 plus one catalog-derived reconstruction for the historical event-trigger ACL migration:
+The live project returned **25 applied migration entries**. Twenty-five source files are tracked in this repository: 24 source migrations ported from V5 plus one catalog-derived reconstruction for the historical event-trigger ACL migration. The registry is source-covered, but exact original SQL provenance for that one historical entry remains unavailable:
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|

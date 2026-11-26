@@ -18,7 +18,7 @@
 | D3.11 Workflows & orchestration | SOP Library and workspace mission/task persistence; no false execution claims. | No durable cross-agent workflow engine, scheduler, approvals or compensation runtime demonstrated. | Versioned workflow definitions, triggers, durable execution, retries, approvals, handoffs and audit. | OPEN |
 | D3.12 Enterprise Creation Pipeline | Installation APIs and canonical blueprints cover parts of assembly/provisioning. | No complete opportunity → design → blueprint → assembly → deployment → operations → replication lifecycle. | Implement pipeline state machine, blueprint validation, assembly, acceptance, operations and reproducible replication. | OPEN |
 | D3.13 Control Tower | Garden dashboard surfaces and real API/database health; mission, client and installation data foundations. | No integrated topology/control plane over tenant lifecycle, adapters, agents, workflows, compute, finance and security. | Deliver role-aware Control Tower with actionable lifecycle, audit, health, cost and incident controls. | OPEN |
-| D3.14 Observability, tests & launch | 16 SQL test files validated (13 structural + 3 rollback-only integration). Vercel Preview [dpl_DdLLvP5GZv3FhoCZMZPfStFHghmF](https://vercel.com/amd-lab/business-marketplace/DdLLvP5GZv3FhoCZMZPfStFHghmF) on `ae81359` completed full `bun run verify`: 53/53 Vitest files, 548/548 tests, app/API TypeScript, Vite build, and kernel/bridge/adapters/RBAC 102/102. GitHub Actions run 45856152162 also passed on `dfc3554`. | Full hosted verify PASS and Preview READY. Authenticated browser E2E, backup/restore, load/failure recovery and release/rollback evidence remain absent. | Authenticated browser acceptance; backup/restore; load/security/failure drills; release/rollback. | PARTIAL / ACCEPTANCE OPEN |
+| D3.14 Observability, tests & launch | 16 SQL test files validated (13 structural + 3 rollback-only integration). Vercel Preview [dpl_DdLLvP5GZv3FhoCZMZPfStFHghmF](https://vercel.com/amd-lab/business-marketplace/DdLLvP5GZv3FhoCZMZPfStFHghmF) on `ae81359` completed full `bun run verify`: 53/53 Vitest files, 548/548 tests, app/API TypeScript, Vite build, and kernel/bridge/adapters/RBAC 102/102. GitHub Actions run 45856152162 also passed on `dfc3554`. | Full hosted verify PASS on `ae81359` and Preview READY. A later IT Software Kernel correction is in `2fe574f`; latest branch Preview for `97cc906` is QUEUED and must pass before treating that code as deployed. Authenticated browser E2E, backup/restore (Dashboard reports no backups), load/failure recovery and release/rollback evidence remain absent. | Authenticated browser acceptance; backup/restore; load/security/failure drills; release/rollback. | PARTIAL / ACCEPTANCE OPEN |
 
 ## Live tenant inventory
 
@@ -27,3 +27,13 @@ One real Auth user, one organization, one active organization membership, one wo
 ## Day 3 acceptance gate
 
 Day 3 remains OPEN until a real tenant can be provisioned from blueprints through all eight Areas OS domains, eight Business departments and its holarchy; operate agents and workflows through Compute/Inference/Memory/CEL; monitor and control that lifecycle from one Control Tower; and replicate the enterprise with tenant isolation, audit, recovery and rollback evidence.
+
+
+## Fresh hosted acceptance blockers — 2026-11-26
+
+- Supabase Dashboard currently identifies the project as Free and reports **No backups**. No scheduled backup or backup/restore drill is evidenced. This remains a hard launch gate.
+- Supabase Security Advisor: 42 INFO RLS-enabled/no-policy findings (the affected server-owned tables have no anon/authenticated table grants), plus one WARN: leaked-password protection disabled. Current project Free plan is below the Pro-and-above requirement for this feature; this is a plan-gated Auth hardening item.
+- Performance Advisor: 63 INFO unindexed foreign keys and 272 INFO unused indexes. Do not blindly add/drop indexes; review with actual query plans and workload.
+- Health Advisor: zero findings.
+- The authenticated PostgREST role explicitly exposes `public, dashboard, identity, workspace_data`; `public` has zero app tables. All 117 application tables have RLS enabled. The browser-accessible workspace_data schema has 66 authenticated-readable tables under RLS.
+- Latest code correction `2fe574f` removes fabricated live infrastructure and sovereignty claims. It is included in latest branch head `97cc906`, whose Vercel Preview is currently QUEUED; full verification for that exact latest head is still pending.

@@ -194,3 +194,12 @@ The two existing interfaces now have a first shared persistence layer derived fr
 - Regression: `supabase/tests/marketplace_interface_persistence.sql` passed against the hosted project. Live catalog verification: 35 tables including activity_events, 138 policies, zero RLS-disabled tables, zero anon table grants, and zero rows inserted by the probe.
 
 Important scope boundary: this is the shared CMS persistence foundation, not yet full acceptance of every Web Desktop and Sidebar module. The separate Sidebar repository still has its own `dashboard.clients` / `dashboard.agents` data path; identity-backed People/Agent projection, workspace-level scoping, remaining app-local stores, real browser JWT E2E and deployment validation remain follow-on work. Do not claim the two interfaces are fully unified until those paths are migrated and verified.
+
+
+## Shared Garden / Web Desktop persistence
+
+Both user-facing interfaces use the tenant-owned workspace_data schema. Garden repositories must use the explicit table mapping documented in docs/PRODUCT_ARCHITECTURE.md and implemented in src/components/saas/data/repository.ts; the Web Desktop CMS uses the same collection tables. Do not add new Garden reads or writes to the legacy dashboard schema.
+
+The Garden Documents and Legal Data Room modules have dedicated tables: workspace_data.documents and workspace_data.legal_documents. Migration: 20261126090500_workspace_document_records.sql. Both tables have RLS, member-read and role-gated operator write policies, creator attribution and organization/workspace indexes.
+
+Cloud checkpoint after this migration: 37 workspace_data base tables, 146 policies. The first real tenant exists (one Auth user, organization, organization membership, workspace and workspace membership). No demonstration business records were inserted.

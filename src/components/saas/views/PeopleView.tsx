@@ -1,5 +1,5 @@
 // src/components/views/PeopleView.tsx
-// Zero Bug Sprint — rewritten to use the Agent type (omk_saas.agents) without
+// Zero Bug Sprint — rewritten to use the Agent type (Marketplace tenant agent directory) without
 // the dropped UI fields (accuracy, tasks, totalTasks, desc, time).
 //
 // Bug fixes (D6 #98, D6 #102, D6 #103):

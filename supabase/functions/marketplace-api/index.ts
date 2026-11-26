@@ -900,6 +900,150 @@ async function createOrganization(user: User, body: Record<string, unknown>) {
     return org;
   });
 }
+async function createTenant(user: User, body: Record<string, unknown>) {
+  const name = requiredString(body.organization_name, 'organization_name', 160);
+  const workspaceName = body.workspace_name === undefined
+    ? 'Main Workspace'
+    : requiredString(body.workspace_name, 'workspace_name', 160);
+  const organizationKey = `USR_${user.id.replace(/-/g, '').slice(0, 24).toUpperCase()}`;
+  const workspaceKey = 'main';
+
+  return await withServiceRole(async (tx) => {
+    // Serialize retries for one authenticated principal. The deterministic key
+    // makes onboarding idempotent if the client loses the first response.
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`;
+
+    const insertedOrganizations = await tx`
+      INSERT INTO identity.organizations
+        (organization_key, name, organization_type, created_by_user_id)
+      VALUES (${organizationKey}, ${name}, 'EXTERNAL_ENTERPRISE', ${user.id}::uuid)
+      ON CONFLICT (organization_key) DO NOTHING
+      RETURNING id, organization_key, name, organization_type, status, created_at, created_by_user_id
+    `;
+    let organization = insertedOrganizations[0];
+    if (!organization) {
+      const existing = await tx`
+        SELECT id, organization_key, name, organization_type, status, created_at, created_by_user_id
+        FROM identity.organizations
+        WHERE organization_key = ${organizationKey}
+        LIMIT 1
+      `;
+      if (!existing.length || existing[0].created_by_user_id !== user.id ||
+          existing[0].name !== name || existing[0].organization_type !== 'EXTERNAL_ENTERPRISE' ||
+          existing[0].status !== 'ACTIVE') {
+        throw new Error('Tenant onboarding key exists with a different owner or payload');
+      }
+      organization = existing[0];
+    }
+
+    let organizationMembership = await tx`
+      SELECT membership_status FROM identity.organization_memberships
+      WHERE organization_id = ${organization.id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `;
+    if (!organizationMembership.length) {
+      await tx`
+        INSERT INTO identity.organization_memberships
+          (organization_id, user_id, membership_status, joined_at)
+        VALUES (${organization.id}::uuid, ${user.id}::uuid, 'ACTIVE', now())
+        ON CONFLICT (organization_id, user_id) DO NOTHING
+      `;
+      organizationMembership = await tx`
+        SELECT membership_status FROM identity.organization_memberships
+        WHERE organization_id = ${organization.id}::uuid AND user_id = ${user.id}::uuid
+        LIMIT 1
+      `;
+    }
+    if (!organizationMembership.length || organizationMembership[0].membership_status !== 'ACTIVE') {
+      throw new Error('Tenant onboarding requires an active organization membership');
+    }
+
+    const roleBindings = await tx`
+      SELECT binding_status, starts_at, expires_at
+      FROM identity.role_bindings
+      WHERE organization_id = ${organization.id}::uuid
+        AND subject_user_id = ${user.id}::uuid
+        AND role_code = 'B1_CEO' AND scope_type = 'ORGANIZATION' AND scope_id IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (!roleBindings.length) {
+      await tx`
+        INSERT INTO identity.role_bindings
+          (organization_id, subject_user_id, role_code, scope_type, scope_id, granted_by_user_id)
+        VALUES (${organization.id}::uuid, ${user.id}::uuid, 'B1_CEO', 'ORGANIZATION', NULL, ${user.id}::uuid)
+      `;
+    } else if (roleBindings[0].binding_status !== 'ACTIVE' ||
+        new Date(roleBindings[0].starts_at).getTime() > Date.now() ||
+        (roleBindings[0].expires_at && new Date(roleBindings[0].expires_at).getTime() <= Date.now())) {
+      throw new Error('Tenant onboarding owner role is not active');
+    }
+
+    const insertedWorkspaces = await tx`
+      INSERT INTO enterprise.workspaces
+        (organization_id, workspace_key, name, description, created_by_user_id)
+      VALUES (${organization.id}::uuid, ${workspaceKey}, ${workspaceName}, '', ${user.id}::uuid)
+      ON CONFLICT (organization_id, workspace_key) DO NOTHING
+      RETURNING id, organization_id, workspace_key, name, description, workspace_status, created_at, created_by_user_id
+    `;
+    let workspace = insertedWorkspaces[0];
+    if (!workspace) {
+      const existing = await tx`
+        SELECT id, organization_id, workspace_key, name, description, workspace_status, created_at, created_by_user_id
+        FROM enterprise.workspaces
+        WHERE organization_id = ${organization.id}::uuid AND workspace_key = ${workspaceKey}
+        LIMIT 1
+      `;
+      if (!existing.length || existing[0].created_by_user_id !== user.id ||
+          existing[0].name !== workspaceName || existing[0].workspace_status !== 'ACTIVE') {
+        throw new Error('Default workspace key exists with a different owner or payload');
+      }
+      workspace = existing[0];
+    }
+
+    let workspaceMembership = await tx`
+      SELECT membership_status, workspace_role
+      FROM enterprise.workspace_memberships
+      WHERE organization_id = ${organization.id}::uuid
+        AND workspace_id = ${workspace.id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `;
+    if (!workspaceMembership.length) {
+      await tx`
+        INSERT INTO enterprise.workspace_memberships
+          (organization_id, workspace_id, user_id, membership_status, workspace_role, granted_by_user_id)
+        VALUES (${organization.id}::uuid, ${workspace.id}::uuid, ${user.id}::uuid, 'ACTIVE', 'OWNER', ${user.id}::uuid)
+        ON CONFLICT (workspace_id, user_id) DO NOTHING
+      `;
+      workspaceMembership = await tx`
+        SELECT membership_status, workspace_role
+        FROM enterprise.workspace_memberships
+        WHERE organization_id = ${organization.id}::uuid
+          AND workspace_id = ${workspace.id}::uuid AND user_id = ${user.id}::uuid
+        LIMIT 1
+      `;
+    }
+    if (!workspaceMembership.length || workspaceMembership[0].membership_status !== 'ACTIVE' ||
+        workspaceMembership[0].workspace_role !== 'OWNER') {
+      throw new Error('Tenant onboarding requires an active workspace OWNER membership');
+    }
+
+    if (insertedWorkspaces.length) {
+      await tx`
+        INSERT INTO enterprise.structure_installation_events
+          (organization_id, workspace_id, event_type, entity_type, entity_id, actor_user_id, event_payload)
+        VALUES (
+          ${organization.id}::uuid, ${workspace.id}::uuid, 'WORKSPACE_CREATED', 'WORKSPACE',
+          ${workspace.id}::uuid, ${user.id}::uuid,
+          ${JSON.stringify({ workspace_key: workspaceKey, onboarding: true })}::jsonb
+        )
+      `;
+    }
+
+    return { organization, workspace };
+  });
+}
+
 async function registerAgent(user: User, body: Record<string, unknown>) {
   const orgId = requiredString(body.organization_id, 'organization_id');
   const agentKey = requiredString(body.agent_key, 'agent_key', 96).toUpperCase();
@@ -1314,6 +1458,7 @@ Deno.serve(async (req: Request) => {
       case 'list_orders': data = await listOrders(user, body); break;
       case 'list_capability_entitlements': data = await listCapabilityEntitlements(user, body); break;
       case 'list_provider_listings': data = await listProviderListings(user, body); break;
+      case 'create_tenant': data = await createTenant(user, body); break;
       case 'create_organization': data = await createOrganization(user, body); break;
       case 'register_agent': data = await registerAgent(user, body); break;
       case 'create_capability': data = await createCapability(user, body); break;

@@ -1701,3 +1701,42 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Scanned the primary app entrypoints and seed files under `src/apps`, the full Garden view set, Sidebar data repositories, and the Mission Control views. No active-source matches remained in the inspected paths at this checkpoint.
 - `src/components/saas` and `src/apps` now use Marketplace identity in the inspected surfaces. Historical migration SQL and prior handoff text are retained only as provenance and are not active schemas or product UI.
 - Important: this was a naming cleanup, not a completion of the remaining Sidebar persistence integration. `dashboard.clients` / `dashboard.agents`, CMS `workspace_data.*`, and canonical `identity.*` still need the planned consolidation described in §13.25.
+
+
+### 13.28 Garden + Web Desktop persistence convergence — 2026-11-26
+
+**Live identity/tenant facts rechecked**
+- Supabase now contains 1 Auth user, 1 organization, 1 active organization membership, 1 workspace and 1 workspace membership. This is the first real tenant; it is not a seeded demo tenant.
+- The active organization role binding is B1_CEO at ORGANIZATION scope.
+- Do not publish the user's email, auth UUID, organization UUID or workspace UUID in docs or logs.
+
+**Cloud database changes**
+- Added and applied migration 20261126090500_workspace_document_records.sql.
+- Added workspace_data.documents and workspace_data.legal_documents, with organization/workspace ownership, creator attribution, typed document metadata, RLS, least-privilege grants, organization indexes and four policies per table.
+- Cloud inventory after apply: 37 tables in workspace_data, 146 RLS policies; 1 real user / org / membership / workspace / workspace membership.
+- No tenant content rows were inserted by this work.
+
+**Garden data-layer changes**
+- src/components/saas/config/mode.ts: default Garden DB schema changed from dashboard to workspace_data.
+- src/components/saas/data/repository.ts: replaced the old implicit dashboard.* table assumption with an explicit canonical table map:
+  - clients → workspace_data.clients
+  - agents → workspace_data.people_agents
+  - documents → workspace_data.documents
+  - invoices → workspace_data.invoices
+  - legal_docs → workspace_data.legal_documents
+  - missions → workspace_data.tasks
+  - sales_leads → workspace_data.deals
+  - sops → workspace_data.runbooks
+- Added a typed mapping between Garden UI shapes and canonical workspace records, preserving non-column UI fields in extra_data.
+- Reads/find/update/delete are scoped by organization_id; create injects the authenticated user ID and tenant ID; update preserves the existing extra_data payload before applying partial patches.
+- The Web Desktop CMS already reads/writes the same workspace_data collections through src/lib/cms/repository.ts. Garden and Web Desktop now target the same tenant data plane at the repository layer.
+- Historical dashboard.clients / dashboard.agents tables remain in the database as legacy compatibility artifacts; the Garden repository no longer maps to them. No live rows were copied or deleted.
+
+**Validation / remaining gates**
+- Supabase Health Advisor: 0 findings.
+- Security Advisor: 42 INFO notices for RLS-enabled private tables with no policies (catalog/control-plane schemas), plus 1 WARN: leaked-password protection is disabled. No workspace_data no-policy finding was returned.
+- Performance Advisor: 136 unindexed foreign keys across the wider project and unused-index notices. These are project-wide; the new workspace document tables have organization/workspace/created indexes.
+- No browser-authenticated CRUD test has yet been run against the new Garden repository. The live tenant exists, but the current session tools cannot reuse the user's browser JWT. Do not claim E2E acceptance until browser sign-in, collection CRUD and cross-tenant denial tests pass.
+- No local TypeScript/Vitest/build execution was available through the connected GitHub/Supabase actions in this session. CI/Vercel status must be refreshed on the latest branch head; previous Vercel rate-limit failure was on an older code head.
+- The Garden table map is now explicit but should receive UI-by-UI contract tests for every field. Check special cases: invoice currency fallback currently defaults to USD if no currency metadata exists; upload/storage lifecycle is still not implemented; mission task status and SOP content use the existing tasks/runbooks storage contracts.
+- Next: refresh PR checks, run typecheck + test + build in CI, perform browser CRUD on the real tenant, then complete remaining Sidebar app modules and Control Tower integrations. Keep PR #1 DRAFT until the full Day 1–3 acceptance gates pass.

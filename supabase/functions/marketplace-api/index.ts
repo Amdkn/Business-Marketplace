@@ -863,7 +863,7 @@ function financeLines(value: unknown) {
     const line = item as Record<string, unknown>;
     const accountId = requiredString(line.account_id, 'account_id', 64);
     const decimal = (v: unknown, field: string) => {
-      if (typeof v !== 'string' || !/^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$/.test(v)) throw new Error(`Invalid ${field}`);
+      if (typeof v !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(v)) throw new Error(`Invalid ${field}`);
       return v;
     };
     const debit = decimal(line.debit_amount, 'debit_amount');

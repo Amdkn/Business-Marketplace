@@ -421,13 +421,33 @@ function fromWorkspaceRow(collectionId: string, row: Record<string, unknown>): C
   return item as CmsItem;
 }
 
-function toWorkspaceRow(collectionId: string, item: CmsItem, orgId: string, userId: string): Record<string, unknown> {
+export interface CurrentWorkspaceContext {
+  organizationId: string;
+  workspaceId: string;
+  userId: string;
+  workspaceName: string;
+}
+
+let cachedWorkspaceContext: Promise<CurrentWorkspaceContext | null> | null = null;
+
+// Auth transitions invalidate the resolved tenant context. Never retain one
+// user's organization/workspace after logout or account switching.
+supabase.auth.onAuthStateChange(() => {
+  cachedWorkspaceContext = null;
+});
+
+function toWorkspaceRow(
+  collectionId: string,
+  item: CmsItem,
+  context: CurrentWorkspaceContext,
+): Record<string, unknown> {
   const shape = COLLECTION_FIELDS[collectionId];
   if (!shape) throw new Error(`[cms] no dedicated table for collection: ${collectionId}`);
   const row: Record<string, unknown> = {
     id: item.id,
-    organization_id: orgId,
-    created_by_user_id: userId,
+    organization_id: context.organizationId,
+    workspace_id: context.workspaceId,
+    created_by_user_id: context.userId,
     title: item[shape.title] ?? null,
     extra_data: Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'id')),
     updated_at: new Date().toISOString(),
@@ -436,28 +456,93 @@ function toWorkspaceRow(collectionId: string, item: CmsItem, orgId: string, user
   return row;
 }
 
+/**
+ * Resolve the signed-in user's unique active workspace. The current UI has no
+ * workspace switcher yet, so multiple active memberships fail closed instead
+ * of silently mixing records from different workspaces.
+ */
+export async function getCurrentWorkspaceContext(): Promise<CurrentWorkspaceContext | null> {
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return null;
+  }
+  if (cachedWorkspaceContext) return cachedWorkspaceContext;
+
+  cachedWorkspaceContext = (async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session?.user) {
+        setMode('no-org');
+        return null;
+      }
+
+      const { data: memberships, error: membershipError } = await supabase
+        .schema('enterprise')
+        .from('workspace_memberships')
+        .select('organization_id, workspace_id')
+        .eq('user_id', session.user.id)
+        .eq('membership_status', 'ACTIVE');
+
+      if (membershipError) throw membershipError;
+      if (!memberships?.length) {
+        setMode('no-org', 'No active workspace membership');
+        return null;
+      }
+      if (memberships.length !== 1) {
+        setMode('no-org', 'Multiple active workspaces require an explicit workspace selection');
+        return null;
+      }
+
+      const membership = memberships[0];
+      const { data: workspace, error: workspaceError } = await supabase
+        .schema('enterprise')
+        .from('workspaces')
+        .select('name, workspace_status')
+        .eq('id', membership.workspace_id)
+        .eq('organization_id', membership.organization_id)
+        .maybeSingle();
+
+      if (workspaceError) throw workspaceError;
+      if (!workspace || workspace.workspace_status !== 'ACTIVE') {
+        setMode('no-org', 'The active workspace is unavailable');
+        return null;
+      }
+
+      setMode('connected');
+      return {
+        organizationId: membership.organization_id as string,
+        workspaceId: membership.workspace_id as string,
+        userId: session.user.id,
+        workspaceName: workspace.name as string,
+      };
+    } catch (err) {
+      setMode('unreachable', err);
+      return null;
+    }
+  })();
+
+  const resolved = await cachedWorkspaceContext;
+  if (!resolved) cachedWorkspaceContext = null;
+  return resolved;
+}
+
+/** Compatibility helper for callers that only need the organization key. */
 export async function getCurrentOrgId(): Promise<string | null> {
-  if (!supabaseConfigured) { setMode('unconfigured'); return null; }
-  if (cachedOrgId !== undefined) return cachedOrgId;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { setMode('no-org'); cachedOrgId = null; return null; }
-    const { data, error } = await supabase.schema('identity')
-      .from('organization_memberships').select('organization_id')
-      .eq('user_id', session.user.id).eq('membership_status', 'ACTIVE')
-      .limit(1).maybeSingle();
-    if (error || !data) { setMode('no-org', error ?? 'no active membership'); cachedOrgId = null; return null; }
-    cachedOrgId = data.organization_id as string; setMode('connected'); return cachedOrgId;
-  } catch (err) { setMode('unreachable', err); cachedOrgId = null; return null; }
+  const context = await getCurrentWorkspaceContext();
+  return context?.organizationId ?? null;
 }
 
 /** Hydrate one dedicated tenant table; demo-only collections deliberately stay local. */
 export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId || !tableFor(collectionId)) return null;
+  const context = await getCurrentWorkspaceContext();
+  if (!context || !tableFor(collectionId)) return null;
   try {
     const { data, error } = await supabase.schema('workspace_data').from(collectionId)
-      .select('*').eq('organization_id', orgId).order('created_at', { ascending: false });
+      .select('*')
+      .eq('organization_id', context.organizationId)
+      .eq('workspace_id', context.workspaceId)
+      .order('created_at', { ascending: false });
     if (error || !data) { setMode('unreachable', error); return null; }
     setMode('connected');
     return data.map((row) => fromWorkspaceRow(collectionId, row as Record<string, unknown>));
@@ -469,13 +554,12 @@ export async function upsertCollectionDef(_def: CmsCollectionDef): Promise<void>
 
 /** Persist one item in its dedicated typed collection table. */
 export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId || !tableFor(collectionId)) return;
+  const context = await getCurrentWorkspaceContext();
+  if (!context || !tableFor(collectionId)) return;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    const row = toWorkspaceRow(collectionId, item, orgId, session.user.id);
-    const { error } = await supabase.schema('workspace_data').from(collectionId).upsert(row, { onConflict: 'id' });
+    const row = toWorkspaceRow(collectionId, item, context);
+    const { error } = await supabase.schema('workspace_data').from(collectionId)
+      .upsert(row, { onConflict: 'id' });
     if (error) throw error;
     setMode('connected');
   } catch (err) { setMode('unreachable', err); throw err; }
@@ -483,11 +567,12 @@ export async function upsertItem(collectionId: string, item: CmsItem): Promise<v
 
 /** Delete only the matching row within the resolved tenant. */
 export async function removeItem(collectionId: string, id: string): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId || !tableFor(collectionId)) return;
+  const context = await getCurrentWorkspaceContext();
+  if (!context || !tableFor(collectionId)) return;
   const { error } = await supabase.schema('workspace_data').from(collectionId)
-    .delete().eq('id', id).eq('organization_id', orgId);
+    .delete()
+    .eq('id', id)
+    .eq('organization_id', context.organizationId)
+    .eq('workspace_id', context.workspaceId);
   if (error) throw error;
 }
-
-

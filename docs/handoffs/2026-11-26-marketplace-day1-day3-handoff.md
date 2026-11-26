@@ -1622,3 +1622,17 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Live identity and Finance records remain empty: 0 Auth users, 0 organizations, 0 fee policies, 0 fee snapshots, 0 refund allocations, 0 payout batches and 0 payout items. No synthetic business/financial data was created.
 - PR #1 remains OPEN / DRAFT at `82b7e02fe5d71d393a80ede14bd4eedee4862879`. Current Vercel status is **failure: build-rate-limit**; this is an account/build-quota status, not a verified application compile failure. GitHub Actions reports no PR workflow runs.
 - The code paths are implemented and structurally tested; real tenant and provider E2E remains blocked until Auth onboarding, an organization, and a payment/payout provider are connected.
+
+
+### 13.23 Garden Dashboard tenant data foundation — 2026-11-26
+
+- Corrected the live tenant inventory: the first real Auth user and tenant have now been provisioned. The previous 13.22 zero-user/zero-organization statement is historical and superseded.
+- Verified the first tenant: organization `A'Space Digital Garden` (`47735c82-818d-4794-ac67-1e302173897b`), one ACTIVE membership, B1_CEO role binding, and workspace `Garden` (`c987607d-1c53-42a4-84e5-cb070764dafa`).
+- Reproduced the Garden Dashboard failure from source: `src/components/saas/config/mode.ts` defaulted to `internal`, selecting the non-existent `omk_internal` schema. The Garden repositories query `clients` and `agents` in the selected schema.
+- Applied additive migration `marketplace_garden_dashboard_tenant_data`; canonical source is `supabase/migrations/20261126080000_marketplace_garden_dashboard_tenant_data.sql`.
+- Created `omk_saas.clients` and `omk_saas.agents` using the exact fields expected by the inherited Garden UI, including optional Hermes telemetry fields. These are tenant-owned compatibility tables for the Garden surface; they do not replace the canonical Marketplace identity/enterprise/areas model.
+- Both tables have RLS enabled, four policies each (member read; B1/S0/B2/B2.2 operator writes), org/time indexes, authenticated-only grants, and no anon/public grants. Policies derive tenant membership from `identity.organization_memberships` and role bindings; no browser-provided org id is trusted as authorization.
+- Exposed `omk_saas` alongside `public` to PostgREST via the `authenticator` role setting and issued a PostgREST config reload.
+- Updated Garden mode default from `internal` to `saas`, so the inherited Digital Garden data client selects `omk_saas` unless an explicit internal override is supplied.
+- Live verification: both tables exist, RLS is enabled on both, four policies are present per table, and both tables contain **0 rows**. No fake clients or agents were seeded.
+- Remaining acceptance gates: verify the Vercel production environment does not override `VITE_APP_MODE=internal`; verify the deployed bundle uses `omk_saas`; authenticate in browser and confirm the real user's JWT/RLS reads; then implement durable Dashboard activity/tasks and profile-backed Sidebar identity. This migration alone does not constitute full Dashboard E2E acceptance.

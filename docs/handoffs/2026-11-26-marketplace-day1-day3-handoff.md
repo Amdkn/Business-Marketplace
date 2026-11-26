@@ -1751,3 +1751,10 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - PR #1 remains OPEN / DRAFT. Latest known branch head before this handoff update: 788d42d404106f34e9f416b675253b63f857404f. Vercel still reports the rate-limit failure on the immediately preceding verified head; refresh checks after the handoff commit.
 - Explicit open issues: authenticated browser CRUD and cross-tenant denial; confirm JWT org_id hydration for the real account; validate Garden view field contracts and form flows; file upload/storage; invoice currency is currently defaulted to USD if no currency extra_data is present; mission/task and SOP/runbook mappings need UI-level acceptance; the legacy dashboard schema tables have not yet been dropped and remain compatibility artifacts.
 - Continue implementation in this same branch and repository. Do not create another project, do not move Garden back to dashboard, do not add fake tenant records, and do not mark Day 1–3 accepted until their end-to-end gates pass.
+
+
+### 13.30 Migration ledger filename reconciliation — final session closeout
+
+- Supabase assigned the hosted migration version 20261126090124 to workspace_document_records. The source migration has been renamed to supabase/migrations/20261126090124_workspace_document_records.sql to match the cloud ledger.
+- References in this handoff and supabase/README.md were updated. The old provisional 20261126090500 filename was removed from the active branch.
+- Latest branch head must be fetched again after this handoff commit. The cloud table inventory remains 37 workspace_data tables / 146 policies; documents and legal_documents are both empty by design.

@@ -1,42 +1,6 @@
-// src/data/repository.ts
-// ADR-DASHBOARD-001 D4 + ADR-TENANT-005 (Phase A→F) + Phase I (D6 #97 default mapper)
-// + Zero Bug Sprint (D6 #99, D6 #101) — expanded mapper coverage.
-//
-// Two execution paths:
-//   1. Supabase Cloud (when SUPABASE_READY): queries target `dashboard.*` schema
-//      (per ADR-DASHBOARD-004 single SaaS mode). RLS policies filter by `org_id`
-//      from the JWT claim injected by `public.custom_access_token_hook`.
-//   2. localStorage (dev fallback): seeded with mocks from constants.ts. RLS
-//      is simulated by the in-memory filter `item.org_id === activeOrgId`.
-//
-// FIELD MAPPING (D6 #99, D6 #101 — Zero Bug Sprint)
-//   Without a custom `options.mapper`, the default mapper translates EVERY
-//   canonical snake_case column to its camelCase UI equivalent. Full ISO
-//   strings are preserved (no substring trim — views format display via
-//   `formatDate()` from `lib/safe.ts`).
-//
-//   DB column          -> UI key          (notes)
-//   ──────────────────────────────────────────────────────────
-//   org_id             -> `orgId`         (stripped from UI; repo re-injects)
-//   client_id          -> `clientId`
-//   uploaded_by        -> `uploadedBy`
-//   file_url           -> `fileUrl`
-//   mime_type          -> `mimeType`
-//   created_at         -> `createdAt`     (FULL ISO; no substring)
-//   updated_at         -> `updatedAt`     (FULL ISO)
-//   issued_at          -> `issuedAt`
-//   due_at             -> `dueAt`
-//   paid_at            -> `paidAt`
-//   (anything else passes through unchanged)
-//
-//   Custom mappers (SalesView, LegalView) still take precedence — they pass
-//   `options.mapper` explicitly.
-//
-// TENANT GUARD
-//   When a tenant context is available (useOrg() / getActiveOrgId()),
-//   every query is filtered by `org_id`. The RLS policy is the authoritative
-//   filter server-side; this is defense-in-depth.
-
+// Shared tenant repository for Garden views.
+// All operational Garden collections persist in workspace_data, the same tenant
+// data plane used by the Web Desktop CMS. No legacy dashboard schema fallback.
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 import { IS_SAAS } from '../config/mode';
 import { getActiveOrgId, assertOrgIdForWrite } from '../lib/tenant';
@@ -44,221 +8,129 @@ import { getActiveOrgId, assertOrgIdForWrite } from '../lib/tenant';
 export interface Repository<T extends { id: string }> {
   list(): Promise<T[]>;
   findById(id: string): Promise<T | null>;
-  /** Create a new entity. `id` is optional — Postgres generates via gen_random_uuid(). */
   create(item: Partial<T> & { id?: string }): Promise<T>;
   update(id: string, patch: Partial<T>): Promise<T>;
   remove(id: string): Promise<void>;
 }
+type Mapper<T> = { toDb: (ui: Partial<T>) => Record<string, unknown>; fromDb: (row: Record<string, unknown>) => T };
+interface MakeRepositoryOptions<T> { mapper?: Mapper<T> }
 
-interface MakeRepositoryOptions<T> {
-  /** Override the default mapper if the UI type ≠ DB row shape. */
-  mapper?: Mapper<T>;
-}
-
-type Mapper<T> = {
-  toDb: (ui: Partial<T>) => Record<string, unknown>;
-  fromDb: (row: Record<string, unknown>) => T;
+const COLLECTIONS: Record<string, { table: string; title: string; columns?: Record<string,string> }> = {
+  clients: { table: 'clients', title: 'name', columns: { segment:'segment', ticket:'ticket', openThreads:'open_threads', nextSession:'next_session', health:'health', onboardingStep:'onboarding_step', status:'status' } },
+  agents: { table: 'people_agents', title: 'name', columns: { codename:'codename', role:'role', status:'status', task:'task', rank:'rank', domain:'domain', squad:'squad', cadence:'cadence' } },
+  documents: { table: 'documents', title: 'title', columns: { clientId:'client_id', fileUrl:'file_url', mimeType:'mime_type' } },
+  invoices: { table: 'invoices', title: 'title', columns: { amount:'amount', dueAt:'due', status:'status' } },
+  legal_docs: { table: 'legal_documents', title: 'title', columns: { clientId:'client_id', type:'document_type', category:'category', status:'document_status', fileUrl:'file_url', notes:'notes' } },
+  missions: { table: 'tasks', title: 'title', columns: { when:'when', group:'group', done:'done' } },
+  sales_leads: { table: 'deals', title: 'name', columns: { offer:'offer', value:'value', stage:'stage' } },
+  sops: { table: 'runbooks', title: 'title', columns: { category:'category', updated:'updated', content:'steps' } },
 };
 
-// Identity mapper (pass-through). Used by default + as fallback when no custom mapper.
-export const identityMapper = <T>(): Mapper<T> => ({
-  toDb: (ui) => ui as Record<string, unknown>,
-  fromDb: (row) => row as unknown as T,
-});
-
-// ────────────────────────────────────────────────────────────────────────────
-// Default snake_case → camelCase mapper (D6 #97)
-// ────────────────────────────────────────────────────────────────────────────
-// DB columns are snake_case per Phase A canon. UI types are camelCase.
-// We map the canonical column names introduced by Phase A:
-//   created_at, updated_at, file_url, mime_type, client_id, org_id
-// Anything else passes through unchanged.
-
-const DB_TO_UI_COLUMN_MAP: Readonly<Record<string, string>> = {
-  org_id: 'orgId',
-  client_id: 'clientId',
-  uploaded_by: 'uploadedBy',
-  file_url: 'fileUrl',
-  mime_type: 'mimeType',
-  created_at: 'createdAt',
-  updated_at: 'updatedAt',
-  issued_at: 'issuedAt',
-  due_at: 'dueAt',
-  paid_at: 'paidAt',
-  // Hermes Agent Root — sql/07_hermes_agent_root.sql (D4 forward-only).
-  hermes_code: 'hermesCode',
-  current_task: 'currentTask',
-  load_pct: 'loadPct',
-  tokens_today: 'tokensToday',
-  tasks_today: 'tasksToday',
-  success_pct: 'successPct',
-  default_model: 'defaultModel',
-};
-
-const UI_TO_DB_COLUMN_MAP: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.entries(DB_TO_UI_COLUMN_MAP).map(([db, ui]) => [ui, db]),
-);
-
-/**
- * Convert a single DB row (snake_case) to UI shape (camelCase).
- * - All canonical timestamp/date columns are mapped (no substring trim).
- * - `org_id` is stripped (UI types don't carry tenant identity).
- * - Unknown columns pass through (forward-compat with future schema additions).
- * - In dev mode, logs unknown column keys for diagnostics.
- */
-function rowToUi<T extends { id: string }>(row: Record<string, unknown>): T {
-  const out: Record<string, unknown> = {};
-  const isDev = import.meta.env.DEV;
-  for (const [dbKey, value] of Object.entries(row)) {
-    const uiKey = DB_TO_UI_COLUMN_MAP[dbKey] ?? dbKey;
-    if (uiKey === 'orgId') continue; // strip tenant identity from UI
-    if (uiKey === dbKey && isDev) {
-      // Column passes through unmapped — diagnostic only, not an error.
-      // eslint-disable-next-line no-console
-      console.debug(`[repo] DB column "${dbKey}" passes through unmapped`);
-    }
-    out[uiKey] = value;
-  }
-  return out as T;
+function makeWorkspaceMapper<T extends { id: string }>(collection: string): Mapper<T> {
+  const shape = COLLECTIONS[collection];
+  if (!shape) throw new Error(`[${collection}] no canonical workspace_data collection mapping`);
+  const reverse = Object.fromEntries(Object.entries(shape.columns ?? {}).map(([ui,db]) => [db,ui]));
+  return {
+    toDb(ui) {
+      const source = ui as Record<string, unknown>;
+      const extra: Record<string, unknown> = {};
+      for (const [key,value] of Object.entries(source)) {
+        if (key === 'id' || key === shape.title || key === 'orgId' || key === 'createdAt' || key === 'updatedAt') continue;
+        if (!(key in (shape.columns ?? {}))) extra[key] = value;
+      }
+      const row: Record<string, unknown> = { title: source[shape.title] ?? null, extra_data: extra };
+      if (source.id) row.id = source.id;
+      for (const [uiKey,dbKey] of Object.entries(shape.columns ?? {})) {
+        if (source[uiKey] !== undefined) row[dbKey] = source[uiKey];
+      }
+      // UI invoice IDs and amounts remain strings; Postgres numeric accepts numeric strings.
+      return row;
+    },
+    fromDb(row) {
+      const extra = row.extra_data && typeof row.extra_data === 'object' ? row.extra_data as Record<string,unknown> : {};
+      const result: Record<string,unknown> = { ...extra, id: row.id, createdAt: row.created_at, updatedAt: row.updated_at };
+      if (row.title !== undefined && row.title !== null) result[shape.title] = row.title;
+      for (const [dbKey,uiKey] of Object.entries(reverse)) if (row[dbKey] !== undefined && row[dbKey] !== null) result[uiKey] = row[dbKey];
+      // Compatibility aliases expected by the existing Garden components.
+      if (collection === 'agents' && result.currentTask === undefined && result.task !== undefined) result.currentTask = result.task;
+      if (collection === 'invoices' && result.currency === undefined) result.currency = 'USD';
+      if (collection === 'documents' && result.uploadedBy === undefined) result.uploadedBy = null;
+      return result as T;
+    },
+  };
 }
 
-/**
- * Convert a single UI patch (camelCase) to DB columns (snake_case).
- * Renames known UI→DB keys; passes unknown keys through.
- */
-function uiToRow<T>(ui: Partial<T>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(ui as Record<string, unknown>)) {
-    const dbKey = UI_TO_DB_COLUMN_MAP[key] ?? key;
-    out[dbKey] = value;
-  }
-  return out;
-}
+export const identityMapper = <T>(): Mapper<T> => ({ toDb: (ui) => ui as Record<string,unknown>, fromDb: (row) => row as unknown as T });
 
-// Default mapper wired to the autoMap helpers. Views can still pass a custom
-// mapper via `options.mapper` to override.
-const defaultMapper = <T extends { id: string }>(): Mapper<T> => ({
-  toDb: (ui) => uiToRow<T>(ui),
-  fromDb: (row) => rowToUi<T>(row),
-});
-
-export function makeRepository<T extends { id: string }>(
-  table: string,
-  seed: T[],
-  options: MakeRepositoryOptions<T> = {},
-): Repository<T> {
-  const lsKey = `marketplace_dashboard_${table}`;
-  // D6 #97: prefer the custom mapper if passed; otherwise use the auto mapper.
-  const mapper: Mapper<T> = options.mapper ?? defaultMapper<T>();
+export function makeRepository<T extends { id: string }>(collection: string, seed: T[], options: MakeRepositoryOptions<T> = {}): Repository<T> {
+  const shape = COLLECTIONS[collection];
+  if (!shape) throw new Error(`[${collection}] unmapped Garden collection; refusing to query a non-existent table`);
+  const mapper = options.mapper ?? makeWorkspaceMapper<T>(collection);
+  const lsKey = `marketplace_dashboard_${collection}`;
 
   if (SUPABASE_READY) {
+    const table = () => supabase.schema('workspace_data').from(shape.table);
+    const tenant = () => {
+      const orgId = getActiveOrgId();
+      assertOrgIdForWrite(orgId, collection);
+      return orgId;
+    };
     return {
-      async list(): Promise<T[]> {
-        const { data, error } = await supabase.from(table).select('*');
-        if (error) throw new Error(`[${table}] ${error.message}`);
-        return (data ?? []).map((row) => mapper.fromDb(row as Record<string, unknown>));
-      },
-      async findById(id: string): Promise<T | null> {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
-        if (error) throw new Error(`[${table}] ${error.message}`);
-        return data ? mapper.fromDb(data as Record<string, unknown>) : null;
-      },
-      async create(item): Promise<T> {
+      async list() {
         const orgId = getActiveOrgId();
-        assertOrgIdForWrite(orgId, table);
-
-        const dbRow = mapper.toDb(item as Partial<T>);
-        // Inject org_id automatically — caller doesn't have to remember.
-        (dbRow as Record<string, unknown>).org_id = orgId;
-
-        // If caller didn't provide an id, let Postgres generate one via gen_random_uuid().
-        if (!item.id) delete (dbRow as Record<string, unknown>).id;
-
-        const { data, error } = await supabase.from(table).insert(dbRow).select().single();
-        if (error) throw new Error(`[${table}] ${error.message}`);
-        return mapper.fromDb(data as Record<string, unknown>);
+        if (!orgId) return [];
+        const { data,error } = await table().select('*').eq('organization_id',orgId).order('created_at',{ascending:false});
+        if (error) throw new Error(`[${collection}] ${error.message}`);
+        return (data ?? []).map(row => mapper.fromDb(row as Record<string,unknown>));
       },
-      async update(id: string, patch: Partial<T>): Promise<T> {
-        const dbRow = mapper.toDb(patch);
-        const { data, error } = await supabase
-          .from(table)
-          .update(dbRow as Record<string, unknown>)
-          .eq('id', id)
-          .select()
-          .single();
-        if (error) throw new Error(`[${table}] ${error.message}`);
-        return mapper.fromDb(data as Record<string, unknown>);
+      async findById(id) {
+        const orgId = getActiveOrgId();
+        if (!orgId) return null;
+        const { data,error } = await table().select('*').eq('organization_id',orgId).eq('id',id).maybeSingle();
+        if (error) throw new Error(`[${collection}] ${error.message}`);
+        return data ? mapper.fromDb(data as Record<string,unknown>) : null;
       },
-      async remove(id: string): Promise<void> {
-        const { error } = await supabase.from(table).delete().eq('id', id);
-        if (error) throw new Error(`[${table}] ${error.message}`);
+      async create(item) {
+        const orgId = tenant();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error(`[${collection}] authenticated user unavailable`);
+        const row = mapper.toDb(item);
+        row.organization_id = orgId;
+        row.created_by_user_id = user.id;
+        if (!item.id) delete row.id;
+        const { data,error } = await table().insert(row).select().single();
+        if (error) throw new Error(`[${collection}] ${error.message}`);
+        return mapper.fromDb(data as Record<string,unknown>);
+      },
+      async update(id,patch) {
+        const orgId = tenant();
+        const row = mapper.toDb(patch);
+        delete row.id; delete row.organization_id; delete row.created_by_user_id;
+        const { data,error } = await table().update({ ...row, updated_at:new Date().toISOString() }).eq('organization_id',orgId).eq('id',id).select().single();
+        if (error) throw new Error(`[${collection}] ${error.message}`);
+        return mapper.fromDb(data as Record<string,unknown>);
+      },
+      async remove(id) {
+        const orgId = tenant();
+        const { error } = await table().delete().eq('organization_id',orgId).eq('id',id);
+        if (error) throw new Error(`[${collection}] ${error.message}`);
       },
     };
   }
 
-  // localStorage fallback (dev only) — preserves pre-Supabase behavior.
-  // Simulates tenant isolation by filtering on the in-memory `org_id` field.
+  // Local-only fallback is explicitly separate from production persistence.
   const read = (): T[] => {
     const raw = localStorage.getItem(lsKey);
-    if (raw) {
-      try {
-        return JSON.parse(raw) as T[];
-      } catch {
-        // corrupt cache → reseed below
-      }
-    }
-    // Seed with org_id = 'local-dev' so the filter passes.
-    const seeded = seed.map((item) => ({ ...item, org_id: 'local-dev' })) as unknown as T[];
-    localStorage.setItem(lsKey, JSON.stringify(seeded));
-    return seeded;
+    if (raw) { try { return JSON.parse(raw) as T[]; } catch { /* reseed below */ } }
+    localStorage.setItem(lsKey,JSON.stringify(seed));
+    return seed;
   };
-
-  const write = (next: T[]): void => {
-    localStorage.setItem(lsKey, JSON.stringify(next));
-  };
-
+  const write = (items:T[]) => localStorage.setItem(lsKey,JSON.stringify(items));
   return {
-    async list(): Promise<T[]> {
-      const orgId = getActiveOrgId();
-      const items = read();
-      // Tenant filter (defense-in-depth even in local dev).
-      if (IS_SAAS && orgId) {
-        return items.filter((item: unknown) => (item as { org_id?: string }).org_id === orgId);
-      }
-      return items;
-    },
-    async findById(id: string): Promise<T | null> {
-      const found = read().find((item) => item.id === id);
-      return found ?? null;
-    },
-    async create(item): Promise<T> {
-      const orgId = getActiveOrgId();
-      assertOrgIdForWrite(orgId, table);
-
-      const generatedId = item.id ?? crypto.randomUUID();
-      const created = { ...item, id: generatedId, org_id: orgId } as unknown as T;
-      const next = [...read(), created];
-      write(next);
-      return created;
-    },
-    async update(id: string, patch: Partial<T>): Promise<T> {
-      const current = read();
-      const index = current.findIndex((item) => item.id === id);
-      if (index === -1) throw new Error(`[${table}] not found: ${id}`);
-      const updated: T = { ...current[index], ...patch };
-      const next = [...current];
-      next[index] = updated;
-      write(next);
-      return updated;
-    },
-    async remove(id: string): Promise<void> {
-      const current = read();
-      const next = current.filter((item) => item.id !== id);
-      write(next);
-    },
+    async list() { const orgId=getActiveOrgId(); return IS_SAAS && orgId ? read().filter(x => (x as unknown as {orgId?:string}).orgId===orgId) : read(); },
+    async findById(id) { return read().find(x=>x.id===id) ?? null; },
+    async create(item) { const orgId=getActiveOrgId(); assertOrgIdForWrite(orgId,collection); const created={...item,id:item.id??crypto.randomUUID(),orgId} as T; write([...read(),created]); return created; },
+    async update(id,patch) { const items=read(),i=items.findIndex(x=>x.id===id); if(i<0) throw new Error(`[${collection}] not found: ${id}`); const next=[...items]; next[i]={...next[i],...patch}; write(next); return next[i]; },
+    async remove(id) { write(read().filter(x=>x.id!==id)); },
   };
 }

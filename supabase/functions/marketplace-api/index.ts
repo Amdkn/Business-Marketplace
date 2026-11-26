@@ -873,6 +873,21 @@ function financeLines(value: unknown) {
     return { account_id: accountId, debit_amount: debit, credit_amount: credit, description };
   });
 }
+async function provisionFinanceChartOfAccounts(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id');
+  const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
+  const chartVersion = body.chart_version === undefined ? '2026.1' : requiredString(body.chart_version, 'chart_version', 16);
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  if (!/^\\d{4}\\.\\d+$/.test(chartVersion)) throw new Error('Invalid chart_version');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, organizationId);
+    const rows = await tx`SELECT api.provision_finance_chart_of_accounts(
+      ${user.id}::uuid,${organizationId}::uuid,${currency}::char(3),${chartVersion}
+    ) AS chart`;
+    return rows[0]?.chart;
+  });
+}
+
 async function postFinanceJournalEntry(user: User, body: Record<string, unknown>) {
   const organizationId = requiredString(body.organization_id, 'organization_id');
   const entryNumber = requiredString(body.entry_number, 'entry_number', 100);
@@ -952,6 +967,7 @@ Deno.serve(async (req: Request) => {
       case 'publish_listing': data = await publishListing(user, body); break;
       case 'create_order': data = await createOrder(user, body); break;
       case 'transition_order': data = await transitionOrder(user, body); break;
+      case 'provision_finance_chart_of_accounts': data = await provisionFinanceChartOfAccounts(user, body); break;
       case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
       default: return response({ error: 'Unknown action', action }, 404);
     }

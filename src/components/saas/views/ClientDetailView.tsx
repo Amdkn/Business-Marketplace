@@ -39,13 +39,6 @@ type LoadState =
   | { kind: 'not_found' }
   | { kind: 'ready'; client: Client; docs: Document[] };
 
-const STATUS_PROGRESS: Record<Client['status'], number> = {
-  active: 80,
-  prospect: 20,
-  paused: 50,
-  archived: 100,
-};
-
 const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'danger' | 'info'> = {
   active: 'success',
   prospect: 'info',
@@ -65,6 +58,9 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({ name: '', email: '', phone: '', service: '', status: 'prospect' as Client['status'] });
 
   const activeId = clientId ?? params.id;
 
@@ -97,6 +93,44 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
       onBack();
     } else {
       navigate('/clients');
+    }
+  };
+
+  const startEditing = (): void => {
+    if (state.kind !== 'ready') return;
+    setDraft({
+      name: state.client.name,
+      email: state.client.email ?? '',
+      phone: state.client.phone ?? '',
+      service: state.client.service ?? '',
+      status: state.client.status,
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = async (): Promise<void> => {
+    if (state.kind !== 'ready' || saving) return;
+    const name = draft.name.trim();
+    if (!name) {
+      showToast('Client name is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await clientsRepo.update(state.client.id, {
+        name,
+        email: draft.email.trim() || null,
+        phone: draft.phone.trim() || null,
+        service: draft.service.trim() || null,
+        status: draft.status,
+      });
+      setState((previous) => previous.kind === 'ready' ? { ...previous, client: updated } : previous);
+      setIsEditing(false);
+      showToast(`Client "${updated.name}" saved.`, 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to save client.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -163,8 +197,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
     .slice(0, 2)
     .join('')
     .toUpperCase();
-  const status = (client?.status && client.status in STATUS_PROGRESS ? client.status : 'active') as Client['status'];
-  const progress = STATUS_PROGRESS[status] ?? 0;
+  const status = client.status;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -180,7 +213,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
           <button
             type="button"
             aria-label="Edit client"
-            onClick={() => showToast('Edit form coming in D2.', 'info')}
+            onClick={startEditing}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
           >
             <Edit3 className="w-4 h-4" /> Edit
@@ -195,6 +228,48 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
           </button>
         </div>
       </div>
+
+      {isEditing && (
+        <Card className="p-5">
+          <form onSubmit={(event) => { event.preventDefault(); void handleSave(); }} className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Edit client record</h2>
+              <span className="text-[11px] text-slate-500">Workspace record</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="text-xs font-medium text-slate-600">
+                Name
+                <input required value={draft.name} onChange={(event) => setDraft((value) => ({ ...value, name: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Email
+                <input type="email" value={draft.email} onChange={(event) => setDraft((value) => ({ ...value, email: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Phone
+                <input value={draft.phone} onChange={(event) => setDraft((value) => ({ ...value, phone: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Service
+                <input value={draft.service} onChange={(event) => setDraft((value) => ({ ...value, service: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Status
+                <select value={draft.status} onChange={(event) => setDraft((value) => ({ ...value, status: event.target.value as Client['status'] }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900">
+                  <option value="prospect">Prospect</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" disabled={saving} onClick={() => setIsEditing(false)} className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={saving || !draft.name.trim()} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save client'}</button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {/* Hero card */}
       <Card className="p-6">
@@ -217,16 +292,8 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
               </Badge>
             </div>
             <div className="mt-4 h-px bg-stone-200" />
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span className="font-medium text-slate-700">{progress}% complete</span>
-                <span className="flex items-center gap-1">
-                  <CalendarClock className="w-3.5 h-3.5" /> Last update: {formatDate(client.updatedAt)}
-                </span>
-              </div>
-              <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
-              </div>
+            <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+              <CalendarClock className="w-3.5 h-3.5" /> Last update: {formatDate(client.updatedAt)}
             </div>
           </div>
         </div>
@@ -284,10 +351,6 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
                   {CLIENT_STATUS_LABEL[status] ?? status}
                 </Badge>
               </dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-slate-500">Status weight</dt>
-              <dd className="text-slate-900 font-medium">{progress}%</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-slate-500">Started</dt>

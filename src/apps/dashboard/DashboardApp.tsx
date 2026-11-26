@@ -285,15 +285,10 @@ export function DashboardApp() {
     // Live metrics from the CMS partition — each tile derives from real items,
     // not from a hard-coded array. If a collection is empty, we still render
     // an empty-state number (0) instead of a fake placeholder.
-    const pipelineOpen = deals
-      .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost')
-      .reduce((acc, d) => acc + Number(d.value ?? 0), 0);
     const wonCount = deals.filter((d) => d.stage === 'Won').length;
     const openDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost').length;
 
-    const outstandingInvoices = invoices
-      .filter((i) => i.status !== 'Paid')
-      .reduce((acc, i) => acc + Number(i.amount ?? 0), 0);
+    const openInvoiceCount = invoices.filter((i) => i.status !== 'Paid').length;
     const paidInvoices = invoices.filter((i) => i.status === 'Paid').length;
     const totalInvoices = invoices.length;
 
@@ -317,9 +312,9 @@ export function DashboardApp() {
         icon: Wallet,
         accent: '#ca8a04',
         sub: 'unpaid invoices',
-        metric: `${invoices.filter((invoice) => invoice.status !== 'Paid').length}`,
+        metric: `${openInvoiceCount}`,
         delta: `${paidInvoices} paid · ${totalInvoices} total`,
-        tone: outstandingInvoices === 0 ? 'ok' as const : 'warn' as const,
+        tone: openInvoiceCount === 0 ? 'ok' as const : 'warn' as const,
       },
       {
         key: 'clients' as const,

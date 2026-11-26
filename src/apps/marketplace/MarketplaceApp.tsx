@@ -154,7 +154,8 @@ export function MarketplaceApp() {
                   <div className="flex items-center gap-1.5">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: '#15803d' }}><Check className="w-3.5 h-3.5" /> Installed</span>
                     <button
-                      onClick={() => uninstall(String(l.id))}
+                      onClick={() => { void uninstall(String(l.id)); }}
+                      disabled={mutatingListingId === String(l.id)}
                       data-uninstall={String(l.id)}
                       className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-md transition-colors"
                       style={{ color: 'var(--theme-text-muted)' }}
@@ -164,7 +165,7 @@ export function MarketplaceApp() {
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => install(String(l.id))} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-transform" style={{ background: ACCENT }}>Install</button>
+                  <button onClick={() => { void install(String(l.id)); }} disabled={mutatingListingId === String(l.id)} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-transform" style={{ background: ACCENT }}>Install</button>
                 )}
               </div>
             </div>

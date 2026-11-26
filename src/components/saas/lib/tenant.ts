@@ -2,8 +2,8 @@
 // ADR-TENANT-005 (Phase C) — tenant isolation guard at the application layer.
 //
 // PURPOSE
-//   The RLS policies in `dashboard.*` filter rows server-side based on the
-//   `org_id` claim injected by `public.custom_access_token_hook`. This module
+//   The RLS policies in `workspace_data.*` enforce organization + workspace
+//   membership. This module
 //   adds a CLIENT-SIDE guard so that:
 //     1. Every repository call receives the active org_id (defense-in-depth).
 //     2. UI components can display tenant context (org name, user role).
@@ -93,8 +93,18 @@ export function getActiveOrgId(): string | null {
 }
 
 let _activeOrgIdCache: string | null = null;
+let _activeWorkspaceIdCache: string | null = null;
+
 export function setActiveOrgIdCache(orgId: string | null): void {
   _activeOrgIdCache = orgId;
+}
+
+export function getActiveWorkspaceId(): string | null {
+  return _activeWorkspaceIdCache;
+}
+
+export function setActiveWorkspaceIdCache(workspaceId: string | null): void {
+  _activeWorkspaceIdCache = workspaceId;
 }
 
 /**

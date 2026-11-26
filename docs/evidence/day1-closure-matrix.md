@@ -1,7 +1,7 @@
 # Day 1 closure matrix — A’Space Marketplace
 
 **Snapshot:** 2026-11-26 · Repository: `Amdkn/Business-Marketplace` · Branch: `foundation/marketplace-product-identity`  
-**Gate:** <badge>OPEN — not accepted</badge>
+**Gate: OPEN — not accepted**
 
 This matrix maps D1.01–D1.09 to code, cloud evidence, automated proof and the remaining acceptance boundary. A migration or deployed function is implementation evidence, not Day 1 acceptance by itself.
 

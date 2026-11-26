@@ -1,5 +1,5 @@
 // src/components/views/FinanceView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.invoices schema.
+// Zero Bug Sprint — rewritten for the Marketplace invoice records.
 //
 // Field changes (D6 #98):
 //   - `inv.client` → `clientId` (no denormalized client name on invoices table;
@@ -87,7 +87,7 @@ export const FinanceView: React.FC = () => {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Payments & Finance</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Invoices, billing status, and revenue (live data from omk_saas.invoices)
+          Invoices, billing status, and revenue (tenant invoice records)
         </p>
       </div>
 

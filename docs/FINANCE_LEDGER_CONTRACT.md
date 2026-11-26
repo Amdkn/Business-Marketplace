@@ -80,10 +80,10 @@ Still required:
 |---|---|
 | `20261126061930` | `finance_double_entry_foundation` |
 | `20261126062124` | `finance_integrity_guards` |
-| `20261126062317` | `finance_payment_fact_immutability` |
+| `20261126062317` | `finance_payment_fact_immutability` |\n| `20261126062541` | `finance_foreign_key_indexes` |
 
 ## Verification
 
-The SQL regression suite `supabase/tests/marketplace_finance_ledger.sql` checks all nine tables, RLS, browser privilege isolation, service-role access, ledger balance/immutability triggers, payment/webhook/refund/payout guards and SECURITY DEFINER search_path/EXECUTE restrictions.
+The SQL regression suite `supabase/tests/marketplace_finance_ledger.sql` checks all nine tables, RLS, browser privilege isolation, service-role access, ledger balance/immutability triggers, payment/webhook/refund/payout guards, SECURITY DEFINER search_path/EXECUTE restrictions and full finance foreign-key index coverage.
 
 Passing this structural suite does not mean payment-provider, capture, payout or accounting E2E has passed.

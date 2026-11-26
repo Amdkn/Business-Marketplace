@@ -15,6 +15,7 @@ import { AUDIT_LOG, DLP_HITS } from '../seed';
 import type { AuditEntry } from '../seed';
 import { useShellStore } from '../../../../stores/shell.store';
 import { ACCENT, IconChip, KpiTile, Panel, Pill, SectionTitle } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
 function exportCsv(entries: AuditEntry[], filename: string): void {
   const header = ['at', 'actor', 'action', 'entity', 'note'];
@@ -41,7 +42,7 @@ function exportCsv(entries: AuditEntry[], filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function AuditLog() {
+function DemoAuditLog() {
   const [query, setQuery] = useState('');
   const [actorFilter, setActorFilter] = useState('all');
   const addToast = useShellStore((s) => s.addToast);
@@ -218,4 +219,12 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
       </td>
     </tr>
   );
+}
+
+
+export function AuditLog() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoAuditLog />
+    : <RuntimeUnavailable title="AuditLog" description="A trustworthy audit log must come from the append-only Marketplace audit source. The local dashboard sample journal is demo-only." />;
 }

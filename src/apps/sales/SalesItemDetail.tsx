@@ -116,7 +116,9 @@ export function SalesItemDetail(props: ItemDetailProps) {
       amount,
       status: 'Sent',
       due: due.toISOString().slice(0, 10),
+      dueAt: due.toISOString(),
       issued: now.toISOString().slice(0, 10),
+      issuedAt: now.toISOString(),
       description: `Invoice line · ${offer || 'coaching engagement'} — deal ${dealId}`,
     });
     if (invoiceResult.ok) {

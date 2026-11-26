@@ -78,8 +78,7 @@ interface ValidationCard {
 /** Build Wind Direction validations from LIVE state.
  *  Brief: "soit tu les dérives d'une source réelle (incidents, approbations,
  *  factures en retard…), soit tu assumes le seed **et tu le dis à l'écran**."
- *  On derive first; if nothing emerges, fall back to the seed and mark it
- *  visibly as a demo fixture. */
+ *  Empty means no live workspace validation is pending; never inject sample alerts. */
 function deriveValidations(
   clients: CmsItem[],
   invoices: CmsItem[],
@@ -88,9 +87,7 @@ function deriveValidations(
   const cards: ValidationCard[] = [];
 
   // Open invoices (status != Paid) — top 2 by amount.
-  const open = invoices
-    .filter((i) => i.status !== 'Paid')
-    .sort((a, b) => Number(b.amount ?? 0) - Number(a.amount ?? 0));
+  const open = invoices.filter((i) => i.status !== 'Paid');
   open.slice(0, 2).forEach((inv) => {
     cards.push({
       id: `val-invoice-${String(inv.id)}`,
@@ -334,15 +331,12 @@ export function DashboardApp() {
         sub: 'operational incident feed',
         metric: '—',
         delta: 'not connected',
-        tone: onboardingCount === 0 ? 'ok' as const : 'warn' as const,
+        tone: 'accent' as const,
       },
     ];
 
     // Top 3 open deals by value — sorted desc, capped to 3.
-    const topOpenDeals = [...deals]
-      .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost')
-      .sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0))
-      .slice(0, 3);
+    const topOpenDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost').slice(0, 3);
 
     return (
       <div className="p-7 space-y-6">
@@ -445,9 +439,6 @@ export function DashboardApp() {
                         {String(d.offer ?? '')}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: 'var(--theme-text)' }}>
-                      ${Number(d.value ?? 0).toLocaleString()}
-                    </span>
                   </li>
                 ))}
               </ul>
@@ -605,7 +596,7 @@ export function DashboardApp() {
                   statusTone={c.status === 'Active' ? 'ok' : c.status === 'Onboarding' ? 'warn' : 'danger'}
                   accent={ACCENT}
                   icon={<GitBranch className="w-5 h-5" />}
-                  meta={pinned ? 'Pinned to pipeline' : 'Pipeline tier'}
+                  meta={pinned ? 'Pinned to pipeline' : 'Workspace record'}
                   onClick={() => openPipelineClient(id)}
                 />
                 <button

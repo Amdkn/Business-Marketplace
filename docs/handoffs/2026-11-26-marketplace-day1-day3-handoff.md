@@ -2143,3 +2143,59 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 1. Continue auditing and converting the remaining business app forms to strict persisted CRUD; specifically inspect any Garden or secondary entry point that can create/update deals, invoices or clients outside the primary Sales/Finance apps.
 2. Add browser tests for the authenticated workspace flow: client → deal → invoice, duplicate source_key rejection, and cross-workspace FK/RLS denial.
 3. Finish the full UI/TypeScript test run when a local runner is available. Continue source/database work independently of Vercel quota.
+
+
+### 13.41 Business UI strict-write sweep, Garden mission board integrity and authenticated tenant-isolation checks — 2026-11-26
+
+**Business UI write-path sweep**
+- Converted the remaining high-value business UI mutations to the strict persisted CMS actions. These paths now wait for the workspace repository response before changing the visible Zustand projection or showing a success toast:
+  - Tasks: create, completion toggle and delete.
+  - Clients: create, with a required name and positive ticket value; no synthetic health score or default USD assumption.
+  - Product: roadmap stage transitions and MVP creation.
+  - Growth: acquisition-channel and partnership creation, acquisition verdict changes and partnership state changes.
+  - Operations: incident/alert creation, triage-state update, change-request creation and approve/reject decisions.
+  - Legal: AI Act check transitions and Legal document status updates.
+  - Sales: both deal-detail invoice entry points use strict persistence, workspace client linkage, deal linkage and the shared idempotency source key.
+  - Finance: production invoice creation uses strict persistence; the legacy local addItem path is gated to the explicit memory-only Coach demo tenant.
+  - Existing strict paths were also reviewed in Settings, Audit, Marketplace, IT/R&D and Dashboard. Their mutations use persisted store actions; no production success path was intentionally left on the best-effort local mutation API in the files inspected.
+- The generic CMS invoice mapper now round-trips clientId, currency, issuedAt, dueAt and paidAt through the dedicated typed invoice columns, rather than duplicating those values into extra_data. Legacy tenant/ownership/audit keys are stripped from extra_data hydration and excluded from writes.
+- No seed agents, fake client records, fake deals, simulated invoice payments, invented runtime metrics or demo telemetry were added.
+
+**Garden Mission Control**
+- Repaired MissionTasksView drag-and-drop persistence. Same-column reordering now persists every affected position, not just the dragged mission. Cross-column moves persist both status and destination position.
+- Removed swallowed persistence errors. The board updates only after successful writes; on failure it reloads the canonical workspace list and displays the failure instead of silently keeping a false local state.
+- Reordering uses the complete persisted source column even when search/priority filters hide some cards, avoiding duplicate/colliding positions.
+- The Garden MissionTasks board and Web Desktop People → Cadence both use workspace_data.missions. Garden's generic mission repository and People’s schedule projection are separate views over the same tenant-scoped table; schedule metadata remains in extra_data and agent assignment uses the canonical agent_principal_id FK.
+
+**Hosted authenticated SQL verification**
+- Re-ran these repository test files against the connected Marketplace project; each returned without exception:
+  - supabase/tests/marketplace_interface_persistence.sql
+  - supabase/tests/operations_change_requests.sql
+  - supabase/tests/sales_deal_client_currency.sql
+  - supabase/tests/sales_deal_invoice_link.sql
+  - supabase/tests/agent_workspace_delegation.sql
+- Ran an additional rollback-only integration transaction as the actual active workspace OWNER under PostgreSQL role authenticated (JWT subject set to the real signed-in user). It inserted, updated, asserted and deleted temporary records for tasks, deals, incidents/alerts, change_requests, product_items, product_mvps, growth_acquisition and growth_partenariats. All assertions passed; the transaction rolled back.
+- Ran a rollback-only authenticated mission test: create, status update, read assertion and delete on workspace_data.missions. It passed and rolled back.
+- Ran a rollback-only cross-workspace denial test inside the same organization: created a second workspace with no membership for the signed-in user, inserted one row as the database owner, then verified that the authenticated user could not SELECT that row and could not INSERT into that workspace. Both denial assertions passed.
+- Ran the equivalent cross-organization isolation check using a temporary second organization/workspace with no membership. Authenticated SELECT returned no row and INSERT was denied.
+- Follow-up counts for all temporary e2e-* rows in tasks, deals, incidents, change_requests, product_items, product_mvps, growth_acquisition, growth_partenariats and missions are zero. All test transactions rolled back; no test records remain.
+- These checks exercise Postgres RLS, constraints and triggers with the authenticated role. They are not a browser/JWT E2E test of the React/Supabase-JS client.
+
+**Deployed API and hosted migration state**
+- marketplace-api remains ACTIVE v29 with verify_jwt=true.
+- Retrieved the deployed Edge Function source and compared its index.ts byte-for-byte with supabase/functions/marketplace-api/index.ts on the working branch: exact match (70,468 characters). The deployed version includes list_workspace_agents, list_workspace_members, register_agent and revoke_agent_delegation.
+- Hosted migration ledger remains through version 20261126112710 / remaining_workspace_cms_collections. The interface persistence structural test passes against that hosted schema; no additional migration was required for this tranche.
+- Canonical agent identity and delegation remain in identity.agent_principals / identity.agent_delegations. The browser continues to use the narrow authenticated Marketplace API projection rather than direct grants on identity tables.
+
+**CI, deployment and acceptance boundary**
+- Latest code commit: f22846810c74fb62c973b8a5d73111d572f390d8 — Garden mission positions remain consistent when the board is filtered.
+- GitHub Actions API reports 0 workflow runs for foundation/marketplace-product-identity. GitHub combined status still contains only the Vercel failure target build-rate-limit; this is the known deployment quota signal, not a verified source build failure.
+- The linked Desktop Commander device Amd-PC remains OFFLINE. npm ci, npm run typecheck, npm test, npm run build and Playwright/browser E2E were not run. Do not claim TypeScript/build success.
+- No new Vercel deployment was attempted. PR #1 remains OPEN / DRAFT and mergeable. Day 1–3 remain OPEN until frontend CI/typecheck/build and authenticated browser acceptance are complete.
+- The remaining external blocker is a live authenticated browser session for UI CRUD and real API invocations. SQL-level RLS and cross-workspace denial have now been verified independently.
+
+**Continuation**
+1. Continue the source-backed collection/schema sweep for any newly added app surface; keep all production mutations on strict persisted actions.
+2. Run the complete frontend verification (npm ci, npm run typecheck, npm test, npm run build) as soon as the local checkout/runner is available. Investigate actual compiler/test failures; do not conflate them with Vercel's build-rate-limit context.
+3. Complete browser-authenticated CRUD against Garden and Web Desktop, including live Edge Function list/register/revoke calls and UI refresh behavior.
+4. Keep PR #1 OPEN / DRAFT and Day 1–3 OPEN until those frontend/browser gates pass.

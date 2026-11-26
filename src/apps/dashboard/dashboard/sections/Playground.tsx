@@ -10,6 +10,7 @@ import { Beaker, Clock, Coins, Sparkles } from 'lucide-react';
 import { PLAYGROUND_MODELS, PLAYGROUND_PROMPT } from '../seed';
 import type { PlaygroundModel } from '../seed';
 import { ACCENT, IconChip, KpiTile, Panel, Pill, SectionTitle } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
 const VENDOR_META: Record<string, { label: string; color: string }> = {
   Anthropic:  { label: 'Anthropic',  color: '#d97757' },
@@ -17,7 +18,7 @@ const VENDOR_META: Record<string, { label: string; color: string }> = {
   OpenRouter: { label: 'OpenRouter', color: '#0891b2' },
 };
 
-export function Playground() {
+function DemoPlayground() {
   const [prompt, setPrompt] = useState(PLAYGROUND_PROMPT);
 
   const totalCost = useMemo(
@@ -195,4 +196,12 @@ function median(arr: number[]): number {
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
+}
+
+
+export function Playground() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoPlayground />
+    : <RuntimeUnavailable title="Playground" description="Model comparison requires live provider adapters and measured responses. Static sample outputs and prices are not presented as live results." />;
 }

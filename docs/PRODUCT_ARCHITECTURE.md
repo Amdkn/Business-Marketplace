@@ -317,3 +317,11 @@ The foundation is applied through cloud migrations `20261126061930`, `2026112606
 This is structural infrastructure, not payment acceptance. No payment processor is configured, no provider event is being treated as a capture, and no payout or journal has been fabricated. The full contract is in [FINANCE_LEDGER_CONTRACT.md](./FINANCE_LEDGER_CONTRACT.md), with regression assertions in `supabase/tests/marketplace_finance_ledger.sql`.
 
 An authenticated, idempotent `api.post_finance_journal_entry` function and `post_finance_journal_entry` action are now implemented and deployed in `marketplace-api` v17. Posting validates role, same-tenant/currency active accounts, balanced debit/credit lines and payload-stable idempotency. No production journal is fabricated. Still open: provider-specific payment adapter, signed webhook verification implementation, fee policies, capture/refund/payout actions, settlement reconciliation, tax policy, dispute workflow, financial read models and UI.
+
+## Finance & Capital — standard chart of accounts
+
+The Finance schema now has a versioned global template catalogue (finance.chart_account_templates) and tenant-specific account provisioning. Chart version 2026.1 defines 16 accounts spanning ASSET, LIABILITY, EQUITY, REVENUE and EXPENSE. Each account is instantiated per organization and currency; templates themselves are not tenant financial records.
+
+The guarded SQL function api.provision_finance_chart_of_accounts checks active organization, membership and Finance-capable role, serializes concurrent provisioning with an advisory transaction lock, rejects code/system-key collisions and is idempotent for the same organization/currency/version. It is callable only by service_role and has a pinned SECURITY DEFINER search_path. The authenticated marketplace-api action is provision_finance_chart_of_accounts; live deployment v19 has verify_jwt=true.
+
+No organization exists in the current hosted project, so no chart instance was seeded. This is a structural capability only. The baseline is not a substitute for jurisdiction-specific statutory or tax configuration. See docs/FINANCE_LEDGER_CONTRACT.md.

@@ -320,6 +320,18 @@ type AdapterFamilyBlueprint = {
   implementation_status: 'PLANNED' | 'IN_PROGRESS' | 'AVAILABLE' | 'DEPRECATED';
 };
 
+type ProviderAdapterBlueprint = {
+  provider_key: string;
+  family_key: string;
+  family_name: string;
+  provider_name: string;
+  manifest_version: string;
+  implementation_status: 'PLANNED' | 'IN_PROGRESS' | 'AVAILABLE' | 'DEPRECATED';
+  auth_contract_status: 'UNSPECIFIED' | 'SPECIFIED' | 'IMPLEMENTED' | 'VERIFIED';
+  supported_operations: string[];
+  documentation_uri: string | null;
+};
+
 const fallbackAdapterFamilies: AdapterFamilyBlueprint[] = adapterFamilies.map(([name, providers, icon], index) => ({
   family_key: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   family_name: name,
@@ -332,32 +344,70 @@ const fallbackAdapterFamilies: AdapterFamilyBlueprint[] = adapterFamilies.map(([
 
 function AdaptersView() {
   const [families, setFamilies] = useState<AdapterFamilyBlueprint[]>(fallbackAdapterFamilies);
+  const [providers, setProviders] = useState<ProviderAdapterBlueprint[]>([]);
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [source, setSource] = useState<'loading' | 'database' | 'fallback'>('loading');
 
   useEffect(() => {
     let activeRequest = true;
     if (!supabaseConfigured) {
+      setProviders(fallbackAdapterFamilies.flatMap(family => family.provider_examples.map(name => ({
+        provider_key: family.family_key + '-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        family_key: family.family_key,
+        family_name: family.family_name,
+        provider_name: name,
+        manifest_version: 'local-fallback',
+        implementation_status: 'PLANNED' as const,
+        auth_contract_status: 'UNSPECIFIED' as const,
+        supported_operations: [],
+        documentation_uri: null,
+      }))));
       setSource('fallback');
       return () => { activeRequest = false; };
     }
-    void supabase.functions.invoke('marketplace-api', { body: { action: 'list_adapter_families' } })
-      .then(({ data, error }) => {
-        if (error) throw error;
-        if (!Array.isArray(data?.data) || data.data.length !== 20) throw new Error('Expected exactly 20 adapter family blueprints');
-        if (activeRequest) {
-          setFamilies(data.data as AdapterFamilyBlueprint[]);
-          setSource('database');
-        }
-      })
-      .catch(() => {
-        if (activeRequest) setSource('fallback');
-      });
+
+    void Promise.all([
+      supabase.functions.invoke('marketplace-api', { body: { action: 'list_adapter_families' } }),
+      supabase.functions.invoke('marketplace-api', { body: { action: 'list_provider_adapter_blueprints' } }),
+    ]).then(([familyResult, providerResult]) => {
+      if (familyResult.error) throw familyResult.error;
+      if (providerResult.error) throw providerResult.error;
+      if (!Array.isArray(familyResult.data?.data) || familyResult.data.data.length !== 20) throw new Error('Expected exactly 20 adapter family blueprints');
+      if (!Array.isArray(providerResult.data?.data) || providerResult.data.data.length !== 73) throw new Error('Expected 73 provider adapter blueprints');
+      if (activeRequest) {
+        setFamilies(familyResult.data.data as AdapterFamilyBlueprint[]);
+        setProviders(providerResult.data.data as ProviderAdapterBlueprint[]);
+        setSource('database');
+      }
+    }).catch(() => {
+      if (activeRequest) {
+        setProviders(fallbackAdapterFamilies.flatMap(family => family.provider_examples.map(name => ({
+          provider_key: family.family_key + '-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          family_key: family.family_key,
+          family_name: family.family_name,
+          provider_name: name,
+          manifest_version: 'local-fallback',
+          implementation_status: 'PLANNED' as const,
+          auth_contract_status: 'UNSPECIFIED' as const,
+          supported_operations: [],
+          documentation_uri: null,
+        }))));
+        setSource('fallback');
+      }
+    });
     return () => { activeRequest = false; };
   }, []);
 
-  return <div className="bm-stack"><div className="bm-notice"><div className="bm-notice-icon"><Zap size={17}/></div><div><strong>20 adapter families mapped.</strong><span>Provider examples are design scope only; no production connector or tenant connection is implied.</span></div><span className="bm-notice-tag">CATALOG BLUEPRINT</span></div><div className={'bm-source-pill '+source}>{source==='database'?'SUPABASE REFERENCE DATA':source==='loading'?'LOADING ADAPTER REGISTRY':'LOCAL REFERENCE FALLBACK'}</div><div className="bm-adapter-grid">{families.map((item,i)=><div className="bm-adapter-card" key={item.family_key}><div className="bm-adapter-card-head"><span className="bm-adapter-icon">{adapterIcon(item.icon_key)}</span><span className="bm-adapter-number">A{i+1<10?'0':''}{i+1}</span></div><h3>{item.family_name}</h3><p>{item.provider_examples.join(' · ')}</p><div className="bm-adapter-card-foot"><span><i/> {item.implementation_status === 'AVAILABLE' ? 'Available' : item.implementation_status === 'IN_PROGRESS' ? 'In progress' : 'Not connected'}</span><span>{item.implementation_status === 'PLANNED' ? 'Manifest pending' : item.implementation_status}</span></div></div>)}</div></div>;
-}
+  const visibleProviders = providers.filter(provider => provider.family_key === selectedFamily);
+  const selectedFamilyName = families.find(family => family.family_key === selectedFamily)?.family_name;
 
+  return <div className="bm-stack">
+    <div className="bm-notice"><div className="bm-notice-icon"><Zap size={17}/></div><div><strong>20 adapter families · 73 provider blueprints.</strong><span>These records define integration design scope only. No provider adapter, credential, OAuth grant or tenant connection is live.</span></div><span className="bm-notice-tag">CATALOG BLUEPRINT</span></div>
+    <div className={'bm-source-pill '+source}>{source==='database'?'SUPABASE REFERENCE DATA':source==='loading'?'LOADING ADAPTER REGISTRY':'LOCAL REFERENCE FALLBACK'}</div>
+    <div className="bm-adapter-grid">{families.map((item,i)=><button type="button" className={'bm-adapter-card '+(selectedFamily===item.family_key?'selected':'')} key={item.family_key} onClick={()=>setSelectedFamily(selectedFamily===item.family_key?null:item.family_key)}><div className="bm-adapter-card-head"><span className="bm-adapter-icon">{adapterIcon(item.icon_key)}</span><span className="bm-adapter-number">A{i+1<10?'0':''}{i+1}</span></div><h3>{item.family_name}</h3><p>{item.provider_examples.join(' · ')}</p><div className="bm-adapter-card-foot"><span><i/> {item.implementation_status === 'AVAILABLE' ? 'Available' : item.implementation_status === 'IN_PROGRESS' ? 'In progress' : 'Not connected'}</span><span>{item.provider_examples.length} provider blueprints</span></div></button>)}</div>
+    {selectedFamily && <section className="bm-panel bm-provider-panel"><div className="bm-panel-head"><div><span className="bm-eyebrow">PROVIDER BLUEPRINTS</span><h2>{selectedFamilyName}</h2></div><span className="bm-provider-count">{visibleProviders.length} providers</span></div><div className="bm-provider-list">{visibleProviders.map(provider=><article className="bm-provider-row" key={provider.provider_key}><div><strong>{provider.provider_name}</strong><span>{provider.provider_key}</span></div><span className="bm-provider-state">PLANNED</span><span className="bm-provider-auth">AUTH {provider.auth_contract_status}</span><span className="bm-provider-ops">{provider.supported_operations.length} operations specified</span></article>)}</div><div className="bm-panel-foot">Provider-specific auth, scopes, operations, credentials and execution contracts must be reviewed and implemented before a connection can be offered.</div></section>}
+  </div>;
+}
 
 function adapterIcon(name: string) {
   const icons: Record<string, typeof Activity> = { ShieldCheck, Zap, Activity, FileText, Workflow, GitBranch, Database, Blocks, Sparkles, Network, CreditCard, BriefcaseBusiness, Compass, Layers3, Building2, Globe2, Cloud };

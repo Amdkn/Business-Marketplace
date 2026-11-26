@@ -6,6 +6,19 @@
 // avec le spy posé : pas de réseau, pas de Supabase réel.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// These tests explicitly exercise the in-memory demo branch. Vercel injects
+// production Supabase environment variables during builds, so isolate this
+// module from deployment configuration exactly as the query tests do.
+vi.mock('../supabase', () => ({
+  supabaseConfigured: false,
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: null } }),
+    },
+  },
+}));
+
 import {
   appendEvent,
   listInMemoryEvents,

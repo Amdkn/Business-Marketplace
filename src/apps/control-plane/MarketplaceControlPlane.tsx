@@ -43,6 +43,26 @@ const ld01MarvelSquads = [
   'B3.5_Marvel_Squad', 'B3.6_Marvel_Squad', 'B3.7_Marvel_Squad', 'B3.8_Marvel_Squad',
 ] as const;
 
+type HolonBlueprint = {
+  holon_code: string;
+  area_code: string;
+  holon_level: 1 | 2 | 3;
+  holon_type: 'OWNER_BOOK' | 'TACTICAL_DC_MANAGER' | 'MARVEL_EXECUTION_SQUAD';
+  display_name: string;
+  mandate: string;
+  parent_holon_code: string | null;
+  specialist_count: number | null;
+  runbook_required: boolean;
+  source_path: string;
+  sort_order: number;
+};
+
+const fallbackLd01Holons: HolonBlueprint[] = [
+  { holon_code: 'B1', area_code: 'LD01', holon_level: 1, holon_type: 'OWNER_BOOK', display_name: 'B1-BOOK · OwnerBook', mandate: 'OwnerBook B1 · Carrière & Business.', parent_holon_code: null, specialist_count: null, runbook_required: false, source_path: 'local-fallback', sort_order: 1 },
+  ...ld01DcManagers.map(([code, name], index) => ({ holon_code: code, area_code: 'LD01', holon_level: 2 as const, holon_type: 'TACTICAL_DC_MANAGER' as const, display_name: `${code} · ${name}`, mandate: `Playbook patrimonial DC — ${name}.`, parent_holon_code: 'B1', specialist_count: null, runbook_required: false, source_path: 'local-fallback', sort_order: index + 2 })),
+  ...ld01MarvelSquads.map((code, index) => ({ holon_code: code.slice(0, 4), area_code: 'LD01', holon_level: 3 as const, holon_type: 'MARVEL_EXECUTION_SQUAD' as const, display_name: `${code.slice(0, 4)} · Marvel Squad`, mandate: '7 spécialistes + Runbook opérationnel.', parent_holon_code: 'B1', specialist_count: 7, runbook_required: true, source_path: 'local-fallback', sort_order: index + 10 })),
+];
+
 const adapterFamilies = [
   ['Identity & access', 'Google Workspace · Microsoft 365 · Auth0 · Clerk', 'ShieldCheck'],
   ['Communication', 'Gmail · Outlook · Slack · Google Chat · Teams · Discord', 'Zap'],
@@ -98,6 +118,8 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
   const [mobileNav, setMobileNav] = useState(false);
   const [taxonomy, setTaxonomy] = useState({ businessDepartments, areasPortfolios });
   const [taxonomySource, setTaxonomySource] = useState<'loading' | 'database' | 'fallback'>('loading');
+  const [ld01Holons, setLd01Holons] = useState<HolonBlueprint[]>(fallbackLd01Holons);
+  const [holonSource, setHolonSource] = useState<'loading' | 'database' | 'fallback'>('loading');
   const copy = sectionCopy[active];
   const departments = taxonomy.businessDepartments;
   const areas = taxonomy.areasPortfolios;
@@ -150,6 +172,26 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
     return () => { activeRequest = false; };
   }, []);
 
+  useEffect(() => {
+    let activeRequest = true;
+    if (!supabaseConfigured) {
+      setHolonSource('fallback');
+      return () => { activeRequest = false; };
+    }
+    void supabase.functions.invoke('marketplace-api', { body: { action: 'list_holon_blueprints', area_code: 'LD01' } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const rows = data?.data;
+        if (!Array.isArray(rows) || rows.length !== 17) throw new Error('Expected 17 canonical LD01 holon blueprints');
+        if (activeRequest) {
+          setLd01Holons(rows as HolonBlueprint[]);
+          setHolonSource('database');
+        }
+      })
+      .catch(() => { if (activeRequest) setHolonSource('fallback'); });
+    return () => { activeRequest = false; };
+  }, []);
+
   return (
     <div className="bm-shell">
       <aside className={`bm-sidebar ${mobileNav ? 'bm-sidebar-open' : ''}`}>
@@ -199,7 +241,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
 
           {active === 'overview' && <Overview onNavigate={setActive} departments={departments} areas={areas} />}
           {active === 'core' && <CoreView />}
-          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} />}
+          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} holons={ld01Holons} holonSource={holonSource} />}
           {active === 'adapters' && <AdaptersView />}
           {active === 'marketplace' && <MarketplaceCatalogView />}
           {active === 'workspaces' && <ComingSoon icon={Building2} title="Organization workspaces" text="Organization provisioning, membership and workspace isolation are being connected to the Marketplace identity model." />}
@@ -245,7 +287,7 @@ function Overview({ onNavigate, departments, areas }: { onNavigate: (section: Se
   </div>;
 }
 
-function DomainsView({ domains: list, query, setQuery, onSelect, selected, axis, setAxis, source }: { domains: Domain[]; query: string; setQuery: (v:string)=>void; onSelect: (id:string|null)=>void; selected?: Domain; axis: 'departments' | 'areas'; setAxis: (v:'departments'|'areas')=>void; source: 'loading' | 'database' | 'fallback' }) {
+function DomainsView({ domains: list, query, setQuery, onSelect, selected, axis, setAxis, source, holons, holonSource }: { domains: Domain[]; query: string; setQuery: (v:string)=>void; onSelect: (id:string|null)=>void; selected?: Domain; axis: 'departments' | 'areas'; setAxis: (v:'departments'|'areas')=>void; source: 'loading' | 'database' | 'fallback'; holons: HolonBlueprint[]; holonSource: 'loading' | 'database' | 'fallback' }) {
   const title = axis === 'departments' ? 'Business Departments' : 'Areas OS mission portfolios';
   const codeRange = axis === 'departments' ? '8 operating units' : 'LD01 – LD08';
   return <div className="bm-domains-layout">
@@ -254,7 +296,7 @@ function DomainsView({ domains: list, query, setQuery, onSelect, selected, axis,
       <div className="bm-panel-foot">Global reference architecture · tenant installation and ownership are separate lifecycle records</div>
     </section>
     <aside className="bm-panel bm-domain-detail">{selected ? <><div className="bm-detail-kicker">{selected.axis==='department'?'MARKETPLACE OPERATING DEPARTMENT':'AREAS OS PORTFOLIO'} / {selected.code}</div><h2>{selected.name}</h2><p>{selected.description}</p><div className="bm-detail-stat"><strong>{selected.code}</strong><span>{selected.axis==='department'?'Operating department':'Mission portfolio'}</span></div><h3>Operating responsibility</h3><p>{selected.role}</p>
-      {selected.axis==='area' && selected.code==='LD01' && <div className="bm-ld01-holarchy"><div className="bm-holarchy-owner"><span>B1</span><strong>Book</strong><em>OwnerBook · LD01 Business</em></div><div className="bm-holarchy-grid"><div className="bm-holarchy-group"><h4>B2 · 8 Managers tactiques DC</h4>{ld01DcManagers.map(([code,name])=><div className="bm-holarchy-row" key={code}><strong>{code}</strong><span>{name}</span></div>)}</div><div className="bm-holarchy-group"><h4>B3 · 8 Squads d’exécution Marvel</h4>{ld01MarvelSquads.map(code=><div className="bm-holarchy-row" key={code}><strong>{code.slice(0,4)}</strong><span>Marvel Squad</span></div>)}<p>Chaque squad : 7 spécialistes + un Runbook opérationnel.</p></div></div><div className="bm-holarchy-note">B2/B3 are the LD01 internal delegation hierarchy. They are not the eight Marketplace operating departments.</div></div>}
+      {selected.axis==='area' && selected.code==='LD01' && <div className="bm-ld01-holarchy"><div className="bm-holarchy-owner"><span>{holons.find(h=>h.holon_level===1)?.holon_code ?? 'B1'}</span><strong>{holons.find(h=>h.holon_level===1)?.display_name.replace('B1-BOOK · ','') ?? 'OwnerBook'}</strong><em>LD01 · B1 OwnerBook</em></div><div className="bm-source-pill" style={{marginBottom:10}}>{holonSource==='database'?'CANONICAL V5 HOLARCHY · SUPABASE':holonSource==='loading'?'LOADING LD01 HOLARCHY':'LOCAL SOURCE FALLBACK'}</div><div className="bm-holarchy-grid"><div className="bm-holarchy-group"><h4>B2 · {holons.filter(h=>h.holon_level===2).length} Managers tactiques DC</h4>{holons.filter(h=>h.holon_level===2).map(item=><div className="bm-holarchy-row" key={item.holon_code}><strong>{item.holon_code}</strong><span>{item.display_name.replace(item.holon_code+' · ','')}</span></div>)}</div><div className="bm-holarchy-group"><h4>B3 · {holons.filter(h=>h.holon_level===3).length} Squads d’exécution Marvel</h4>{holons.filter(h=>h.holon_level===3).map(item=><div className="bm-holarchy-row" key={item.holon_code}><strong>{item.holon_code}</strong><span>Marvel Squad</span></div>)}<p>Chaque squad : {holons.find(h=>h.holon_level===3)?.specialist_count ?? 7} spécialistes + {holons.find(h=>h.holon_level===3)?.runbook_required ? 'un Runbook opérationnel' : 'runbook à spécifier'}.</p></div></div><div className="bm-holarchy-note">B2/B3 are LD01 internal holons. They are not the eight Marketplace operating departments.</div></div>}
       <div className="bm-detail-warning"><LockKeyhole size={15}/> Blueprint only. Tenant ownership, dependencies and installations are not implied by this global reference.</div></> : <div className="bm-empty-detail"><Network size={26}/><strong>Select a structural unit</strong><span>Inspect the Marketplace department or Areas OS portfolio without merging their identities.</span></div>}</aside>
   </div>;
 }

@@ -529,12 +529,42 @@ export async function upsertItem(collectionId: string, item: CmsItem): Promise<v
     throw error;
   }
   try {
+    const table = supabase.schema('workspace_data').from(collectionId);
     const row = toWorkspaceRow(collectionId, item, context);
-    const { error } = await supabase.schema('workspace_data').from(collectionId)
-      .upsert(row, { onConflict: 'id' });
-    if (error) throw error;
+    const { data: existing, error: lookupError } = await table.select('id')
+      .eq('id', item.id)
+      .eq('organization_id', context.organizationId)
+      .eq('workspace_id', context.workspaceId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+
+    if (existing) {
+      // Creator and tenant ownership are immutable audit fields. Never let an
+      // ordinary CMS edit rewrite created_by_user_id or move a row between tenants.
+      const update = { ...row };
+      delete update.id;
+      delete update.organization_id;
+      delete update.workspace_id;
+      delete update.created_by_user_id;
+      const { data, error } = await table.update(update)
+        .eq('id', item.id)
+        .eq('organization_id', context.organizationId)
+        .eq('workspace_id', context.workspaceId)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error(`[cms] update refused or row disappeared: ${collectionId}/${item.id}`);
+    } else {
+      // A primary-key collision in another workspace is intentionally not
+      // converted into an UPDATE: the INSERT will fail under the PK/RLS guard.
+      const { error } = await table.insert(row);
+      if (error) throw error;
+    }
     setMode('connected');
-  } catch (err) { setMode('unreachable', err); throw err; }
+  } catch (err) {
+    setMode('unreachable', err);
+    throw err;
+  }
 }
 
 /** Delete only the matching row within the resolved tenant; never report a silent success. */

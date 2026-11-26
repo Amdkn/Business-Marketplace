@@ -1682,3 +1682,12 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 5. Run TypeScript/build/tests and deploy a new preview; Vercel had previously rate-limited deployment. Then perform browser E2E with the real user's JWT and verify both interfaces render empty states and persist a real record end-to-end.
 
 **Branch:** `foundation/marketplace-product-identity`. **PR:** #1 OPEN / DRAFT. Latest commit must be refreshed from the branch before continuing. Day 1–3 remain OPEN; this tranche is a persistence foundation, not full interface acceptance.
+
+
+### 13.26 Legacy product identifier cleanup — 2026-11-26 03:26 ET
+
+- Removed remaining active-source references to the legacy product/schema label from `src/components/saas/lib/types.ts`, the central CMS service seed, and the Operations, IT/R&D and Tasks demo seeds.
+- Replaced the old mock service identity with `Supabase — Marketplace`; updated the historical mock references to the current Marketplace runtime/schema labels.
+- Rechecked those five source files: zero remaining matches.
+- Live Supabase schema inventory had already confirmed no schema name containing the legacy label. Historical applied migration files and handoff provenance are retained; do not rewrite applied migration history merely to erase historical references.
+- PR #1 remains OPEN / DRAFT. Latest branch head at this checkpoint: `fd0c8a2cae9c2378fce75ee240cf6a639a01173f`. Vercel status on that head: `failure` with description `Deployment rate limited — retry in 24 hours`; no GitHub Actions check runs.

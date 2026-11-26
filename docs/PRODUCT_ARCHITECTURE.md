@@ -328,3 +328,7 @@ No organization exists in the current hosted project, so no chart instance was s
 
 
 Finance action authorization is separated from the general organization-role helper. The dedicated Finance gate accepts S0 Sovereign, B1 CEO, B2 Manager and B2.2 Treasury roles, and the SQL functions repeat the membership/role check. The active Marketplace API deployment is v20.
+
+### Finance & Capital — versioned fee calculation
+
+Finance now provides a versioned fee policy catalogue and immutable per-order fee snapshots. Policies support platform or seller scope, percentage basis points, fixed fees, optional minimum/maximum, currency-specific policies, explicit rounding scale and effective windows. The snapshot fixes gross, policy version, fee and seller net for the order; policy terms and snapshots cannot be rewritten after activation/application. Taxes and payment processing are kept outside the commission calculation. No default rate or fictitious order is seeded.

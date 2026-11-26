@@ -333,7 +333,7 @@ export function WelcomeApp() {
   // Le bandeau PAGES du canvas et la barre latérale d'AppFrame lisent chacun
   // leur propre source de vérité : la sidebar suit `activeId` interne à
   // AppFrame, le bandeau suit `activePageId` interne à WelcomeApp. Sans pont,
-  // cliquer la sidebar « OMK Coach Demo » laisse le bandeau surligner « OMK RH »,
+  // cliquer la sidebar « A’Space Coach Demo » laisse le bandeau surligner « A’Space RH »,
   // et cliquer un onglet du bandeau ne déplace pas la sidebar. (cf. FIX-4.2.)
   //
   // Le pont le plus local possible :

@@ -25,7 +25,7 @@ const initialForm = (): FormState => ({
   lastName: 'User',
   email: 'owner@aspace.example',
   phone: '+1 234 567 8900',
-  company: 'A'Space Marketplace',
+  company: "A'Space Marketplace",
 });
 
 export const SettingsView: React.FC = () => {

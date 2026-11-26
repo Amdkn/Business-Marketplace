@@ -310,14 +310,52 @@ function MarketplaceCatalogView() {
   </div>;
 }
 
-function AdaptersView() {
-  return <div className="bm-stack"><div className="bm-notice"><div className="bm-notice-icon"><Zap size={17}/></div><div><strong>20 adapter families mapped.</strong><span>These are planned integration families, not claims that 20 production connectors are already implemented.</span></div><span className="bm-notice-tag">CATALOG BLUEPRINT</span></div><div className="bm-adapter-grid">{adapterFamilies.map(([name,providers,icon],i)=><div className="bm-adapter-card" key={name}><div className="bm-adapter-card-head"><span className="bm-adapter-icon">{adapterIcon(icon)}</span><span className="bm-adapter-number">A{i+1<10?'0':''}{i+1}</span></div><h3>{name}</h3><p>{providers}</p><div className="bm-adapter-card-foot"><span><i/> Not connected</span><span>Manifest pending</span></div></div>)}</div></div>;
-}
+type AdapterFamilyBlueprint = {
+  family_key: string;
+  family_name: string;
+  provider_examples: string[];
+  icon_key: string;
+  sort_order: number;
+  taxonomy_version: string;
+  implementation_status: 'PLANNED' | 'IN_PROGRESS' | 'AVAILABLE' | 'DEPRECATED';
+};
 
-function adapterIcon(name: string) {
-  const icons: Record<string, typeof Activity> = { ShieldCheck, Zap, Activity, FileText, Workflow, GitBranch, Database, Blocks, Sparkles, Network, CreditCard, BriefcaseBusiness, Compass, Layers3, Building2, Globe2, Cloud };
-  const Icon = icons[name] ?? Box;
-  return <Icon size={18}/>;
+const fallbackAdapterFamilies: AdapterFamilyBlueprint[] = adapterFamilies.map(([name, providers, icon], index) => ({
+  family_key: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+  family_name: name,
+  provider_examples: providers.split(' · '),
+  icon_key: icon,
+  sort_order: index + 1,
+  taxonomy_version: 'local-fallback',
+  implementation_status: 'PLANNED',
+}));
+
+function AdaptersView() {
+  const [families, setFamilies] = useState<AdapterFamilyBlueprint[]>(fallbackAdapterFamilies);
+  const [source, setSource] = useState<'loading' | 'database' | 'fallback'>('loading');
+
+  useEffect(() => {
+    let activeRequest = true;
+    if (!supabaseConfigured) {
+      setSource('fallback');
+      return () => { activeRequest = false; };
+    }
+    void supabase.functions.invoke('marketplace-api', { body: { action: 'list_adapter_families' } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (!Array.isArray(data?.data) || data.data.length !== 20) throw new Error('Expected exactly 20 adapter family blueprints');
+        if (activeRequest) {
+          setFamilies(data.data as AdapterFamilyBlueprint[]);
+          setSource('database');
+        }
+      })
+      .catch(() => {
+        if (activeRequest) setSource('fallback');
+      });
+    return () => { activeRequest = false; };
+  }, []);
+
+  return <div className="bm-stack"><div className="bm-notice"><div className="bm-notice-icon"><Zap size={17}/></div><div><strong>20 adapter families mapped.</strong><span>Provider examples are design scope only; no production connector or tenant connection is implied.</span></div><span className="bm-notice-tag">CATALOG BLUEPRINT</span></div><div className={'bm-source-pill '+source}>{source==='database'?'SUPABASE REFERENCE DATA':source==='loading'?'LOADING ADAPTER REGISTRY':'LOCAL REFERENCE FALLBACK'}</div><div className="bm-adapter-grid">{families.map((item,i)=><div className="bm-adapter-card" key={item.family_key}><div className="bm-adapter-card-head"><span className="bm-adapter-icon">{adapterIcon(item.icon_key)}</span><span className="bm-adapter-number">A{i+1<10?'0':''}{i+1}</span></div><h3>{item.family_name}</h3><p>{item.provider_examples.join(' · ')}</p><div className="bm-adapter-card-foot"><span><i/> {item.implementation_status === 'AVAILABLE' ? 'Available' : item.implementation_status === 'IN_PROGRESS' ? 'In progress' : 'Not connected'}</span><span>{item.implementation_status === 'PLANNED' ? 'Manifest pending' : item.implementation_status}</span></div></div>)}</div></div>;
 }
 
 function GovernanceView() {

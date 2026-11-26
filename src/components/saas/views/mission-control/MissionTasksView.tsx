@@ -255,7 +255,8 @@ export const MissionTasksView = (): React.ReactElement => {
     if (!draft.title.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const position = grouped[draft.status].length;
+      const position = missions.filter((mission) => mission.status === draft.status)
+        .reduce((maximum, mission) => Math.max(maximum, mission.position), -1) + 1;
       const created = await missionsRepo.create({
         title: draft.title.trim(),
         priority: draft.priority,

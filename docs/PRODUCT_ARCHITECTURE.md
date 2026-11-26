@@ -361,3 +361,22 @@ This does not complete the interface conversion. The Sidebar-specific repositori
 ## 17. Legacy OMK naming removal — 2026-11-26
 
 The active Garden/Sidebar views, Mission Control surfaces, Web Desktop app entrypoints/seeds and Welcome landing/canvas copy were audited and the legacy OMK product/schema naming was removed or replaced with current Marketplace/A’Space terminology. This includes obsolete `omk_saas.*` UI labels, `ADR-OMK-*` comments, old product names, old demo service identifiers, and `omknexus.io` demo domains. The active source paths inspected now have no remaining OMK matches. The live Supabase catalog also has no schema with that name. Historical migration files and handoff records retain legacy references only as provenance; do not rewrite already-applied migrations to erase history.
+
+
+## 18. Shared interface persistence — Garden + Web Desktop
+
+The Garden Sidebar and Web Desktop CMS must use one tenant data plane: Supabase schema workspace_data. The Garden default schema is workspace_data; the CMS repository already resolves tenant membership through identity.organization_memberships and reads/writes workspace_data collections.
+
+Garden's repository table map is explicit and must not query an implicit dashboard schema:
+- clients → workspace_data.clients
+- agents → workspace_data.people_agents
+- documents → workspace_data.documents
+- invoices → workspace_data.invoices
+- legal_docs → workspace_data.legal_documents
+- missions → workspace_data.tasks
+- sales_leads → workspace_data.deals
+- sops → workspace_data.runbooks
+
+UI-only attributes are retained in each row's extra_data JSONB while stable, queried attributes remain typed columns. Every Garden repository operation is organization-scoped; create also attributes the authenticated creator. Database RLS remains authoritative. The first real Marketplace tenant is now present in Supabase (one user, organization, organization membership, workspace and workspace membership); no synthetic tenant data was created by the persistence work.
+
+The older dashboard.clients and dashboard.agents tables are legacy compatibility artifacts only. Do not add new Garden features to that schema or silently fall back to it. Documents and Legal Data Room now have dedicated tenant tables. Storage upload/download, cross-workspace selector behavior and authenticated browser CRUD still require integration and acceptance tests.

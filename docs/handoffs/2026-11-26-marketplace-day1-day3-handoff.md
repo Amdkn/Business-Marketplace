@@ -1558,3 +1558,13 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Re-ran all five SQL regression suites successfully after fee engine integration. The Finance suite includes fee table/RLS/grant/immutability checks, percentage/fixed calculation arithmetic, fee caps, seller-net conservation and SECURITY DEFINER/least-privilege assertions.
 - Live Finance inventory is now 12 tables. All Finance foreign keys have covering indexes (0 unindexed Finance FKs). The broader project still reports 61 unindexed foreign keys across non-Finance schemas and informational unused-index notices; no speculative mass indexing was applied.
 - Supabase Health Advisor has no findings. Security Advisor reports 41 INFO RLS-enabled/no-policy notices across intentionally private, service-role-gated schemas; these are not exposed browser tables.
+
+### 13.17 Fee Engine follow-up hardening and verification — 2026-11-26
+
+- The first full Finance regression run identified two unindexed fee-policy foreign keys (creator user and optional seller scope). Added `finance_fee_policy_fk_indexes`; the full Finance suite then passed.
+- A concurrency review identified that locking activation by draft policy ID alone would not serialize two competing versions. Replaced it with a shared advisory lock on owner organization + policy key + scope + seller scope + currency, then rechecks overlap under lock. Source migration: `20261126073200_fee_policy_activation_serialization`.
+- Re-ran the complete Finance SQL suite after the serialization fix; all assertions passed.
+- Re-ran all five repository SQL regression suites successfully: security baseline, adapter OAuth runtime, Google Drive adapter manifest, capability entitlements and Finance ledger/fee engine.
+- Live inventory: 12 Finance tables, 0 unindexed Finance foreign keys, 0 organizations and 0 Auth users. No fee policies, orders, snapshots or money movement were fabricated.
+- Health Advisor: zero findings. Security Advisor: 41 INFO RLS-enabled/no-policy notices in private schemas. Performance Advisor: 61 unindexed foreign keys across the wider non-Finance project and informational unused indexes; Finance-specific FK coverage is complete.
+- `marketplace-api` remains ACTIVE v21 with `verify_jwt=true`. Tenant-level API execution and end-to-end order→fee→payment→journal validation remain blocked by the empty identity tenant state.

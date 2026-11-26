@@ -6,8 +6,9 @@
 import { AlertOctagon, Coins, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { COST_BUCKETS, COST_TREND, MONTH_SUMMARY } from '../seed';
 import { IconChip, KpiTile, Panel, Pill, ProgressBar, SectionTitle, Sparkline } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
-export function Cost() {
+function DemoCost() {
   const monthlyPct = (MONTH_SUMMARY.monthToDateUsd / MONTH_SUMMARY.monthBudgetUsd) * 100;
   const overBy = MONTH_SUMMARY.monthToDateUsd - MONTH_SUMMARY.monthBudgetUsd;
   const variancePct = ((MONTH_SUMMARY.monthToDateUsd - MONTH_SUMMARY.monthPreviousUsd) / MONTH_SUMMARY.monthPreviousUsd) * 100;
@@ -188,3 +189,11 @@ function Small({ label, value }: { label: string; value: string }) {
 
 // Icons reserved for future breakdowns.
 void TrendingUp; void TrendingDown;
+
+
+export function Cost() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoCost />
+    : <RuntimeUnavailable title="Cost" description="AI inference cost cannot be shown until provider billing or usage-ledger events are connected." />;
+}

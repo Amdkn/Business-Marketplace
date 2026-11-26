@@ -2526,3 +2526,11 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Preview remains protected and is not production. No alias promotion or SSO weakening occurred.
 - This supersedes section 13.54's then-current statement that the latest Preview was QUEUED. The latest branch is now hosted-verified; authenticated browser E2E remains open because no authorized browser interaction was completed.
 - Supabase Free/no-backup and Pro+-gated leaked-password protection blockers remain unchanged. No new identities, tenant rows, documents, connections or commerce data were created.
+
+## 13.56 — Post-verification documentation-only commits — 2026-11-26 21:05 UTC
+
+- Application source verification remains on commit `b7c2b29454b4a47f19705ef68d8053a221de3a83`, whose protected Preview is READY and full `bun run verify` passed (548/548 tests, app/API TypeScript, Vite build, 102/102 benchmarks).
+- Subsequent branch commits after `b7c2b29` are documentation-only updates to Day 1/Day 3 matrices and `supabase/README.md`; they do not alter application source. Current branch head at this handoff refresh: `c78e533869c9c6567647435b438074b717e8e35c`.
+- Vercel has a documentation-only deployment queued for an intermediate docs commit `d17070b`. Do not confuse that queue with the already READY application Preview on `b7c2b29`; no application code changed after the verified app commit.
+- The latest docs reconcile the earlier stale build-rate-limit/QUEUED statements and correct the Day 1 migration-source count (69 ledger entries vs 68 exact sources plus one catalog-derived reconstruction).
+- Remaining gates are unchanged: authenticated browser acceptance; real OAuth and PSP lifecycle; tenant installations and agent runtime; backup/restore (none on current Free project); plan-gated leaked-password protection; load/failure and release/rollback drills.

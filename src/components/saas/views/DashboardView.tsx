@@ -2,13 +2,10 @@
 // Zero Bug Sprint — rewired to use Marketplace tenant schema fields.
 //
 // Bug fixes (D6 #98, D6 #102, D6 #104):
-//   - `client.progress` removed (no DB column) → use a fake "Progress" from
-//     derived status (active = 80, prospect = 20, paused = 50, archived = 100).
+//   - Never synthesize a client progress percentage from status; show persisted status only.
 //   - `client.status` translated via CLIENT_STATUS_LABEL.
 //   - "View Swarm Details" button now navigates to /agents (was dead).
 //   - Added <BackButton /> + EmptyState handling for clients/agents.
-//   - <ProgressBar> replaced by hand-rolled div (component still uses progress
-//     prop, but we derive a number from status for the demo).
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -22,13 +19,6 @@ import { RefreshCw, CheckCircle, Activity, BarChart3, ArrowUpRight, Briefcase, C
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { safeArray, safeStr } from '../lib/safe';
-
-const STATUS_PROGRESS: Record<Client['status'], number> = {
-  active: 80,
-  prospect: 20,
-  paused: 50,
-  archived: 100,
-};
 
 const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'info' | 'danger'> = {
   active: 'success',
@@ -175,7 +165,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             ) : (
               <div className="space-y-4">
                 {clients.slice(0, 3).map((client) => {
-                  const progress = STATUS_PROGRESS[client.status];
                   const initials = safeStr(client.name)
                     .split(' ')
                     .map((n) => n[0] ?? '')
@@ -204,7 +193,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                       <div className="flex-1 max-w-xs w-full lg:px-8">
                         <div className="flex justify-between text-xs mb-2">
                           <span className="text-slate-500">Status weight</span>
-                          <span className="font-medium text-slate-900">{progress}%</span>
+                          <span className="font-medium text-slate-900">{CLIENT_STATUS_LABEL[client.status]}</span>
                         </div>
                         <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
                           <div

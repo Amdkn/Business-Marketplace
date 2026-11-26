@@ -2085,3 +2085,61 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 1. Finish the source-backed CRUD conversion for remaining Operations screens and audit Sales, Product, Growth, Legal and all other Business departments for legacy best-effort mutations or collections without a canonical table.
 2. Complete a CMS collection-to-workspace_data schema compatibility test for every mapped collection, including aliases.
 3. Run frontend typecheck/Vitest/build and authenticated browser tests when a local runner and browser session are available; do not wait on Vercel quota to continue source/database work.
+
+### 13.40 Sales client/deal/invoice integrity and currency-safe commercial flows — 2026-11-26
+
+**Client records**
+- Added nullable workspace_data.clients.currency with ISO 4217 format check. Existing records can remain currency-unknown; new ClientsApp entries require an explicit currency whenever a monthly ticket is entered.
+- ClientsApp no longer pre-fills a USD 1,800 ticket or assumes USD. It no longer assigns a fabricated 100% health score to a newly created client; health remains unknown until measured.
+- Client ticket values render with Intl.NumberFormat only when a valid currency code is present; otherwise the UI explicitly says currency not set.
+- Migration ledger version 20261126110342, name 20261126112000_client_ticket_currency.
+- Source: supabase/migrations/20261126110342_20261126112000_client_ticket_currency.sql.
+
+**Sales deals**
+- Added workspace_data.deals.client_id and currency.
+- Composite FK (organization_id, workspace_id, client_id) → workspace_data.clients(organization_id, workspace_id, id) prevents linking a deal to a client from another organization/workspace.
+- ISO 4217 check permits unknown legacy currency but rejects malformed supplied codes. Added client relation index.
+- Sales Kanban creation now selects an existing workspace client, requires a positive amount and explicit ISO currency, and removes the prefilled USD 1,800 assumption.
+- Sales Kanban and Today detail routes carry clientId, currency and numeric amount into the deal dossier. Amounts are formatted by their actual currency; no dollar symbol is assumed.
+- SalesItemDetail no longer invents a stage-derived win probability. Probability and weighted forecast show Not reported unless a probability value is explicitly persisted.
+- Migration ledger version 20261126105452, name 20261126110500_sales_deal_client_currency.
+- Source: supabase/migrations/20261126105452_20261126110500_sales_deal_client_currency.sql.
+- Test: supabase/tests/sales_deal_client_currency.sql executed against the hosted project without exception.
+
+**Deal-linked invoices and idempotency**
+- Added workspace_data.invoices.deal_id and source_key.
+- Added composite deal FK (organization_id, workspace_id, deal_id) → workspace_data.deals(organization_id, workspace_id, id).
+- Added unique partial index on (organization_id, workspace_id, source_key), plus deal lookup index. The source key used by the Sales UI is deal:<deal-id>:full, preventing duplicate full-deal invoice generation even if the action is submitted twice.
+- Added BEFORE INSERT/UPDATE trigger enforcing that an invoice linked to a deal must use that deal's client_id. The trigger is search_path-pinned and not directly executable by client roles.
+- Both Sales detail entry points now create invoices only for an existing linked workspace client, require a valid deal currency, use strict CMS persistence, and use the same idempotency key. They no longer create duplicate clients or describe invoice creation as payment capture / Mark Paid.
+- Migration ledger version 20261126110128, name 20261126111500_invoice_deal_source_idempotency.
+- Migration ledger version 20261126110518, name 20261126112500_invoice_deal_client_consistency.
+- Sources:
+  - supabase/migrations/20261126110128_20261126111500_invoice_deal_source_idempotency.sql
+  - supabase/migrations/20261126110518_20261126112500_invoice_deal_client_consistency.sql
+- Test: supabase/tests/sales_deal_invoice_link.sql executed against the hosted project without exception.
+
+**Authenticated rollback integration checks**
+- Using the actual active workspace OWNER identity under the authenticated database role, created a temporary client, deal and invoice in one transaction; verified the invoice linked to the same workspace client and deal.
+- A second insert with the same source_key was rejected by the unique index; the transaction observed exactly one invoice for the deal.
+- A separate transaction attempted to invoice a deal against a different client in the same workspace; the invoice/deal consistency trigger rejected it with check_violation.
+- Both transactions were rolled back. Follow-up counts confirmed zero test clients, deals and invoices remain.
+- After the rollback tests, the hosted workspace counts remain: clients=0, deals=0, invoices=0, incidents=0, change_requests=0. No fake business records were left behind.
+
+**CMS mapping compatibility sweep**
+- Parsed the active CMS repository map against information_schema.columns for workspace_data.
+- All 34 mapped collections resolve to an existing workspace_data table (including aliases alerts → incidents and changes → change_requests); every mapped table has the generic title and extra_data columns needed by the mapper.
+- The only app-specific fields without dedicated SQL columns are the alert enrichment/source/riskScore/hypothesis/trace/status fields (and the alerts extraFields bundle); these are intentionally preserved in extra_data. No mapped collection points at a missing table.
+- documents, legal_documents, missions, people_agents, team and activity_events are handled through dedicated repositories rather than the generic CMS collection map.
+
+**Verification and boundaries**
+- Re-ran operations_change_requests.sql, sales_deal_client_currency.sql and sales_deal_invoice_link.sql; each structural assertion block returned no exception.
+- Supabase security advisor produced no new finding for the touched clients/deals/invoices/incidents/change_requests tables. Performance advisor reported no missing new FK indexes for these additions; it reports unused indexes on empty workspace tables, expected while this tenant contains no business rows. Existing dashboard-schema findings and leaked-password-protection warning remain outside this change set.
+- These are hosted SQL/schema and rollback integration checks, not React/browser E2E. TypeScript, Vitest and Vite build remain NOT RUN because the connected Desktop Commander device is offline and Vercel is still at build-rate-limit.
+- Latest observed code commit: 2974097e95b69dc80fbaaee5e9109914c9aca424. Its only returned status is Vercel build-rate-limit; GitHub Actions returned no workflow run. No Vercel deployment attempt was made.
+- PR #1 remains OPEN / DRAFT. Day 1–3 remain OPEN until frontend CI/build and authenticated browser CRUD/cross-workspace acceptance are completed.
+
+**Next continuation**
+1. Continue auditing and converting the remaining business app forms to strict persisted CRUD; specifically inspect any Garden or secondary entry point that can create/update deals, invoices or clients outside the primary Sales/Finance apps.
+2. Add browser tests for the authenticated workspace flow: client → deal → invoice, duplicate source_key rejection, and cross-workspace FK/RLS denial.
+3. Finish the full UI/TypeScript test run when a local runner is available. Continue source/database work independently of Vercel quota.

@@ -301,3 +301,12 @@ The Garden Mission Board maps to `workspace_data.missions`, not `workspace_data.
 Latest SQL verification: `marketplace_security_baseline.sql`, `marketplace_interface_persistence.sql`, `adapter_oauth_runtime.sql`, `google_drive_adapter_manifest.sql`, `marketplace_capability_entitlements.sql` and `marketplace_finance_ledger.sql` all pass against the hosted project. The authenticated workspace-context RPC was also exercised under the `authenticated` database role and returned the expected first tenant context. A transaction-scoped CRUD probe was rolled back; no probe row remains.
 
 Validation is not full browser acceptance: no live browser JWT E2E, cross-workspace browser denial, TypeScript/Vitest/Vite build, or new Vercel deployment has been verified in this tranche. Do not mark Day 1–3 accepted until those gates pass.
+
+
+## Latest full application verification — 2026-11-26
+
+GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) passed on application commit [dfc3554](https://github.com/Amdkn/Business-Marketplace/commit/dfc3554b6f35c782d23b8b7721da5a7c2264c9eb): frozen Bun install, app + Node TypeScript, API TypeScript, Vitest (53 files / 548 tests), Vite build, kernel 27/27, bridge 20/20, adapters 39/39 and RBAC 16/16 (102/102 benchmark tests). This supersedes the earlier run 45855710702 as the latest full CI evidence.
+
+The separate Vercel commit status is currently `failure` with target URL `build-rate-limit`. Treat this as a deployment quota blocker, not as evidence that the source build failed. No Preview for the latest commit is verified. Preview SSO remains enabled; do not promote production or weaken access controls to bypass the blocker.
+
+The current hosted tenant inventory is one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. Do not manufacture a second identity or tenant. The absence of installations, provider connections, agent principals, listings, orders and payment activity remains the actual operational state.

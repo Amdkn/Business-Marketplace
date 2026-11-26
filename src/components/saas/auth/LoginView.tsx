@@ -37,7 +37,7 @@ export const LoginView: React.FC = () => {
             <Shield strokeWidth={2.5} className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">OMK Services</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">A'Space Marketplace</h1>
             <span className="text-xs text-slate-500 font-medium tracking-wide">BUSINESS OS</span>
           </div>
         </div>

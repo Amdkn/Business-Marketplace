@@ -192,9 +192,9 @@ export function OperationsApp() {
         severity: composerSeverity,
         enrichment: 'raw',
         source: composerSource.trim() || 'manual · ops',
-        riskScore: 'Not assessed',
-        hypothesis: 'À qualifier lors du triage.',
-        trace: 'Not attached',
+        riskScore: null,
+        hypothesis: null,
+        trace: null,
         status: 'open',
       });
       if (result.ok) {

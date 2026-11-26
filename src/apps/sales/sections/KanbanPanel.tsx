@@ -116,7 +116,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
   const otherDeals = deals.filter((d) => !knownStageSet.has(String(d.stage)));
   const hasOther = otherDeals.length > 0;
 
-  const allColumns: { title: string; accent: string; items: { id: string; stage: string; clientName: string; offer: string; value: number; currency: string }[] }[] = DEAL_STAGES.map((stage) => ({
+  const allColumns: { title: string; accent: string; items: { id: string; stage: string; clientName: string; clientId: string; offer: string; value: number; currency: string }[] }[] = DEAL_STAGES.map((stage) => ({
     title: stage,
     accent: stage === 'Won' ? WIN : stage === 'Lost' ? LOSE : stage === 'Proposal' ? ACCENT : RELANCE,
     items: deals
@@ -125,6 +125,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
         id: String(d.id),
         stage: String(d.stage),
         clientName: String(d.client ?? d.title ?? 'Untitled'),
+        clientId: String(d.clientId ?? ''),
         offer: String(d.offer ?? ''),
         value: Number(d.value ?? 0),
         currency: String(d.currency ?? ''),
@@ -159,6 +160,9 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
           onClick={() => onSelect({
             id: d.id,
             kind: 'deal',
+            clientId: d.clientId,
+            currency: d.currency,
+            amount: d.value,
             title: d.clientName,
             subtitle: d.offer,
             status: d.stage,

@@ -87,6 +87,8 @@ LD01 Business has its own delegation structure, which must not be mistaken for t
 
 This B1/B2/B3 hierarchy is internal to LD01. It does not label, number or replace the eight Marketplace operating departments.
 
+The canonical LD01 hierarchy is persisted in `areas.holon_blueprints` (17 reference records) and exposed through the public read-only `list_holon_blueprints` API action. The Control Plane loads the B1/B2/B3 detail from that API instead of treating the hard-coded UI arrays as the source of truth. Each B3 record carries the source-grounded invariant of seven specialists plus a required operational runbook. The individual specialist identities are not invented or stored by this registry.
+
 The six Marketplace market surfaces identified by the V5 Day 1 core are another separate dimension; this Control Plane does not reinterpret them as departments, Areas OS portfolios or LD01 holons.
 
 The Marketplace department registry, Areas OS portfolio registry and LD01 holarchy may connect through explicit project, ownership, capability and reporting relationships, but must retain independent identities and lifecycle semantics.

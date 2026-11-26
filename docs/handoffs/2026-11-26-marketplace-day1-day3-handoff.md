@@ -1450,3 +1450,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Rechecked the RLS advisor findings against effective privileges: zero policy-less internal tables had effective table privileges for anon or authenticated. Do not add permissive policies just to clear the INFO linter.
 - The latest Vercel deployment for the code/documentation checkpoint was observed in state BUILDING; GitHub Vercel status remained pending. No READY claim is made.
 - PR #1 remains OPEN / DRAFT. No Auth user or tenant fixture was created. The next Day 1 acceptance dependency is a real authorized signup/confirmation/sign-in journey; the project currently has no custom SMTP configured and no Auth users.
+
+### 13.8 Continuation verification — 2026-11-26 06:10 UTC
+
+- Re-read the full Day 1–3 handoff and reconciled it with the current live migration registry and repository inventory.
+- Live migration registry: 25 entries. Repository: 25 corresponding source files. The 20261126041718 / revoke_public_execution_rls_auto_enable entry has a tracked catalog-derived ACL reconstruction; exact original historical SQL provenance remains unavailable. This is not an active privilege-state gap and the reconstruction must not be replayed.
+- Re-executed the four canonical SQL regression suites against the existing swegnrvaxxgfrnshdpxx project using the linked Aspace marketplace account. All four completed without assertion exceptions: security baseline, adapter OAuth runtime, Google Drive draft manifest, and Marketplace capability entitlements.
+- Rechecked Supabase Health advisor: no findings. Security advisor still reports 29 INFO RLS-without-policy notices, triaged against effective browser-role privileges in the security baseline. Performance advisor reports 61 INFO unindexed-FK and 50 INFO unused-index notices; no blind index changes were made.
+- Vercel deployment for exact PR HEAD b4be9cae141031af638124c4c17a9baa013a16eb is READY: https://business-marketplace-orzyjv9b5-amd-lab.vercel.app. This is a successful deployment observation, not Day 1–3 acceptance.
+- GitHub PR-triggered workflow lookup for this exact commit returned no workflow runs. No separate GitHub CI success is claimed.
+- PR #1 remains OPEN / DRAFT. The current concrete Day 1 blocker remains real Auth signup/confirmation/sign-in: email/password and confirmation are enabled, but no custom SMTP is configured and there are no Auth users. No synthetic user or tenant was created.
+- Next implementation sequence: inspect Auth/email configuration and application error handling; establish the real signup delivery path using owner-provided SMTP credentials or a supported provider connection; then run the authenticated organization → workspace → domain/department/holon installation journey. Continue Day 2 commercial lifecycle and Day 3 cores/runtime/workflows/Control Tower without reducing scope.

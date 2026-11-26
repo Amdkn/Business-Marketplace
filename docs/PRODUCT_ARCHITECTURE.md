@@ -337,3 +337,5 @@ Fee policy activation uses a logical-identity advisory lock across competing ver
 
 
 Fee policy activation is serialized by owner/key/scope/seller/currency, so concurrent draft-version activations cannot race past the effective-window overlap check. Fee-policy foreign keys are indexed.
+
+Captured payment accounting now bridges provider-confirmed capture → immutable fee snapshot → double-entry journal. The posting action allocates gross to PSP clearing, seller payable and platform fee revenue and delegates to the journal's idempotent immutable posting boundary. Refunds remain separate accounting events.

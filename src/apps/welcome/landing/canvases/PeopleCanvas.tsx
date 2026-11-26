@@ -1,4 +1,4 @@
-/** OMK People canvas — horizontal 12-week cohort timeline + seat cards.
+/** A’Space People canvas — horizontal 12-week cohort timeline + seat cards.
  *
  *  Why this layout, not the landing template:
  *  People & Scalabilité is about the journey from 1:1 to 200 seats without
@@ -269,7 +269,7 @@ export function PeopleCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

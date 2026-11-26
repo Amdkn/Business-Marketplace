@@ -72,6 +72,17 @@ begin
   ) then
     raise exception 'workspace_data contains an unindexed foreign key';
   end if;
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname='identity'
+      and indexname='agent_delegations_one_active_scope_uidx'
+      and indexdef like '%UNIQUE INDEX%'
+  ) then
+    raise exception 'Canonical active agent delegation uniqueness index is missing';
+  end if;
+  if position('ap.principal_status = ''ACTIVE''' in pg_get_functiondef('workspace_data.validate_mission_agent_delegation()'::regprocedure)) = 0 then
+    raise exception 'Mission agent guard does not reject inactive principals';
+  end if;
   if exists(select 1 from information_schema.tables where table_schema='workspace_data' and table_name like 'demo_coach_%') then
     raise exception 'demo-only collections must not have tenant persistence tables';
   end if;

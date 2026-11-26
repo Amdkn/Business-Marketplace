@@ -144,3 +144,7 @@ Do not interpret the presence of templates as tenant provisioning, financial act
 
 ### Finance authorization alignment — 2026-11-26
 The Finance actions now use a dedicated API authorization helper for S0_SOVEREIGN, B1_CEO, B2_MANAGER and B2.2 Treasury roles. This matches the SQL authorization boundary. marketplace-api is ACTIVE v20 with verify_jwt=true.
+
+## Fee Policy Engine — 2026-11-26
+
+Two private Finance tables now define versioned fee policy terms and immutable order fee snapshots. The fee engine supports platform-wide or seller-scoped commissions, basis-point percentage rates, fixed fees, optional floors/caps, explicit currency rounding, effective windows and draft/active/retired policy lifecycle. Activated terms and applied order snapshots are immutable. There is no seeded commission rate; an authorized Finance operator must create and activate a policy. Edge actions: `create_fee_policy`, `activate_fee_policy`, `apply_order_fee_policy`. See `docs/FINANCE_LEDGER_CONTRACT.md`.

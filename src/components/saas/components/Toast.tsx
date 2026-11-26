@@ -1,5 +1,5 @@
 // src/components/Toast.tsx
-// Auto-dismiss toast notification (success / info / error). 2.5s timeout, OMK palette.
+// Auto-dismiss toast notification (success / info / error). 2.5s timeout, Marketplace palette.
 
 import React from 'react';
 import { CheckCircle2, Info, AlertCircle, X } from 'lucide-react';

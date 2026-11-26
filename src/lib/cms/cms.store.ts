@@ -270,6 +270,13 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const current = get().itemsByTenant[tenantId]?.[collectionId]?.find((item) => item.id === id);
     if (!current) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
     const updated: CmsItemTenant = { ...current, ...patch, tenant_id: tenantId };
+    // The explicit Coach demo tenant is intentionally memory-only. Keep the
+    // same persisted-method contract for shared UI components without ever
+    // sending demo rows to the Marketplace workspace repository.
+    if (tenantId === TENANT_DEMO_COACH) {
+      get().updateItemFor(tenantId, collectionId, id, patch);
+      return { ok: true, item: updated };
+    }
     try {
       await repoUpsertItemRequired(collectionId, updated);
       set((state) => {
@@ -327,6 +334,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     const def = get().collectionsByTenant[tenantId]?.[collectionId];
     if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    if (tenantId === TENANT_DEMO_COACH) return get().addItemFor(tenantId, collectionId, partial);
     const id = makeId(collectionId);
     const item: CmsItemTenant = { id, tenant_id: tenantId, ...partial };
     try {
@@ -390,6 +398,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     const def = get().collectionsByTenant[tenantId]?.[collectionId];
     if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    if (tenantId === TENANT_DEMO_COACH) return get().removeItemFor(tenantId, collectionId, id);
     const current = get().itemsByTenant[tenantId]?.[collectionId] ?? [];
     if (!current.some((item) => item.id === id)) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
     try {

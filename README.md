@@ -52,7 +52,7 @@ Navigation is a target contract. Existing template applications are not automati
 
 The first-class hierarchy is:
 
-`Organization → Workspace → Installed structure → Domain/Department → Capability → Installation`
+`Organization → Workspace → Installed structure → (Business Department OR tenant Domain) → Capability → Installation`
 
 Do not collapse the two distinct A’Space taxonomy axes:
 
@@ -129,12 +129,15 @@ Rules:
 - [x] Vercel production project connected and baseline deployment verified.
 - [x] Marketplace Supabase URL and public client key configured in Vercel environments.
 - [x] Coach schema adoption migration applied additively to Marketplace Supabase (no source rows copied).
-- [ ] Product identity and navigation separated from Coach OS legacy.
-- [ ] Domain registry and capability model implemented.
-- [ ] Adapter registry, connection lifecycle and health model implemented.
+- [x] Independent Marketplace identity and Control Plane navigation; inherited Coach auth/session bridge remains explicitly isolated for the next refactor.
+- [x] Global B2.1–B2.8 / LD01–LD08 blueprint registry persisted in Supabase and served through a read-only API.
+- [x] Public published-listing read path connected; current catalogue correctly returns zero published offers.
+- [x] Four platform-core foundations represented in the Control Plane.
+- [ ] Tenant-owned domain/department installation, ownership and dependency graph.
+- [ ] Adapter registry, connection lifecycle, secrets references and health model.
 - [ ] Organization/workspace provisioning and authorization verified end-to-end.
-- [ ] Marketplace installation lifecycle connected to backend.
-- [ ] Production authentication redirects verified against deployed routes.
+- [ ] Marketplace capability installation and order lifecycle connected to the frontend.
+- [ ] Production signup/email delivery and browser authentication verified.
 - [ ] E2E tests for tenant isolation, adapter permissions and install lifecycle.
 
 ## Engineering principles

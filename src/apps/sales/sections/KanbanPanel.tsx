@@ -54,10 +54,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
     }
   };
 
-  /** Compose a new deal inline. The coach enters the client name, picks an
-   *  offer and a value; the stage defaults to "Qualified" (first stage) so
-   *  the new card lands in the leftmost column of the kanban. The mutation
-   *  flows through addItem so the new row appears without a refresh. */
+  /** Create a deal linked to an existing workspace client with an explicit currency. */
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerClientId, setComposerClientId] = useState('');
   const [composerOffer, setComposerOffer] = useState<'Citadelle' | 'Programme'>('Citadelle');
@@ -212,10 +209,10 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
             title: d.clientName,
             subtitle: d.offer,
             status: d.stage,
-            summary: `Deal valued at $${d.value.toLocaleString('en-US')}. Move forward to track progress.`,
+            summary: `Deal value: ${formatDealValue(d.value, d.currency)}. Move forward to track progress.`,
             fields: [
               { label: 'Offer', value: d.offer },
-              { label: 'Value', value: `$${d.value.toLocaleString('en-US')}` },
+              { label: 'Value', value: formatDealValue(d.value, d.currency) },
               { label: 'Stage', value: d.stage },
             ],
           })}

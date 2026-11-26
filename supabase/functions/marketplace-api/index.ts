@@ -76,6 +76,82 @@ async function listOrganizations(user: User) {
     ORDER BY o.created_at ASC
   `);
 }
+async function getSettings(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id', 64);
+  const row = await withServiceRole(async (tx) => {
+    const rows = await tx`
+      SELECT p.display_name, o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      LEFT JOIN identity.profiles p ON p.id = ${user.id}::uuid
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!rows.length) throw new Error('Active organization membership required');
+    return rows[0];
+  });
+  return { ...row, email: user.email ?? null };
+}
+
+async function updateSettings(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id', 64);
+  const hasDisplayName = body.display_name !== undefined;
+  const hasOrganizationName = body.organization_name !== undefined;
+  if (!hasDisplayName && !hasOrganizationName) throw new Error('No settings fields supplied');
+
+  const displayName = hasDisplayName ? requiredString(body.display_name, 'display_name', 120) : null;
+  const organizationName = hasOrganizationName ? requiredString(body.organization_name, 'organization_name', 120) : null;
+
+  const row = await withServiceRole(async (tx) => {
+    const membership = await tx`
+      SELECT o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!membership.length) throw new Error('Active organization membership required');
+
+    if (displayName !== null) {
+      await tx`
+        INSERT INTO identity.profiles (id, display_name)
+        VALUES (${user.id}::uuid, ${displayName})
+        ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name
+      `;
+    }
+
+    if (organizationName !== null && organizationName !== membership[0].organization_name) {
+      await requireOrgRole(tx, user.id, organizationId);
+      await tx`
+        UPDATE identity.organizations
+        SET name = ${organizationName}
+        WHERE id = ${organizationId}::uuid
+      `;
+    }
+
+    const updated = await tx`
+      SELECT p.display_name, o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      LEFT JOIN identity.profiles p ON p.id = ${user.id}::uuid
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!updated.length) throw new Error('Unable to reload saved settings');
+    return updated[0];
+  });
+  return { ...row, email: user.email ?? null };
+}
+
 async function listAdapterFamilies() {
   return await withServiceRole(async (tx) => {
     return await tx`
@@ -1218,6 +1294,8 @@ Deno.serve(async (req: Request) => {
     const user = await authenticate(req);
     let data: unknown;
     switch (action) {
+      case 'get_settings': data = await getSettings(user, body); break;
+      case 'update_settings': data = await updateSettings(user, body); break;
       case 'list_organizations': data = await listOrganizations(user); break;
       case 'list_workspaces': data = await listWorkspaces(user, body); break;
       case 'list_workspace_members': data = await listWorkspaceMembers(user, body); break;

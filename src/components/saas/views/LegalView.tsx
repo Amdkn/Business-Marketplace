@@ -13,14 +13,11 @@ import { Badge } from '../components/Badge';
 import { legalDocsRepo } from '../data/legal-docs.repo';
 import type { LegalDoc } from '../lib/types';
 import { LEGAL_STATUS_LABEL } from '../lib/statusLabels';
-import { useToast } from '../contexts/ToastContext';
 import { useOrg } from '../lib/tenant';
-import { FileText, File, CheckCircle, Clock, FileEdit, ShieldCheck, Lock, Download, Plus, RefreshCw } from 'lucide-react';
+import { FileText, File, CheckCircle, Clock, FileEdit, Lock, Download, RefreshCw } from 'lucide-react';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { formatDate, safeArray } from '../lib/safe';
-
-const COMPLIANCE_SCORE = 100;
 
 const statusVariant = (s: LegalDoc['status']): 'success' | 'warning' | 'default' => {
   if (s === 'Signed') return 'success';
@@ -30,7 +27,6 @@ const statusVariant = (s: LegalDoc['status']): 'success' | 'warning' | 'default'
 
 export const LegalView: React.FC = () => {
   const { isMissing } = useOrg();
-  const { showToast } = useToast();
   const [docs, setDocs] = useState<LegalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +66,12 @@ export const LegalView: React.FC = () => {
             </span>
           )}
           <button
-            onClick={() => showToast('Upload UI coming in D2.', 'info')}
-            className="flex items-center gap-2 px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm"
+            type="button"
+            disabled
+            title="Supabase Storage upload is not configured for legal documents."
+            className="flex items-center gap-2 px-3 py-2 bg-stone-100 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
           >
-            <Plus className="w-4 h-4" /> Upload Document
+            Upload unavailable
           </button>
           <button
             onClick={load}
@@ -83,7 +81,7 @@ export const LegalView: React.FC = () => {
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs font-bold shadow-sm">
             <ShieldCheck className="w-4 h-4" />
-            <span>Encrypted Vault Active</span>
+            <span>Workspace RLS active</span>
           </div>
         </div>
       </div>
@@ -108,13 +106,13 @@ export const LegalView: React.FC = () => {
                 <h3 className="font-semibold text-slate-700 flex items-center gap-2">
                   <Lock className="w-4 h-4 text-slate-400" /> Documents
                 </h3>
-                <span className="text-xs text-slate-500 font-medium">{list.length} files stored</span>
+                <span className="text-xs text-slate-500 font-medium">{list.length} document records</span>
               </div>
 
               {list.length === 0 ? (
                 <EmptyState
                   title="No legal documents yet"
-                  description="Upload your first contract or KBIS to get started."
+                  description="No legal document records exist in this workspace. Upload remains unavailable until private file storage is configured."
                 />
               ) : (
                 <div className="divide-y divide-stone-100">
@@ -155,7 +153,7 @@ export const LegalView: React.FC = () => {
                         </Badge>
                         <button
                           disabled
-                          title="Available next sprint"
+                          title="No private file object is connected to this document."
                           className="text-slate-300 p-1 cursor-not-allowed"
                           aria-label={`Download ${doc.title}`}
                         >
@@ -168,8 +166,8 @@ export const LegalView: React.FC = () => {
               )}
 
               <div className="bg-stone-50 p-3 border-t border-stone-100 text-center">
-                <button className="text-xs text-slate-500 hover:text-emerald-700 font-medium transition-colors">
-                  View Archived Documents
+                <button type="button" disabled title="Document archive lifecycle is not implemented." className="text-xs text-slate-400 cursor-not-allowed">
+                  Archive view unavailable
                 </button>
               </div>
             </Card>
@@ -177,31 +175,13 @@ export const LegalView: React.FC = () => {
 
           <div className="lg:col-span-1">
             <Card className="p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">
-                Compliance Score
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+                Compliance Assessment
               </h3>
-              <div className="relative w-32 h-32 flex items-center justify-center mb-6">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-stone-100" />
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    strokeDasharray="351.86"
-                    strokeDashoffset={351.86 * (1 - COMPLIANCE_SCORE / 100)}
-                    className="text-emerald-500 transition-all duration-1000 ease-out"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-3xl font-bold text-emerald-700">{COMPLIANCE_SCORE}%</span>
-                </div>
-              </div>
-              <p className="text-sm text-slate-500">Your agency is fully compliant with current regulations.</p>
-              <button className="mt-6 w-full py-2.5 bg-stone-50 border border-stone-200 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-xl text-sm font-bold transition-all shadow-sm">
-                Run Audit
+              <div className="text-2xl font-semibold text-slate-500 mb-4">Not assessed</div>
+              <p className="text-sm text-slate-500">No evidence inventory or compliance audit engine is connected. The workspace compliance status is unknown.</p>
+              <button type="button" disabled title="No compliance audit engine is connected." className="mt-6 w-full py-2.5 bg-stone-100 border border-stone-200 text-slate-400 rounded-xl text-sm font-bold cursor-not-allowed">
+                Audit unavailable
               </button>
             </Card>
           </div>

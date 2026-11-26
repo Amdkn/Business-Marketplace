@@ -16,10 +16,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
-import { useToast } from '../contexts/ToastContext';
 import { documentsRepo } from '../data/documents.repo';
 import type { Document } from '../lib/types';
-import { FileText, Search, Eye, Download, Send } from 'lucide-react';
+import { FileText, Search, Eye, Download } from 'lucide-react';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { formatDate, safeArray, safeStr } from '../lib/safe';
@@ -30,8 +29,6 @@ export const DocumentsView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [viewTarget, setViewTarget] = useState<Document | null>(null);
-  const [signatureTarget, setSignatureTarget] = useState<Document | null>(null);
-  const { showToast } = useToast();
 
   useEffect(() => {
     documentsRepo
@@ -48,13 +45,6 @@ export const DocumentsView: React.FC = () => {
       safeStr(d.title).toLowerCase().includes(q),
     );
   }, [documents, search]);
-
-  const handleConfirmSignature = (): void => {
-    if (!signatureTarget) return;
-    const target = signatureTarget;
-    setSignatureTarget(null);
-    showToast(`No e-sign provider is connected. No signature request was sent for "${target.title}".`, 'error');
-  };
 
   if (loading) {
     return (
@@ -86,7 +76,7 @@ export const DocumentsView: React.FC = () => {
         </div>
         <button
           disabled
-          title="Upload available next sprint"
+          title="Supabase Storage upload is not configured for this workspace."
           className="flex items-center gap-2 bg-stone-100 text-slate-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
         >
           <Download className="w-4 h-4 rotate-180" /> Upload
@@ -169,16 +159,18 @@ export const DocumentsView: React.FC = () => {
                   </button>
                   <button
                     disabled
-                    title="Available next sprint"
+                    title="No private storage object is connected to this document."
                     className="px-3 py-1.5 flex items-center gap-2 text-sm font-medium text-slate-400 bg-stone-50 border border-stone-200 rounded cursor-not-allowed opacity-60"
                   >
                     <Download className="w-4 h-4" /> Download
                   </button>
                   <button
-                    onClick={() => setSignatureTarget(doc)}
-                    className="px-3 py-1.5 flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors"
+                    type="button"
+                    disabled
+                    title="No e-sign provider is connected; no signature request can be sent."
+                    className="px-3 py-1.5 flex items-center gap-2 text-sm font-medium text-slate-400 bg-stone-50 rounded cursor-not-allowed"
                   >
-                    <Send className="w-4 h-4" /> Request Signature
+                    Request Signature unavailable
                   </button>
                 </div>
               </div>
@@ -233,37 +225,6 @@ export const DocumentsView: React.FC = () => {
         )}
       </Modal>
 
-      <Modal
-        open={signatureTarget !== null}
-        onClose={() => setSignatureTarget(null)}
-        title="E-sign integration unavailable"
-        size="sm"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setSignatureTarget(null)}
-              className="bg-white border border-stone-200 text-slate-700 hover:bg-stone-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmSignature}
-              className="bg-emerald-500 text-white hover:bg-emerald-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >
-              Close
-            </button>
-          </>
-        }
-      >
-        {signatureTarget && (
-          <p className="text-sm text-slate-600 leading-relaxed">
-            No e-sign provider is connected. This document cannot be sent for signature yet.
-            Connect an e-sign provider before creating a real signature request.
-          </p>
-        )}
-      </Modal>
     </div>
   );
 };

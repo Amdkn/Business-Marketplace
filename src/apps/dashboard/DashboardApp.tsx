@@ -31,9 +31,9 @@
  * rendu sans crash si la collection `clients` est vide ; chaque mutation
  * pousse un toast (succès ou erreur) via `useShellStore.addToast`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
-  AlertTriangle, BarChart3, Bot, Building2, Clock, Compass, GitBranch,
+  AlertTriangle, BarChart3, Bot, Building2, Compass, GitBranch,
   History, LayoutDashboard, ListChecks, MessageSquare, Pin, ScrollText,
   Sparkles, Wallet, Wind,
 } from 'lucide-react';
@@ -41,7 +41,6 @@ import { AppFrame, SectionHead, type AppSection } from '../../components/AppFram
 import { useCmsStore } from '../../lib/cms/cms.store';
 import type { CmsItem } from '../../lib/cms/types';
 import { useShellStore } from '../../stores/shell.store';
-import { useWindowPage } from '../../contexts/WindowContext';
 import { useCollectionDrill } from '../../hooks/useCollectionDrill';
 import { AppDetailOverlay } from '../../components/cms/AppDetailOverlay';
 import { FleetItemCard, FleetItemGrid } from '../_ui/FleetItemCard';
@@ -56,8 +55,6 @@ import { Sessions } from './dashboard/sections/Sessions';
 import { Usage } from './dashboard/sections/Usage';
 import { Cost } from './dashboard/sections/Cost';
 import { AuditLog } from './dashboard/sections/AuditLog';
-import { AgentDetailPage } from './dashboard/sections/AgentDetail';
-import { useDashboardAgents } from './dashboard/cmsAgents';
 import { ACCENT } from './dashboard/Primitives';
 // Modules de sections livres par les vagues 2 et 3, chacune cloisonnee dans son
 // dossier pour pouvoir travailler en parallele sans conflit sur ce fichier.
@@ -178,14 +175,6 @@ export function DashboardApp() {
   const openApp = useShellStore((s) => s.openApp);
   const addToast = useShellStore((s) => s.addToast);
 
-  // Agent detail overlay — opened by clicking an agent card. The list now
-  // comes from the CMS partition (useDashboardAgents) so creating / deleting
-  // an agent from the Agents section propagates here without re-mounting.
-  const [openAgentId, setOpenAgentId] = useState<string | null>(null);
-  const { setDetail: setWindowDetail } = useWindowPage();
-  const dashboardAgents = useDashboardAgents();
-  const openAgent = openAgentId ? dashboardAgents.find((a) => a.id === openAgentId) ?? null : null;
-
   // Clients drill — Pipeline cards open a client detail overlay.
   // We pick the labels Dashboard uses so the breadcrumb segment is consistent.
   const clientsDrill = useCollectionDrill('clients', ['Client Pipeline']);
@@ -202,22 +191,6 @@ export function DashboardApp() {
   const openClientIndex = openClient ? clients.findIndex((c) => c.id === openClient.id) : -1;
   const prevClient = openClientIndex > 0 ? clients[openClientIndex - 1] : undefined;
   const nextClient = openClientIndex >= 0 && openClientIndex < clients.length - 1 ? clients[openClientIndex + 1] : undefined;
-
-  // Breadcrumb publisher: ONE source of truth per overlay. Both `openAgent`
-  // and `openClient` cannot be visible simultaneously in practice (clicking
-  // one dismisses the other) so we let agent win. `setWindowDetail` was
-  // previously fighting the `useCollectionDrill` publisher on the same
-  // window — the fix collapses the state into the drill for clients, and
-  // keeps the manual publisher only for the agent overlay.
-  useEffect(() => {
-    if (openAgent) {
-      setWindowDetail({ label: openAgent.name, onBack: () => setOpenAgentId(null) });
-    }
-    // No else: when openAgent is null but openClient is set, the drill is
-    // already publishing the crumb through `setDetail`. Setting it again
-    // here would race the drill and produce the double `onBack` described
-    // in the SOCLE_ACQUIS. When both are null, the drill's effect clears it.
-  }, [openAgent, setWindowDetail]);
 
   const weightOf = (c: (typeof clients)[number]): number => Number(c.health ?? (c.status === 'Onboarding' ? 45 : 20));
 
@@ -720,7 +693,7 @@ export function DashboardApp() {
   const sections: AppSection[] = [
     { id: 'overview',  label: 'Overview',      icon: BarChart3,   render: ({ navigateToSection }) => <Overview navigateToSection={navigateToSection} /> },
     { id: 'cockpit',   label: 'CEO Cockpit',   icon: Compass,     render: CeoCockpit },
-    { id: 'agents',    label: 'Agents',        icon: Bot,         render: () => <Agents onSelect={setOpenAgentId} /> },
+    { id: 'agents',    label: 'Agents',        icon: Bot,         render: () => <Agents /> },
     { id: 'chat',      label: 'Chat',          icon: MessageSquare, render: () => <Chat /> },
     { id: 'playground',label: 'Playground',    icon: Sparkles,    render: () => <Playground /> },
     { id: 'jarvis',    label: 'Jarvis',        icon: Sparkles,    render: () => <Jarvis /> },
@@ -751,16 +724,6 @@ export function DashboardApp() {
         accent={ACCENT}
         sections={sections}
       />
-      {openAgent ? (
-        <AppDetailOverlay
-          appId="dashboard"
-          accent={ACCENT}
-          onBack={() => setOpenAgentId(null)}
-          motion={{ kind: 'pop-scale', durationMs: 200 }}
-        >
-          <AgentDetailPage agent={openAgent} onBack={() => setOpenAgentId(null)} />
-        </AppDetailOverlay>
-      ) : null}
       {openClient && clientsDef ? (
         <AppDetailOverlay
           appId="dashboard"

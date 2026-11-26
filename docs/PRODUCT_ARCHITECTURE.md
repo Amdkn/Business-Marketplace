@@ -51,18 +51,18 @@ Canonical tenant hierarchy:
 
 The Marketplace UI must preserve two separate taxonomic axes:
 
-### 4.1 Business Departments — B2.1 to B2.8
+### 4.1 Business Departments — eight Marketplace operating units
 
-1. B2.1 Product & IP
-2. B2.2 Growth & Distribution
-3. B2.3 People & Talent
-4. B2.4 Legal & Trust
-5. B2.5 Tech & Intelligence
-6. B2.6 Operations & Delivery
-7. B2.7 Finance & Capital
-8. B2.8 Sales & Partnerships
+1. Product & IP
+2. Growth & Distribution
+3. People & Talent
+4. Legal & Trust
+5. Tech & Intelligence
+6. Operations & Delivery
+7. Finance & Capital
+8. Sales & Partnerships
 
-These eight departments describe the Marketplace business operating model and its value-producing functions.
+These eight departments describe the Marketplace business operating model and its value-producing functions. Their stable database identifiers are slugs (for example `product-ip`), not B2 holon codes.
 
 ### 4.2 Areas OS mission portfolios — LD01 to LD08
 
@@ -75,9 +75,21 @@ These eight departments describe the Marketplace business operating model and it
 7. LD07 MC Sandbox
 8. LD08 Civilizer / ABC OS
 
-These eight Areas OS portfolios describe the A’Space mission/portfolio layer. They are not Marketplace departments and must not be represented as children of the B2 departments. LD01 is the Business mission portfolio; B2.1–B2.8 are the department taxonomy within the Marketplace business model.
+These eight Areas OS portfolios describe the A’Space mission/portfolio layer. They are not Marketplace departments.
 
-The two axes can connect through explicit project, ownership, capability and reporting relationships, but must retain independent identities and lifecycle semantics.
+### 4.3 LD01 internal holarchy — B1 / B2 / B3
+
+LD01 Business has its own delegation structure, which must not be mistaken for the Marketplace department list:
+
+- **B1 Book:** OwnerBook for LD01.
+- **B2 — 8 tactical DC Managers:** B2.1 Operations; B2.2 Tresorerie; B2.3 Legal; B2.4 R&D; B2.5 Alliances; B2.6 Infra; B2.7 IT; B2.8 Gouvernance.
+- **B3 — 8 Marvel execution squads:** B3.1 through B3.8, each composed of 7 specialists plus an operational runbook.
+
+This B1/B2/B3 hierarchy is internal to LD01. It does not label, number or replace the eight Marketplace operating departments.
+
+The six Marketplace market surfaces identified by the V5 Day 1 core are another separate dimension; this Control Plane does not reinterpret them as departments, Areas OS portfolios or LD01 holons.
+
+The Marketplace department registry, Areas OS portfolio registry and LD01 holarchy may connect through explicit project, ownership, capability and reporting relationships, but must retain independent identities and lifecycle semantics.
 
 Domains can also depend on other domains and capabilities. Dependencies form a directed graph; parent/child hierarchy and dependency edges are different relations and must not be conflated.
 

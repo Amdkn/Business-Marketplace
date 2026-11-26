@@ -164,10 +164,10 @@ export function FinanceApp() {
       subtitle: String(item.number ?? item.id),
       status: String(item.status ?? 'open'),
       kpis: [
-        { label: 'Amount', value: `$${Number(item.amount ?? 0).toLocaleString()}` },
+        { label: 'Amount', value: formatInvoiceAmount(Number(item.amount ?? 0), String(item.currency ?? '')) },
         { label: 'Status', value: String(item.status ?? 'open') },
-        { label: 'Due', value: String(item.dueDate ?? '—') },
-        { label: 'Issued', value: String(item.issued ?? '—') },
+        { label: 'Due', value: String(item.dueAt ?? item.due ?? '—') },
+        { label: 'Issued', value: String(item.issuedAt ?? item.issued ?? '—') },
       ],
       rows: [
         { label: 'Description', value: String(item.description ?? item.memo ?? '') },
@@ -232,8 +232,9 @@ export function FinanceApp() {
   };
 
   const cancelComposer = (): void => {
-    setComposerClient('');
+    setComposerClientId('');
     setComposerAmount('');
+    setComposerCurrency('');
     setComposerOpen(false);
   };
 
@@ -332,7 +333,7 @@ export function FinanceApp() {
       <div className="p-7">
         <SectionHead
           title="Invoices"
-          subtitle="Reconciled nightly via Stripe"
+          subtitle="Persisted workspace invoices · payment capture and reconciliation are not connected"
           action={
             !composerOpen ? (
               <button
@@ -368,23 +369,18 @@ export function FinanceApp() {
                 >
                   Client
                 </label>
-                <input
+                <select
                   id="invoice-composer-client"
                   autoFocus
-                  value={composerClient}
-                  onChange={(e) => setComposerClient(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewInvoice();
-                    if (e.key === 'Escape') cancelComposer();
-                  }}
-                  placeholder="Ava Chen"
+                  required
+                  value={composerClientId}
+                  onChange={(e) => setComposerClientId(e.target.value)}
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
-                  style={{
-                    background: 'var(--theme-bg)',
-                    border: '1px solid var(--panel-border)',
-                    color: 'var(--theme-text)',
-                  }}
-                />
+                  style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }}
+                >
+                  <option value="">Select a workspace client</option>
+                  {clients.map((client) => <option key={String(client.id)} value={String(client.id)}>{String(client.name ?? client.title ?? client.id)}</option>)}
+                </select>
               </div>
               <div>
                 <label
@@ -392,7 +388,7 @@ export function FinanceApp() {
                   style={{ color: 'var(--theme-text-dim)' }}
                   htmlFor="invoice-composer-amount"
                 >
-                  Amount (USD)
+                  Amount
                 </label>
                 <input
                   id="invoice-composer-amount"
@@ -414,6 +410,14 @@ export function FinanceApp() {
                   }}
                 />
               </div>
+              <div>
+                <label className="block text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ color: 'var(--theme-text-dim)' }} htmlFor="invoice-composer-currency">Currency (ISO 4217)</label>
+                <input id="invoice-composer-currency" required maxLength={3} value={composerCurrency}
+                  onChange={(e) => setComposerCurrency(e.target.value.toUpperCase())} placeholder="USD"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
+                  style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }} />
+
+              </div>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
@@ -428,14 +432,15 @@ export function FinanceApp() {
                 Cancel
               </button>
               <button
-                onClick={submitNewInvoice}
+                onClick={() => void submitNewInvoice()}
+                disabled={savingInvoice || !composerClientId || !composerCurrency.trim()}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Create invoice
+                {savingInvoice ? 'Saving…' : 'Create invoice'}
               </button>
             </div>
           </div>

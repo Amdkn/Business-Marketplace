@@ -244,7 +244,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
           {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} holons={ld01Holons} holonSource={holonSource} />}
           {active === 'adapters' && <AdaptersView />}
           {active === 'marketplace' && <MarketplaceCatalogView />}
-          {active === 'workspaces' && <ComingSoon icon={Building2} title="Organization workspaces" text="Organization provisioning, membership and workspace isolation are being connected to the Marketplace identity model." />}
+          {active === 'workspaces' && <WorkspacesView departments={departments} areas={areas} />}
           {active === 'agents' && <ComingSoon icon={Sparkles} title="Agent directory" text="Agents will be registered with versioned contracts, scoped tools, policy envelopes and auditable execution receipts." />}
           {active === 'workflows' && <ComingSoon icon={Workflow} title="Workflow orchestration" text="Compose adapters, agents and human approvals into idempotent, observable business processes." />}
           {active === 'governance' && <GovernanceView />}
@@ -254,6 +254,205 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
   );
 }
 
+
+type OrganizationRecord = { id: string; organization_key: string; name: string; organization_type: string; status: string };
+type WorkspaceRecord = { id: string; organization_id: string; workspace_key: string; name: string; description: string; workspace_status: string };
+type InstalledStructure = {
+  domains: Array<{ id: string; domain_code: string; domain_name: string; installation_status: string }>;
+  departments: Array<{ id: string; department_key: string; department_name: string; installation_status: string }>;
+  holons: Array<{ id: string; holon_code: string; display_name: string; holon_level: number; installation_status: string }>;
+};
+
+function WorkspacesView({ departments, areas }: { departments: Domain[]; areas: Domain[] }) {
+  const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
+  const [organizationId, setOrganizationId] = useState('');
+  const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
+  const [workspaceId, setWorkspaceId] = useState('');
+  const [structure, setStructure] = useState<InstalledStructure>({ domains: [], departments: [], holons: [] });
+  const [domainCodes, setDomainCodes] = useState<string[]>([]);
+  const [departmentKeys, setDepartmentKeys] = useState<string[]>([]);
+  const [includeLd01Holarchy, setIncludeLd01Holarchy] = useState(true);
+  const [organizationName, setOrganizationName] = useState('');
+  const [organizationKey, setOrganizationKey] = useState('');
+  const [organizationType, setOrganizationType] = useState('INTERNAL_VENTURE');
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [workspaceKey, setWorkspaceKey] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const loadStructure = async (orgId: string, wsId: string) => {
+    if (!orgId || !wsId) { setStructure({ domains: [], departments: [], holons: [] }); return; }
+    const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', { body: { action: 'list_workspace_structure', organization_id: orgId, workspace_id: wsId } });
+    if (invokeError) throw invokeError;
+    if (!data?.data || !Array.isArray(data.data.domains) || !Array.isArray(data.data.departments) || !Array.isArray(data.data.holons)) throw new Error('Invalid installed structure response');
+    setStructure(data.data as InstalledStructure);
+  };
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        if (!supabaseConfigured) throw new Error('Marketplace backend is not configured in this preview.');
+        const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', { body: { action: 'list_organizations' } });
+        if (invokeError) throw invokeError;
+        if (!Array.isArray(data?.data)) throw new Error('Invalid organization response');
+        if (alive) {
+          const rows = data.data as OrganizationRecord[];
+          setOrganizations(rows);
+          setOrganizationId(rows[0]?.id ?? '');
+        }
+      } catch (cause) {
+        if (alive) setError(cause instanceof Error ? cause.message : 'Unable to load organizations.');
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!organizationId) { setWorkspaces([]); setWorkspaceId(''); setStructure({ domains: [], departments: [], holons: [] }); return; }
+    let alive = true;
+    void (async () => {
+      try {
+        const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', { body: { action: 'list_workspaces', organization_id: organizationId } });
+        if (invokeError) throw invokeError;
+        if (!Array.isArray(data?.data)) throw new Error('Invalid workspace response');
+        if (alive) {
+          const rows = data.data as WorkspaceRecord[];
+          setWorkspaces(rows);
+          setWorkspaceId(rows[0]?.id ?? '');
+        }
+      } catch (cause) { if (alive) setError(cause instanceof Error ? cause.message : 'Unable to load workspaces.'); }
+    })();
+    return () => { alive = false; };
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (!organizationId || !workspaceId) { setStructure({ domains: [], departments: [], holons: [] }); return; }
+    let alive = true;
+    void (async () => {
+      try {
+        const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', { body: { action: 'list_workspace_structure', organization_id: organizationId, workspace_id: workspaceId } });
+        if (invokeError) throw invokeError;
+        if (!data?.data) throw new Error('Invalid installed structure response');
+        if (alive) setStructure(data.data as InstalledStructure);
+      } catch (cause) { if (alive) setError(cause instanceof Error ? cause.message : 'Unable to load installed structure.'); }
+    })();
+    return () => { alive = false; };
+  }, [organizationId, workspaceId]);
+
+  const createOrganization = async () => {
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const key = organizationKey.trim().toUpperCase();
+      const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', {
+        body: { action: 'create_organization', name: organizationName.trim(), organization_key: key, organization_type: organizationType },
+      });
+      if (invokeError) throw invokeError;
+      if (!data?.data?.id) throw new Error('Organization was not created.');
+      const created = data.data as OrganizationRecord;
+      setOrganizations(current => [...current, created]);
+      setOrganizationId(created.id);
+      setNotice('Organization created. Create its first workspace to continue.');
+      setOrganizationName(''); setOrganizationKey('');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Organization creation failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const createWorkspace = async () => {
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', {
+        body: { action: 'create_workspace', organization_id: organizationId, workspace_key: workspaceKey.trim().toLowerCase(), name: workspaceName.trim() },
+      });
+      if (invokeError) throw invokeError;
+      if (!data?.data?.id) throw new Error('Workspace was not created.');
+      const created = data.data as WorkspaceRecord;
+      setWorkspaces(current => [...current, created]);
+      setWorkspaceId(created.id);
+      setWorkspaceName(''); setWorkspaceKey('');
+      setNotice('Workspace created. Choose the structure you want to install.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace creation failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const install = async () => {
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const idempotencyKey = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : 'install-' + Date.now();
+      const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', {
+        body: {
+          action: 'install_structure', organization_id: organizationId, workspace_id: workspaceId,
+          idempotency_key: idempotencyKey, domain_codes: domainCodes, department_keys: departmentKeys,
+          include_ld01_holarchy: includeLd01Holarchy && domainCodes.includes('LD01'),
+        },
+      });
+      if (invokeError) throw invokeError;
+      const counts = data?.data?.counts;
+      if (!counts) throw new Error('Installation returned an invalid result.');
+      setNotice('Installation complete · ' + counts.domains + ' domains · ' + counts.departments + ' departments · ' + counts.holons + ' LD01 holons.');
+      await loadStructure(organizationId, workspaceId);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Structure installation failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const toggle = (values: string[], value: string, setter: (next: string[]) => void) =>
+    setter(values.includes(value) ? values.filter(item => item !== value) : [...values, value]);
+
+  if (loading) return <section className="bm-panel bm-workspace-state"><Activity size={22}/><strong>Loading organization context…</strong><span>Resolving authenticated memberships and workspace access.</span></section>;
+
+  return <div className="bm-stack">
+    <div className="bm-notice"><div className="bm-notice-icon"><Building2 size={17}/></div><div><strong>Tenant installation engine</strong><span>Global blueprints become organization-owned instances only after an authorized installation request. No organization or workspace is created automatically.</span></div><span className="bm-notice-tag">AUTHENTICATED CONTROL</span></div>
+    {error && <div className="bm-workspace-alert error"><strong>Action blocked</strong><span>{error}</span></div>}
+    {notice && <div className="bm-workspace-alert success"><strong>Confirmed</strong><span>{notice}</span></div>}
+
+    {organizations.length === 0 ? <section className="bm-panel bm-workspace-panel">
+      <span className="bm-eyebrow">STEP 01 / ORGANIZATION</span><h2>Create the tenant boundary</h2><p>An organization owns its workspaces, memberships, policies and installed business structures.</p>
+      <div className="bm-workspace-form">
+        <label>Organization name<input value={organizationName} onChange={e=>setOrganizationName(e.target.value)} placeholder="A’Space Marketplace" /></label>
+        <label>Organization key<input value={organizationKey} onChange={e=>setOrganizationKey(e.target.value)} placeholder="ASPACE-MARKETPLACE" /></label>
+        <label>Organization type<select value={organizationType} onChange={e=>setOrganizationType(e.target.value)}><option value="MARKETPLACE_OPERATOR">Marketplace operator</option><option value="INTERNAL_VENTURE">Internal venture</option><option value="EXTERNAL_ENTERPRISE">External enterprise</option><option value="SUPPLIER">Supplier</option><option value="CUSTOMER">Customer</option><option value="PARTNER">Partner</option></select></label>
+        <button className="bm-primary" disabled={saving || !organizationName.trim() || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(organizationKey.trim())} onClick={()=>void createOrganization()}>{saving?'Creating…':'Create organization'} <ArrowRight size={15}/></button>
+      </div>
+    </section> : <>
+      <section className="bm-panel bm-workspace-panel">
+        <div className="bm-workspace-heading"><div><span className="bm-eyebrow">STEP 01 / ORGANIZATION</span><h2>Organization context</h2></div><span className="bm-source-pill database">{organizations.length} accessible organization(s)</span></div>
+        <label className="bm-workspace-field">Active organization<select value={organizationId} onChange={e=>setOrganizationId(e.target.value)}>{organizations.map(org=><option key={org.id} value={org.id}>{org.name} · {org.organization_key}</option>)}</select></label>
+      </section>
+      <section className="bm-panel bm-workspace-panel">
+        <div className="bm-workspace-heading"><div><span className="bm-eyebrow">STEP 02 / WORKSPACE</span><h2>Operating environments</h2></div><span className="bm-source-pill">{workspaces.length} workspace(s)</span></div>
+        {workspaces.length>0 && <label className="bm-workspace-field">Active workspace<select value={workspaceId} onChange={e=>setWorkspaceId(e.target.value)}>{workspaces.map(ws=><option key={ws.id} value={ws.id}>{ws.name} · {ws.workspace_key}</option>)}</select></label>}
+        <div className="bm-workspace-form compact">
+          <label>Workspace name<input value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)} placeholder="Headquarters" /></label>
+          <label>Workspace key<input value={workspaceKey} onChange={e=>setWorkspaceKey(e.target.value)} placeholder="headquarters" /></label>
+          <button className="bm-primary" disabled={saving || !organizationId || !workspaceName.trim() || !/^[a-z0-9][a-z0-9._-]{1,95}$/.test(workspaceKey.trim().toLowerCase())} onClick={()=>void createWorkspace()}>{saving?'Creating…':'Create workspace'} <ArrowRight size={15}/></button>
+        </div>
+      </section>
+      {workspaceId && <section className="bm-panel bm-workspace-panel">
+        <div className="bm-workspace-heading"><div><span className="bm-eyebrow">STEP 03 / STRUCTURE INSTALLATION</span><h2>Compose the operating structure</h2><p>Choose which reference blueprints become installed instances in this workspace.</p></div><span className="bm-source-pill database">TENANT-SCOPED</span></div>
+        <div className="bm-install-columns">
+          <div><h3>Areas OS · mission portfolios</h3>{areas.map(area=><label className="bm-install-option" key={area.id}><input type="checkbox" checked={domainCodes.includes(area.code)} onChange={()=>toggle(domainCodes,area.code,setDomainCodes)}/><span><strong>{area.code} · {area.name}</strong><small>{area.description}</small></span></label>)}</div>
+          <div><h3>Marketplace · operating departments</h3>{departments.map(dept=><label className="bm-install-option" key={dept.id}><input type="checkbox" checked={departmentKeys.includes(dept.id)} onChange={()=>toggle(departmentKeys,dept.id,setDepartmentKeys)}/><span><strong>{dept.name}</strong><small>{dept.description}</small></span></label>)}</div>
+        </div>
+        {domainCodes.includes('LD01') && <label className="bm-install-holarchy"><input type="checkbox" checked={includeLd01Holarchy} onChange={e=>setIncludeLd01Holarchy(e.target.checked)}/><span><strong>Install LD01 internal holarchy</strong><small>B1 OwnerBook + 8 B2 tactical managers + 8 B3 Marvel squads. These are structural holon instances, not executable agents.</small></span></label>}
+        <button className="bm-primary" disabled={saving || (!domainCodes.length && !departmentKeys.length)} onClick={()=>void install()}>{saving?'Installing…':'Install selected structure'} <ArrowRight size={15}/></button>
+      </section>}
+      {workspaceId && <section className="bm-panel bm-workspace-panel">
+        <div className="bm-workspace-heading"><div><span className="bm-eyebrow">STEP 04 / INSTALLED INVENTORY</span><h2>Workspace structure</h2></div><span className="bm-source-pill database">LIVE TENANT READ</span></div>
+        <div className="bm-installed-summary"><div><strong>{structure.domains.length}</strong><span>Areas OS</span></div><div><strong>{structure.departments.length}</strong><span>Departments</span></div><div><strong>{structure.holons.length}</strong><span>LD01 holons</span></div></div>
+        <div className="bm-installed-list">
+          {structure.domains.map(item=><div key={item.id}><span>{item.domain_code}</span><strong>{item.domain_name}</strong><em>{item.installation_status}</em></div>)}
+          {structure.departments.map(item=><div key={item.id}><span>DEPT</span><strong>{item.department_name}</strong><em>{item.installation_status}</em></div>)}
+          {structure.holons.map(item=><div key={item.id}><span>{item.holon_code}</span><strong>{item.display_name}</strong><em>{item.installation_status}</em></div>)}
+          {!structure.domains.length && !structure.departments.length && !structure.holons.length && <p>No structure installed in this workspace yet.</p>}
+        </div>
+      </section>}
+    </>}
+  </div>;
+}
 
 function CoreView() {
   const cores = [

@@ -337,3 +337,12 @@ The Dashboard currently identifies the project as **Free** and reports **No back
 Live records: 1 Auth user/profile/org/org membership/workspace/workspace membership; zero domain/department/holon installations, agent principals/delegations, tenant connections, OAuth transactions, execution jobs, listings, orders, payment intents, refunds, payout batches, journal entries, clients and document records. One provider manifest exists and remains DRAFT. No synthetic records were inserted.
 
 Latest source truth: commit `2fe574f` corrects IT Software Kernel to show architectural targets and unverified P10–P18 objectives instead of fabricated connected statuses, latency/uptime or a sovereignty score. Latest branch head `97cc906` has a Vercel Preview QUEUED; the last fully verified Preview is `ae81359` (548/548 tests, full typecheck/build and 102/102 runtime benchmarks).
+
+
+## Latest branch hosted verify — 2026-11-26 21:03 UTC
+
+Vercel Preview [dpl_Cxp8KS7ptZBBo7zPxYcrPPzwUox6](https://vercel.com/amd-lab/business-marketplace/Cxp8KS7ptZBBo7zPxYcrPPzwUox6) for exact branch head `b7c2b29454b4a47f19705ef68d8053a221de3a83` is READY. Full `bun run verify` passed: 53/53 Vitest files, 548/548 tests, app/API TypeScript, Vite build (2712 modules transformed), kernel 27/27, bridge 20/20, adapters 39/39, RBAC 16/16 (102/102).
+
+This exact head includes the IT Software Kernel truth correction `2fe574f`. Non-blocking build warnings: Vite native config loader reports `__dirname`; CMS seed has an ineffective dynamic import; main JS bundle 2,958.06 kB (772.81 kB gzip); npm reports `core-js@3.49.0` postinstall not allowlisted and unknown `cache-dir` env config. No warning failed the build.
+
+Supabase Dashboard still reports Free / No backups. Leaked-password protection remains Pro+-gated. No backup/restore drill, authenticated browser E2E or production promotion was performed.

@@ -67,6 +67,7 @@ export function SalesItemDetail(props: ItemDetailProps) {
   const offerBlurb = OFFER_BLURBS[offer] ?? `Coaching engagement for ${title}. Stage: ${stage ?? 'open'}.`;
   const addToast = useShellStore((s) => s.addToast);
   const clientsItems = useCmsStore((s) => s.items['clients']) ?? [];
+  const invoicesItems = useCmsStore((s) => s.items['invoices']) ?? [];
   const addItem = useCmsStore((s) => s.addItemPersisted);
   /** Create a sent invoice from a won deal only when its canonical client and currency are present. */
   const onWonOnboard = async (dealId: string): Promise<void> => {
@@ -84,12 +85,20 @@ export function SalesItemDetail(props: ItemDetailProps) {
       addToast({ source: 'Sales', type: 'warning', message: 'This deal is not linked to an existing workspace client. Link the client before invoicing.' });
       return;
     }
+    const sourceKey = `deal:${dealId}:full`;
+    const existingInvoice = invoicesItems.find((invoice) => String(invoice.sourceKey ?? '') === sourceKey);
+    if (existingInvoice) {
+      addToast({ source: 'Sales', type: 'info', message: `An invoice is already linked to this deal (${String(existingInvoice.id)}).` });
+      return;
+    }
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
     const clientName = String(client.name ?? client.title ?? client.id);
     const invoiceResult = await addItem('invoices', {
       client: clientName,
       clientId,
+      dealId,
+      sourceKey,
       number: `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${dealId.slice(-4)}`,
       amount,
       currency,

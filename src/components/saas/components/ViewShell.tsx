@@ -1,5 +1,5 @@
 // src/components/ViewShell.tsx
-// ADR-OMK-005 (Phase D) — standardized page shell for the 14 nav views.
+// ADR-DASHBOARD-005 (Phase D) — standardized page shell for the 14 nav views.
 //
 // PURPOSE
 //   Every view has the same 4 render states (loading / error / empty / ready).

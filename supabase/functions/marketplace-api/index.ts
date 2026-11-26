@@ -178,6 +178,67 @@ function stringArray(value: unknown, field: string, pattern: RegExp, maxItems = 
   if (values.some((item) => !pattern.test(item)) || new Set(values).size !== values.length) throw new Error(`Invalid or duplicate ${field}`);
   return values;
 }
+async function listWorkspaceMembers(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    return await tx`
+      SELECT wm.user_id AS id,
+        COALESCE(NULLIF(p.display_name,''), 'Workspace member') AS name,
+        rb.role_code,
+        wm.membership_status,
+        wm.workspace_role,
+        wm.created_at,
+        wm.updated_at
+      FROM enterprise.workspace_memberships wm
+      LEFT JOIN identity.profiles p ON p.id=wm.user_id
+      LEFT JOIN LATERAL (
+        SELECT r.role_code
+        FROM identity.role_bindings r
+        WHERE r.organization_id=wm.organization_id
+          AND r.subject_user_id=wm.user_id
+          AND r.binding_status='ACTIVE'
+          AND r.scope_type='ORGANIZATION'
+          AND r.scope_id IS NULL
+          AND r.starts_at <= now()
+          AND (r.expires_at IS NULL OR r.expires_at > now())
+        ORDER BY r.created_at DESC
+        LIMIT 1
+      ) rb ON true
+      WHERE wm.organization_id=${orgId}::uuid
+        AND wm.workspace_id=${workspaceId}::uuid
+        AND wm.membership_status='ACTIVE'
+      ORDER BY p.display_name NULLS LAST, wm.created_at
+    `;
+  });
+}
+
+async function listWorkspaceAgents(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    return await tx`
+      SELECT ap.id, ap.agent_key, ap.display_name, ap.agent_class, ap.runtime,
+        ap.principal_status, ap.created_at,
+        d.permission_codes, d.starts_at, d.expires_at
+      FROM identity.agent_principals ap
+      JOIN identity.agent_delegations d
+        ON d.agent_principal_id=ap.id
+       AND d.organization_id=ap.organization_id
+      WHERE ap.organization_id=${orgId}::uuid
+        AND d.scope_type='WORKSPACE'
+        AND d.scope_id=${workspaceId}::uuid
+        AND d.delegation_status='ACTIVE'
+        AND d.starts_at <= now()
+        AND (d.expires_at IS NULL OR d.expires_at > now())
+        AND d.revoked_at IS NULL
+      ORDER BY ap.display_name, ap.agent_key
+    `;
+  });
+}
+
 async function listWorkspaces(user: User, body: Record<string, unknown>) {
   const orgId = requiredString(body.organization_id, 'organization_id');
   return await withServiceRole(async (tx) => {
@@ -1066,6 +1127,8 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case 'list_organizations': data = await listOrganizations(user); break;
       case 'list_workspaces': data = await listWorkspaces(user, body); break;
+      case 'list_workspace_members': data = await listWorkspaceMembers(user, body); break;
+      case 'list_workspace_agents': data = await listWorkspaceAgents(user, body); break;
       case 'list_workspace_structure': data = await listWorkspaceStructure(user, body); break;
       case 'create_workspace': data = await createWorkspace(user, body); break;
       case 'install_structure': data = await installStructure(user, body); break;

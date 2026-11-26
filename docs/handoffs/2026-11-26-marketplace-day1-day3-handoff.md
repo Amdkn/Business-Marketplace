@@ -2631,3 +2631,27 @@ Aucune migration SQL supplémentaire n'a été appliquée. Les changements de sc
 ### 6. Règle de reprise
 
 Reprendre depuis le HEAD réel de la branche, pas depuis le dernier Preview READY. Ne pas annoncer 548 tests pour les commits postérieurs à `d17070b`. Ne pas déclarer OAuth corrigé en production tant que les versions hébergées restent v2/v8. Ne pas considérer `marketplace-api v31` comme preuve du parcours d'inscription complet : seul le déploiement backend et la simulation SQL rollback-only sont confirmés.
+
+---
+
+## 13.59 — Audit de continuité du contexte tenant entre surfaces
+
+L'inspection du vrai point d'entrée et des composants de Garden révèle une séparation supplémentaire à traiter avant l'acceptance multi-tenant :
+
+- `MarketplaceControlPlane.WorkspacesView` charge les organisations et workspaces depuis `marketplace-api` et permet de les sélectionner, mais conserve les choix uniquement dans son état React local.
+- `AuthProvider` est monté dans `SaasGardenOverlay`, pas à la racine de `App`. Il hydrate le contexte via `identity.get_current_workspace_context` et remplit les caches globaux `getActiveOrgId()` / `getActiveWorkspaceId()`.
+- Le RPC de contexte global reste limité à un contexte organisation/workspace unique. Avec plusieurs workspaces actifs, il ne donne pas de contexte sélectionné.
+- `ProfileWorkspaceSection` dans le Desktop historique utilise `useTenantStore.registerTenant/switchTenant`. Ces actions manipulent le registre local Zustand et ne créent ni ne sélectionnent une organisation/workspace Supabase.
+- `src/lib/workspace/store.ts` utilise encore des `Map` en mémoire pour branches, snapshots, PR et reviews ; ce cycle de vie n'est pas une persistance multi-tenant démontrée.
+
+Conséquence : le sélecteur de la vue Workspaces, le contexte de Garden et l'ancien sélecteur du Desktop ne partagent pas encore une source de vérité organisation + workspace. Le fonctionnement mono-contexte peut être testé, mais le basculement entre plusieurs contextes à travers toutes les surfaces ne l'est pas.
+
+**Travail requis avant clôture :**
+
+1. Créer une source de vérité partagée `organization_id + workspace_id`, alimentée par les memberships serveur.
+2. Propager la sélection de `WorkspacesView` vers `AuthProvider/useOrg`, les caches de repositories et les opérations Storage.
+3. Remplacer le sélecteur Desktop local-only par des memberships/workspaces réels, ou le retirer de la surface opérationnelle tant qu'il n'est pas branché.
+4. Persister branches/snapshots/PR/reviews dans le backend et prouver l'isolation workspace.
+5. Tester deux organisations et deux workspaces avec deux identités distinctes, y compris lecture, écriture, Storage, changement de contexte et révocation.
+
+Ne pas marquer l'acceptance multi-tenant comme réussie avant ces preuves.

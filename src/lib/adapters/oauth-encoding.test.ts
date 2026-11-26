@@ -20,3 +20,30 @@ describe('base64Url', () => {
     expect(encoded).toBe('AP_vvq37_w');
   });
 });
+
+
+describe('OAuth scope parsing source contract', () => {
+  it('uses a real whitespace separator in both deployed Edge Function sources', async () => {
+    const { readFileSync } = await import('node:fs');
+    const callback = readFileSync('supabase/functions/adapter-oauth-callback/index.ts', 'utf8');
+    const worker = readFileSync('supabase/functions/adapter-worker/index.ts', 'utf8');
+
+    for (const source of [callback, worker]) {
+      expect(source).toContain('split(/\\s+/)');
+      expect(source).not.toContain('split(/\\\\s+/)');
+    }
+  });
+
+  it('splits provider scope strings containing spaces, tabs, or newlines', () => {
+    const scopes = 'openid email\\tprofile\\nhttps://www.googleapis.com/auth/drive.file'
+      .trim()
+      .split(/\\s+/);
+
+    expect(scopes).toEqual([
+      'openid',
+      'email',
+      'profile',
+      'https://www.googleapis.com/auth/drive.file',
+    ]);
+  });
+});

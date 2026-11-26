@@ -8,21 +8,22 @@ import { CalendarDays, CheckCheck, CircleDashed, PhoneCall, Target } from 'lucid
 import { useCmsStore } from '../../../lib/cms/cms.store';
 import { listWorkspaceActivity, type WorkspaceActivityEvent } from '../sales.repo';
 import type { DetailItem } from '../SalesDetailPage';
-import { ACCENT, Eyebrow, FONT_BODY, FONT_DISPLAY, FONT_MONO, Frame, LOSE, RELANCE, WIN } from './Primitives';
+import { ACCENT, Eyebrow, FONT_DISPLAY, FONT_MONO, Frame, RELANCE, WIN } from './Primitives';
 
 function taskDetail(task: Record<string, unknown>): DetailItem {
   const title = String(task.label ?? task.title ?? 'Untitled task');
+  const isDone = ['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase());
   return {
     id: String(task.id),
     kind: 'task',
     title,
     subtitle: String(task.when ?? ''),
-    status: task.done ? 'done' : String(task.group ?? 'open'),
+    status: isDone ? 'done' : String(task.group ?? 'open'),
     summary: String(task.notes ?? task.body ?? 'No task notes recorded.'),
     fields: [
       { label: 'When', value: String(task.when ?? 'Not scheduled') },
       { label: 'Group', value: String(task.group ?? 'Unassigned') },
-      { label: 'Status', value: task.done ? 'Done' : 'Open' },
+      { label: 'Status', value: isDone ? 'Done' : 'Open' },
     ],
   };
 }
@@ -163,7 +164,7 @@ export function TodayPanel({ onSelect }: { onSelect: (item: DetailItem) => void 
                 style={{ borderColor: 'var(--panel-border)', background: 'var(--theme-surface)' }}>
                 <span className="block text-sm font-semibold">{String(task.label ?? task.title ?? 'Untitled task')}</span>
                 <span className="mt-1 block text-xs" style={{ color: 'var(--theme-text-muted)' }}>{String(task.when ?? 'Not scheduled')}</span>
-                <span className="mt-3 block text-[10px] font-mono uppercase" style={{ color: task.done ? WIN : RELANCE }}>{task.done ? 'Done' : String(task.group ?? 'Open')}</span>
+                <span className="mt-3 block text-[10px] font-mono uppercase" style={{ color: ['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase()) ? WIN : RELANCE }}>{['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase()) ? 'Done' : String(task.group ?? 'Open')}</span>
               </button>
             ))}
           </div>

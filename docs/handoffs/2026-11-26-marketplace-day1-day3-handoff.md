@@ -2402,3 +2402,14 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - This supersedes the earlier 13.47 note that Vitest was unrun. OAuth Base64URL vectors are now included in the passing Vitest suite.
 - CI success does not replace authenticated browser acceptance, provider OAuth, PSP sandbox, backup/restore or real tenant lifecycle acceptance. Vercel Preview is still older than current branch because Vercel deployment creation returned HTTP 402 `api-deployments-free-per-day` (24-hour retry).
 - PR #1 remains OPEN / DRAFT. No production alias was moved; the existing production domain still points at the old `main` deployment and is not being promoted from this unaccepted branch.
+
+
+
+## 13.49 — Production-environment-safe unit tests and latest CI pass — 2026-11-26
+
+- The first Vercel build using the new full `bun run verify` command correctly exposed a CI-vs-build environment difference: Vercel injects production Supabase environment variables during build. Six audit query tests therefore took the real Supabase read path instead of the in-memory test path (542/548 passed; two test files failed). This was a test isolation defect, not a reason to use production data in tests.
+- Updated `src/lib/audit/queries.test.ts` to mock `../supabase` with `supabaseConfigured: false` and a null session. The audit query tests are now deterministic and cannot call a real tenant API merely because deployment environment variables exist.
+- Also corrected the legacy Filiales matrix: the Coach OS row is now marked `Legacy · hors Marketplace`, all five rows are explicitly blueprints rather than Marketplace installations, and the page states that the live installation registry is authoritative. This removes the false `Live` / `Deployed Vercel` implication while the Marketplace has zero domain installations.
+- Dispatched CI run [45855710702](https://github.com/Amdkn/Business-Marketplace/actions/runs/45855710702) on commit `a140c27ffacf94d00d315cdfa55e70803f0206c6`. It completed SUCCESS: frozen Bun install, app+Node TypeScript, API TypeScript, Vitest 53 files / 548 tests, Vite build, kernel 27/27, bridge 20/20, adapters 39/39 and RBAC 16/16 (102/102 benchmarks).
+- Vercel full verify on `c60131d` failed only in the six audit query tests because of the environment mismatch above. The fix is now CI-green, but the latest branch has not been deployed: Vercel status remains HTTP 402 `build-rate-limit` / `api-deployments-free-per-day`. Do not weaken Preview SSO or promote production.
+- PR #1 remains OPEN / DRAFT. Day 1, Day 2 and Day 3 acceptance remain open pending latest Preview, authenticated browser E2E, real provider/payment credentials and operational tenant lifecycle.

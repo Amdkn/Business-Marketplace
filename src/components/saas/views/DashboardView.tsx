@@ -37,12 +37,6 @@ const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'info'
   archived: 'danger',
 };
 
-const HARDCODED_TASKS = [
-  { title: 'Validation devis client TechFlow', time: 'Today', type: 'warning' as const },
-  { title: 'Retard livraison projet GreenScale', time: 'Yesterday', type: 'danger' as const },
-  { title: 'Mise à jour Stripe requise', time: '2 days ago', type: 'info' as const },
-];
-
 interface DashboardViewProps {
   onNavigate?: (tab: string) => void;
 }
@@ -163,33 +157,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <h3 className="text-lg font-semibold text-slate-900">Wind Direction</h3>
               <span className="text-sm text-slate-500 italic">Things requiring validation</span>
             </div>
-            <div className="space-y-3">
-              {HARDCODED_TASKS.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-4 rounded-lg border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        item.type === 'warning'
-                          ? 'bg-amber-500'
-                          : item.type === 'danger'
-                          ? 'bg-red-500'
-                          : 'bg-blue-500'
-                      }`}
-                    />
-                    <div>
-                      <p className="font-medium text-slate-900 text-sm">{item.title}</p>
-                      <p className="text-xs text-slate-500 mt-1">{item.time}</p>
-                    </div>
-                  </div>
-                  <button className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors flex items-center gap-1 group">
-                    Review{' '}
-                    <ArrowUpRight className="w-4 h-4 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                </div>
-              ))}
+            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 px-5 py-8 text-center">
+              <p className="text-sm font-medium text-slate-700">No pending validations</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Real approvals and operational alerts will appear here when records are created in this workspace.
+              </p>
             </div>
           </Card>
 

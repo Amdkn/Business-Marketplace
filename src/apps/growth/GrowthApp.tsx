@@ -328,7 +328,7 @@ export function GrowthApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitNewChannel();
+                    if (e.key === 'Enter') void void submitNewChannel();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Podcast guest appearances"
@@ -353,7 +353,7 @@ export function GrowthApp() {
                   value={composerCategory}
                   onChange={(e) => setComposerCategory(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChannel();
+                    if (e.key === 'Enter') void submitNewChannel();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Marketplace / Owned / Earned / Paid / Events"
@@ -612,7 +612,7 @@ export function GrowthApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitNewPartner();
+                    if (e.key === 'Enter') void void submitNewPartner();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Indie Hackers"
@@ -637,7 +637,7 @@ export function GrowthApp() {
                   value={composerType}
                   onChange={(e) => setComposerType(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewPartner();
+                    if (e.key === 'Enter') void submitNewPartner();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Media / Platform / School / Community / Referral"

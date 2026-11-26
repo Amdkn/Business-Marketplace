@@ -195,6 +195,10 @@ Migrations are tracked under `supabase/migrations/` and match the hosted migrati
 - `20261126092033_workspace_policy_predicate_definer_boundary.sql`
 - `20261126092835_garden_invoice_and_mission_records.sql`
 - `20261126093031_current_workspace_context_rpc.sql`
+- `20261126094200_agent_workspace_delegation_scope.sql`
+- `20261126094206_workspace_data_fk_indexes.sql`
+
+Workspace data foreign-key audit: **0 unindexed foreign keys** remain in `workspace_data`. The broader Supabase project still has unindexed-FK findings in other schemas; do not conflate those with the interface data layer.
 
 `marketplace-api` is ACTIVE v25 with `verify_jwt=true`. The current authenticated tenant context resolves to the first real organization/workspace and role `B1_CEO`. No agent principal or fake business record has been created.
 

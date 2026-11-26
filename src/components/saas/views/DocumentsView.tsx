@@ -252,18 +252,15 @@ export const DocumentsView: React.FC = () => {
               onClick={handleConfirmSignature}
               className="bg-emerald-500 text-white hover:bg-emerald-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
-              Send Request
+              Close
             </button>
           </>
         }
       >
         {signatureTarget && (
           <p className="text-sm text-slate-600 leading-relaxed">
-            Request signature from{' '}
-            <span className="font-mono text-xs">
-              client {signatureTarget.clientId ? `${signatureTarget.clientId.slice(0, 8)}…` : '—'}
-            </span>{' '}
-            for <span className="font-semibold">{signatureTarget.title}</span>?
+            No e-sign provider is connected. This document cannot be sent for signature yet.
+            Connect an e-sign provider before creating a real signature request.
           </p>
         )}
       </Modal>

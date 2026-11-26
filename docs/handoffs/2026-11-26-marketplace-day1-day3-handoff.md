@@ -2470,3 +2470,22 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 2. Confirm `logger.test.ts` now passes and the full suite reaches 548/548.
 3. Continue through Vite build and all four runtime benches; only then mark the latest Preview build as green.
 4. Keep Preview SSO enabled and do not promote production. Authenticated browser E2E and the real provider/payment/tenant runtime gates remain open.
+
+
+## 13.53 — Latest Preview full verification and kernel dashboard truth correction — 2026-11-26
+
+### Latest verified Preview
+- Vercel Preview [dpl_DdLLvP5GZv3FhoCZMZPfStFHghmF](https://vercel.com/amd-lab/business-marketplace/DdLLvP5GZv3FhoCZMZPfStFHghmF) is **READY** for commit `ae81359f27ca6f22a21d496eba606c44296e1740`; Preview URL: https://business-marketplace-48edhjyl6-amd-lab.vercel.app.
+- Full hosted `bun run verify` succeeded: Vitest **53/53 files, 548/548 tests**; app TypeScript; API TypeScript; Vite production build; kernel **27/27**, bridge **20/20**, adapters **39/39**, RBAC **16/16**. The previously failing audit logger memory-mode test now passes in the Vercel environment.
+- Build warnings remain non-blocking: Vite config uses `__dirname` under native config loader; CMS seed module is both dynamically and statically imported; main JS chunk is about 2.96 MB (772.75 KB gzip); Bun reports `core-js` postinstall script not explicitly allowlisted. Track these as build hygiene/performance work, not failed acceptance.
+- Preview is not production. SSO remains enabled; no alias promotion or production deployment was performed.
+
+### Kernel dashboard truth correction
+- Commit [2fe574f](https://github.com/Amdkn/Business-Marketplace/commit/2fe574fa09bbb23a02d55fdcd41d785ed8001ee2) rewrites `ItSoftwareKernelView.tsx`: removed hardcoded connected statuses, invented latency/uptime figures, 8/9 sovereignty score, and unsubstantiated claims that Hermes/Ollama, Firecracker, Vault, network isolation and AI Act controls were operational.
+- The view now clearly labels the stack as an architectural target register and every P10–P18 item as an unverified control objective until evidence is attached. Real Supabase/API health is measured separately by the IT & Infrastructure view; a Vercel Preview being READY is not an uptime/SLO measurement.
+- This was a real operational-truth defect found during the wider UI audit, not merely a cosmetic change.
+
+### Current remaining gates
+- Authenticated browser acceptance still requires the authorized protected Preview session.
+- Real Google OAuth and Drive provider round-trip, PSP sandbox lifecycle, tenant installations, agent runtime, Compute/Inference/Memory/CEL, backup/restore and failure/release drills remain open.
+- No fake identities, tenants, agent executions, OAuth connections, listings or commerce records were created.

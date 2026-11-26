@@ -1553,3 +1553,8 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Structural and arithmetic SQL assertions passed: private grants, RLS, immutability triggers, fee cap, seller net and double-count conservation.
 - Tenant E2E remains blocked: hosted project has zero organizations and zero Auth users. The new actions cannot be exercised with real tenant membership until identity onboarding is connected.
 - Next: connect the fee snapshot to payment capture facts and journal posting; define the seller-payable/platform-revenue accounting event and then provider adapter/webhook settlement.
+
+- Added `finance_fee_policy_fk_indexes` and `fee_policy_activation_serialization` follow-up migrations: both fee-policy foreign keys are indexed, and competing activations serialize on owner/key/scope/seller/currency before the overlap check.
+- Re-ran all five SQL regression suites successfully after fee engine integration. The Finance suite includes fee table/RLS/grant/immutability checks, percentage/fixed calculation arithmetic, fee caps, seller-net conservation and SECURITY DEFINER/least-privilege assertions.
+- Live Finance inventory is now 12 tables. All Finance foreign keys have covering indexes (0 unindexed Finance FKs). The broader project still reports 61 unindexed foreign keys across non-Finance schemas and informational unused-index notices; no speculative mass indexing was applied.
+- Supabase Health Advisor has no findings. Security Advisor reports 41 INFO RLS-enabled/no-policy notices across intentionally private, service-role-gated schemas; these are not exposed browser tables.

@@ -222,18 +222,24 @@ async function listWorkspaceAgents(user: User, body: Record<string, unknown>) {
     return await tx`
       SELECT ap.id, ap.agent_key, ap.display_name, ap.agent_class, ap.runtime,
         ap.principal_status, ap.created_at,
-        d.permission_codes, d.starts_at, d.expires_at
+        d.id AS delegation_id, d.permission_codes, d.starts_at, d.expires_at
       FROM identity.agent_principals ap
-      JOIN identity.agent_delegations d
-        ON d.agent_principal_id=ap.id
-       AND d.organization_id=ap.organization_id
+      JOIN LATERAL (
+        SELECT d.id, d.permission_codes, d.starts_at, d.expires_at
+        FROM identity.agent_delegations d
+        WHERE d.agent_principal_id=ap.id
+          AND d.organization_id=ap.organization_id
+          AND d.scope_type='WORKSPACE'
+          AND d.scope_id=${workspaceId}::uuid
+          AND d.delegation_status='ACTIVE'
+          AND d.starts_at <= now()
+          AND (d.expires_at IS NULL OR d.expires_at > now())
+          AND d.revoked_at IS NULL
+        ORDER BY d.created_at DESC
+        LIMIT 1
+      ) d ON true
       WHERE ap.organization_id=${orgId}::uuid
-        AND d.scope_type='WORKSPACE'
-        AND d.scope_id=${workspaceId}::uuid
-        AND d.delegation_status='ACTIVE'
-        AND d.starts_at <= now()
-        AND (d.expires_at IS NULL OR d.expires_at > now())
-        AND d.revoked_at IS NULL
+        AND ap.principal_status <> 'REVOKED'
       ORDER BY ap.display_name, ap.agent_key
     `;
   });
@@ -820,16 +826,27 @@ async function createOrganization(user: User, body: Record<string, unknown>) {
 }
 async function registerAgent(user: User, body: Record<string, unknown>) {
   const orgId = requiredString(body.organization_id, 'organization_id');
-  const agentKey = requiredString(body.agent_key, 'agent_key', 96);
+  const agentKey = requiredString(body.agent_key, 'agent_key', 96).toUpperCase();
   const displayName = requiredString(body.display_name, 'display_name', 160);
   const agentClass = requiredString(body.agent_class, 'agent_class', 40);
   const runtime = requiredString(body.runtime, 'runtime', 120);
   const scopeType = requiredString(body.scope_type, 'scope_type', 24);
   const scopeId = body.scope_id == null ? null : requiredString(body.scope_id, 'scope_id');
-  const permissions = Array.isArray(body.permission_codes) ? body.permission_codes.map((x) => requiredString(x, 'permission_code', 100)) : [];
-  if (!permissions.length) throw new Error('At least one permission_code is required');
+  const allowedClasses = ['GOVERNANCE','ORCHESTRATOR','AREA_OWNER','DEPARTMENT_OWNER','MANAGER','TECHNICIAN','SPECIALIST'];
+  if (!/^[A-Z0-9][A-Z0-9._-]{1,95}$/.test(agentKey)) throw new Error('Invalid agent_key format');
+  if (!allowedClasses.includes(agentClass)) throw new Error('Invalid agent_class');
+  if (!['WORKSPACE','ORGANIZATION'].includes(scopeType)) throw new Error('Agents may be delegated only to a workspace or organization');
+  if ((scopeType === 'WORKSPACE') !== Boolean(scopeId)) throw new Error('WORKSPACE delegation requires scope_id; ORGANIZATION delegation must omit it');
+  const rawPermissions = Array.isArray(body.permission_codes) ? body.permission_codes : [];
+  const permissions = rawPermissions.map((x) => requiredString(x, 'permission_code', 100));
+  if (!permissions.length || permissions.length > 32 ||
+      permissions.some((code) => !/^[A-Z][A-Z0-9_.:-]{1,99}$/.test(code)) ||
+      new Set(permissions).size !== permissions.length) {
+    throw new Error('permission_codes must contain 1–32 unique uppercase permission codes');
+  }
   return await withServiceRole(async (tx) => {
     await requireOrgRole(tx, user.id, orgId);
+    if (scopeType === 'WORKSPACE') await requireWorkspaceMember(tx, user.id, orgId, scopeId!);
     const rows = await tx`
       INSERT INTO identity.agent_principals
         (organization_id,agent_key,display_name,agent_class,runtime,created_by_user_id)
@@ -837,14 +854,38 @@ async function registerAgent(user: User, body: Record<string, unknown>) {
       RETURNING id,organization_id,agent_key,display_name,agent_class,runtime,principal_status,created_at
     `;
     const agent = rows[0];
-    await tx`
+    const delegations = await tx`
       INSERT INTO identity.agent_delegations
         (organization_id,agent_principal_id,delegator_user_id,scope_type,scope_id,permission_codes)
       VALUES (${orgId}::uuid,${agent.id}::uuid,${user.id}::uuid,${scopeType},${scopeId}::uuid,${permissions})
+      RETURNING id AS delegation_id
     `;
-    return agent;
+    return { ...agent, delegation_id: delegations[0].delegation_id, permission_codes: permissions };
   });
 }
+async function revokeAgentDelegation(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  const delegationId = requiredString(body.delegation_id, 'delegation_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    const rows = await tx`
+      UPDATE identity.agent_delegations
+      SET delegation_status='REVOKED', revoked_at=now()
+      WHERE id=${delegationId}::uuid
+        AND organization_id=${orgId}::uuid
+        AND scope_type='WORKSPACE'
+        AND scope_id=${workspaceId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+      RETURNING id,agent_principal_id,delegation_status,revoked_at
+    `;
+    if (!rows.length) throw new Error('Active workspace agent delegation not found');
+    return rows[0];
+  });
+}
+
 async function createCapability(user: User, body: Record<string, unknown>) {
   const orgId = requiredString(body.organization_id, 'organization_id');
   const key = requiredString(body.capability_key, 'capability_key', 96).toLowerCase();
@@ -1129,6 +1170,7 @@ Deno.serve(async (req: Request) => {
       case 'list_workspaces': data = await listWorkspaces(user, body); break;
       case 'list_workspace_members': data = await listWorkspaceMembers(user, body); break;
       case 'list_workspace_agents': data = await listWorkspaceAgents(user, body); break;
+      case 'revoke_agent_delegation': data = await revokeAgentDelegation(user, body); break;
       case 'list_workspace_structure': data = await listWorkspaceStructure(user, body); break;
       case 'create_workspace': data = await createWorkspace(user, body); break;
       case 'install_structure': data = await installStructure(user, body); break;

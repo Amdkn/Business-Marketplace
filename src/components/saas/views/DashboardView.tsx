@@ -205,7 +205,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <Card className="p-6 bg-slate-900 text-white border-slate-800">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold">Workspace Agents</h3>
-              <span className="px-2 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">{agents.length} assigned</span>            </div>
+              <span className="px-2 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">{agents.length} assigned</span>
+            </div>
             {agents.length === 0 ? (
               <p className="text-sm text-slate-400 italic">No agents configured yet.</p>
             ) : (
@@ -235,7 +236,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               onClick={() => (onNavigate ? onNavigate('people-agents') : navigate('/agents'))}
               className="w-full mt-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              View Swarm Details
+              View Agent Directory
               <ArrowUpRight className="w-4 h-4" />
             </button>
           </Card>

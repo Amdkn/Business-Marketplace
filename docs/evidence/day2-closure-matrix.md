@@ -38,3 +38,10 @@ Zero rows are the actual tenant state, not synthetic placeholders. Do not activa
 ## Day 2 acceptance gate
 
 Day 2 remains OPEN until a real buyer and seller can publish/discover a capability, order it, receive a valid entitlement, install it, connect and execute a real provider operation, process its webhook, and reconcile payment/fees/ledger/payout — with authorization and audit intact.
+
+
+## Verification refresh — 2026-11-26
+
+GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) passed on application commit [dfc3554](https://github.com/Amdkn/Business-Marketplace/commit/dfc3554b6f35c782d23b8b7721da5a7c2264c9eb): 548 Vitest tests, app/API typechecks, Vite build and 102/102 runtime benchmarks. OAuth Base64URL regression vectors are included in the passing Vitest suite.
+
+No provider credential or tenant connection was added. The Google Drive manifest remains DRAFT; provider round-trip and first real execution remain blocked on the actual OAuth client configuration. CI success does not close the D2.10 real provider acceptance gate.

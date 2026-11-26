@@ -1484,3 +1484,13 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - No organization, order, payment, webhook, refund, payout or journal fixture was created. No provider credentials were added. No provider is represented as connected.
 - Day 2 Finance foundation is structurally implemented, but Day 2 remains OPEN: fee policy, posting API, payment adapter, signed webhook implementation, settlement/payout execution, reconciliation, tax handling, disputes and finance UI remain.
 - Next: add a database-level ledger posting API with strict service-role boundary and idempotent balanced journal posting; then wire a provider-neutral payment API and test the lifecycle using controlled test-mode provider credentials only after a provider is explicitly configured.
+
+
+### 13.11 Finance integrity and index hardening — 2026-11-26
+
+- Added cloud migration `20261126062541 finance_foreign_key_indexes` and tracked source file. All 14 Finance foreign keys are now covered by matching indexes; a catalog query returned no unindexed Finance FKs.
+- Extended `marketplace_finance_ledger.sql` to fail if any Finance foreign key lacks a covering index; reran successfully.
+- Re-ran the five canonical SQL regression suites (security baseline, OAuth runtime, Google Drive manifest, capability entitlements, Finance ledger); each completed without assertion exceptions.
+- Supabase Health advisor returned no findings. Security advisor now reports 38 INFO RLS-enabled/no-policy notices (nine are the new private Finance tables); these remain intentional because the finance schema has no browser USAGE and no anon/authenticated table grants. Finance privilege assertions pass.
+- Performance advisor now reports 71 unindexed-FK and 56 unused-index INFO notices across the whole project. Finance FKs are all indexed; the remaining findings concern other schemas and should be triaged by workload, not mass-indexed. Newly added indexes are naturally unused before traffic.
+- Finance foundation is structural only. No provider, payment, refund, payout, dispute or ledger transaction was simulated. Payment posting API, fee policy, provider webhook verification implementation, settlement and payout E2E, tax handling, financial read models and UI remain open.

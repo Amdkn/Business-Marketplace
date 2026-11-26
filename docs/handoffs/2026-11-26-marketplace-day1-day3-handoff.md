@@ -2236,3 +2236,40 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 1. Keep auditing Garden detail and secondary entry points for inert buttons or success messages without a durable backend operation.
 2. When the local runner is available, run the complete frontend verification and fix any actual compiler/test failures.
 3. When an authenticated browser session is available, verify the Garden client edit, SOP archive/restore, document integration unavailable state, People cadence and agent API flows end to end.
+
+
+
+### 13.43 Frontend build triage and Garden secondary-action integrity — 2026-11-26
+
+**Vercel project and build evidence**
+- Resolved the Vercel project directly: project `business-marketplace` (`prj_82qsF3EPY75T4hpC19JFJ4ApZ6zL`), linked to `Amdkn/Business-Marketplace` and the working branch. The earlier repository-filtered project lookup returned no rows, but the project exists under the connected team.
+- Inspected the latest pre-fix deployment `b30ce6074fe68d674f9ea78ccb3d09b8c69fb852`. It failed with a real TypeScript parser error in `src/components/saas/views/SettingsView.tsx`: the company default used an unescaped apostrophe (`'A'Space Marketplace'`). Corrected to a double-quoted string in commit `639fc546f52f500c52b7d805514796c06a57d0de`.
+- The subsequent deployment for `639fc54` passed the parser and reached `tsc -b`, which exposed eight compile errors:
+  1. Three TS7053 computed-tenant-key errors in `src/lib/cms/cms.store.ts` (lines 290, 349, 413).
+  2. TS2352 generic cast warning/error in the local repository create path (`src/components/saas/data/repository.ts:156`).
+  3. TS2339: DashboardView referenced removed `Client.segment` instead of canonical `Client.service`.
+  4. TS2322: the Sales Kanban "Other" stage projection omitted required `clientId`.
+  5. TS6133: FinanceApp imported unused `CmsItem`.
+  6. TS2322: Overview passed an optional navigation callback into DemoOverview's required prop.
+- Fixed all eight source errors in commits `2f7bbc4`, `839e3c6`, `b776e6d`, `b84a541`, `e6f31ea` and `d4befe2`. The tenant map updates now have an explicit `Record<TenantId, Record<string, CmsItemTenant[]>>` type; the local fallback cast is explicitly double-cast through `unknown`; the remaining UI projections now match the canonical contracts.
+- The Vercel deployment for `639fc54` is recorded as ERROR / `lint_or_type_error` because those eight errors were present at that commit. Subsequent source commits have not yet been built: the latest status check reports `build-rate-limit`, and no deployment was found for the newer checkpoint. Therefore the fixes are committed and source-verified, but TypeScript/build success is **NOT VERIFIED**. No Vitest or Playwright result is claimed.
+- `.github/workflows/ci.yml` exists and configures push triggers for `main` and `foundation/marketplace-product-identity`, pull requests targeting `main`, and manual dispatch. `.nvmrc` exists with Node `24.12.0`. The available GitHub workflow-run lookup is limited to PR-triggered runs and returned no rows; do not infer from that response alone that no push-triggered run exists.
+
+**Garden secondary actions and data truthfulness**
+- Mission Control Content's `New Doc` control had no action handler. It is now explicitly disabled with the reason that file storage/document authoring is not connected. The misleading `Agents Writing` counter was actually counting distinct `uploadedBy` values; it is now labelled `Distinct uploaders`, and the page no longer queries the agent directory for that statistic.
+- The Content empty state and header now describe a read-only workspace document register. No document, file, upload or agent activity was fabricated.
+- Mission Control Docs was stale: it claimed missions were not persisted, described visual city windows as live agent work, and implied document authoring/agent writing was operational. The guide now reflects persisted workspace missions, canonical agent principals/delegations, read-only schedule projection, visual-only city representation, and the unconnected storage/runtime boundaries.
+- MissionTasks had two position-integrity gaps beyond the previously recorded drag persistence: moving a mission between columns left a hole in the source column, and creating while search/priority filters were active derived the new position from the filtered list. Cross-column moves now compact both affected columns after successful writes; creation derives the next position from the complete persisted workspace column (maximum position + 1), independent of UI filters. On partial write failure, the existing error path reloads the canonical workspace list.
+- These are source-level fixes. No browser-authenticated UI E2E was performed, and no test workspace or production business records were created.
+
+**Latest source checkpoint**
+- Latest code commit before this handoff update: `e19a5ebf055c2df898fefbf32a4cc4ad197b762f` — Garden mission creation allocates positions from the full workspace column.
+- Additional Garden commits: `ed353c8` (Content action/counter honesty), `bc1010a` (Mission Control guide corrections), `cb26e41` (cross-column compaction).
+- Supabase schema and Edge Functions were not changed in this tranche. `marketplace-api` remains ACTIVE v29 with JWT verification enabled.
+- PR #1 remains OPEN / DRAFT. Day 1–3 remain OPEN. Do not accept frontend build, browser CRUD, runtime execution or the overall Days until the relevant evidence exists.
+
+**Next continuation**
+1. Re-run the branch Preview typecheck/build when Vercel build capacity is available; inspect the next compiler output rather than assuming the first eight errors were exhaustive.
+2. Run `npm ci`, `npm run typecheck`, `npm run typecheck:api`, `npm test`, `npm run build` and runtime benches on an available local runner. The Amd-PC Desktop Commander runner was previously offline; current availability remains unverified.
+3. Complete authenticated browser CRUD for Client edit/delete, SOP archive/restore, mission create/reorder/status transitions, document-link behavior, and agent register/revoke. Verify UI refresh and visible failure behavior.
+4. Keep PR #1 Draft and Day 1–3 OPEN until frontend CI/build and authenticated browser acceptance are demonstrated.

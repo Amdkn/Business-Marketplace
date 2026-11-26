@@ -1,9 +1,7 @@
-import { useCmsStore } from '../../../lib/cms/cms.store';
-import { TENANT_DEMO_COACH } from '../../../stores/tenant.store';
+import { useIsDemoTenant } from '../../../lib/cms/useIsDemoTenant';
 
 export function useDashboardDemoMode(): boolean {
-  const activeTenantId = useCmsStore((state) => state.activeTenantId);
-  return activeTenantId === TENANT_DEMO_COACH;
+  return useIsDemoTenant();
 }
 
 export function RuntimeUnavailable({ title, description }: {

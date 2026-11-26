@@ -79,7 +79,7 @@ export const SalesView: React.FC = () => {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Sales Sanctum</h1>
-          <p className="text-slate-500 text-sm mt-1">Live pipeline from omk_saas.sales_leads</p>
+          <p className="text-slate-500 text-sm mt-1">Live pipeline from tenant-scoped sales records</p>
         </div>
         <div className="flex items-center gap-3">
           {isMissing && (
@@ -207,7 +207,7 @@ export const SalesView: React.FC = () => {
         <Card className="p-6">
           <p className="text-sm text-slate-500 italic">
             Agent logs (sales agent swarm) — D2 backlog. Currently no live log stream
-            connected to omk_saas.sales_leads.
+            connected to tenant-scoped sales records.
           </p>
         </Card>
       )}

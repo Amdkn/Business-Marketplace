@@ -1897,3 +1897,14 @@ All six SQL suites were executed against the connected hosted project after the 
 - Continue the remaining Garden/Web Desktop modules through real CRUD, contract tests, browser JWT validation and cross-workspace denial. Day 1–3 remain OPEN; PR #1 remains DRAFT until acceptance gates pass.
 
 **Continuation rule:** continue in `Amdkn/Business-Marketplace`, branch `foundation/marketplace-product-identity`, linked Supabase project `swegnrvaxxgfrnshdpxx`. Do not return to V5 for Marketplace code, do not recreate OMK namespaces, do not seed fake tenants/agents/business data, and do not claim E2E acceptance from SQL-only tests.
+
+
+### 13.36 Agent delegation scope and workspace FK index closure — 2026-11-26
+
+- Hosted migration `20261126094200_agent_workspace_delegation_scope` permits canonical `WORKSPACE` agent delegations and validates that a delegation targets an active workspace in the same organization. Its source is tracked at `supabase/migrations/20261126094200_agent_workspace_delegation_scope.sql`.
+- Hosted migration `20261126094206_workspace_data_fk_indexes` adds a supporting leading-column index for every `workspace_data` foreign key not already covered. Its source is tracked at `supabase/migrations/20261126094206_workspace_data_fk_indexes.sql`.
+- Re-ran the foreign-key coverage query against `workspace_data`: **0 unindexed foreign keys** remain in that schema.
+- Updated `marketplace_interface_persistence.sql` to enforce the zero-unindexed-FK contract.
+- Re-executed all six hosted SQL suites after the new migrations and Edge Function changes; all six passed with no exceptions.
+- The broader Supabase Performance Advisor still reports unindexed foreign keys outside `workspace_data`; these are not part of the Garden/Web Desktop persistence layer and remain a separate schema-by-schema review.
+

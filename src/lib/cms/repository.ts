@@ -1,14 +1,7 @@
-/** CmsRepository — Supabase-backed persistence for CMS collections, Phase 1.
- *  Mirrors the exact dual-write pattern already proven in the Life OS `DomainDB`
- *  (idb.ts): try Supabase, fall back silently on any failure or missing auth.
- *  There is no sign-in UI yet, so `getCurrentOrgId()` simply returns null when
- *  no session exists — every caller already handles that as "use the seed".
- *
- *  Brief-B (2026-08-11) — extension. Le repli local doit être EXPLICITE :
- *  on ne simule rien. `supabaseMode()` retourne l'état observé, et chaque
- *  fallback loggue un message d'info (pas warn — c'est attendu en démo).
- *  Le mapping `tableFor()` ouvre la voie au nouveau schéma typé (23 tables)
- *  sans casser le chemin générique existant. */
+/** Marketplace CMS repository.
+ *  Collection definitions are source-controlled; tenant records are persisted
+ *  in dedicated workspace_data tables. Real tenants never fall back to demo
+ *  records. Missing tenant context and failed writes are explicit errors. */
 import { supabase, supabaseConfigured } from '../supabase';
 import type { CmsCollectionDef, CmsItem } from './types';
 
@@ -40,9 +33,10 @@ export function lastSupabaseError(): string | null {
 }
 
 function setMode(next: SupabaseMode, err?: unknown): void {
-  if (_modeLogged && _mode === next) return;
+  const previous = _mode;
   _mode = next;
   _lastError = err instanceof Error ? err.message : err ? String(err) : null;
+  if (_modeLogged && previous === next) return;
   if (!_modeLogged) {
     _modeLogged = true;
     // L'info-level est volontaire : en mode démo, c'est le comportement
@@ -51,7 +45,7 @@ function setMode(next: SupabaseMode, err?: unknown): void {
     console.info(
       `[cms] supabase mode: ${_mode}` +
         (_lastError ? ` (last error: ${_lastError})` : '') +
-        ` — falling back to bundled seed is the documented contract.`,
+        '',
     );
   } else if (next === 'unreachable' || next === 'no-org') {
     // Mode change after first success — useful when DNS comes back or a
@@ -533,29 +527,49 @@ export async function getCurrentOrgId(): Promise<string | null> {
   return context?.organizationId ?? null;
 }
 
-/** Hydrate one dedicated tenant table; demo-only collections deliberately stay local. */
+/** Hydrate one dedicated tenant table. null means local-only or no auth session;
+ *  database/API failures reject so callers cannot mistake an outage for an empty list. */
 export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
+  if (!tableFor(collectionId)) return null;
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return null;
+  }
   const context = await getCurrentWorkspaceContext();
-  if (!context || !tableFor(collectionId)) return null;
-  try {
-    const { data, error } = await supabase.schema('workspace_data').from(collectionId)
-      .select('*')
-      .eq('organization_id', context.organizationId)
-      .eq('workspace_id', context.workspaceId)
-      .order('created_at', { ascending: false });
-    if (error || !data) { setMode('unreachable', error); return null; }
-    setMode('connected');
-    return data.map((row) => fromWorkspaceRow(collectionId, row as Record<string, unknown>));
-  } catch (err) { setMode('unreachable', err); return null; }
+  if (!context) return null;
+  const { data, error } = await supabase.schema('workspace_data').from(collectionId)
+    .select('*')
+    .eq('organization_id', context.organizationId)
+    .eq('workspace_id', context.workspaceId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    setMode('unreachable', error);
+    throw error;
+  }
+  setMode('connected');
+  return (data ?? []).map((row) => fromWorkspaceRow(collectionId, row as Record<string, unknown>));
 }
 
 /** Collection metadata lives in source-controlled definitions, not tenant rows. */
 export async function upsertCollectionDef(_def: CmsCollectionDef): Promise<void> { /* definitions are versioned with the app */ }
 
-/** Persist one item in its dedicated typed collection table. */
+/** Persist one item. A configured production client must never silently drop a write. */
 export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return; // local-only development/demo mode
+  }
   const context = await getCurrentWorkspaceContext();
-  if (!context || !tableFor(collectionId)) return;
+  if (!context) {
+    const error = new Error('[cms] write refused: authenticated workspace context is unavailable');
+    setMode('no-org', error);
+    throw error;
+  }
+  if (!tableFor(collectionId)) {
+    const error = new Error(`[cms] write refused: collection "${collectionId}" has no persistent Marketplace table`);
+    setMode('unreachable', error);
+    throw error;
+  }
   try {
     const row = toWorkspaceRow(collectionId, item, context);
     const { error } = await supabase.schema('workspace_data').from(collectionId)
@@ -565,14 +579,31 @@ export async function upsertItem(collectionId: string, item: CmsItem): Promise<v
   } catch (err) { setMode('unreachable', err); throw err; }
 }
 
-/** Delete only the matching row within the resolved tenant. */
+/** Delete only the matching row within the resolved tenant; never report a silent success. */
 export async function removeItem(collectionId: string, id: string): Promise<void> {
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return;
+  }
   const context = await getCurrentWorkspaceContext();
-  if (!context || !tableFor(collectionId)) return;
+  if (!context) {
+    const error = new Error('[cms] delete refused: authenticated workspace context is unavailable');
+    setMode('no-org', error);
+    throw error;
+  }
+  if (!tableFor(collectionId)) {
+    const error = new Error(`[cms] delete refused: collection "${collectionId}" has no persistent Marketplace table`);
+    setMode('unreachable', error);
+    throw error;
+  }
   const { error } = await supabase.schema('workspace_data').from(collectionId)
     .delete()
     .eq('id', id)
     .eq('organization_id', context.organizationId)
     .eq('workspace_id', context.workspaceId);
-  if (error) throw error;
+  if (error) {
+    setMode('unreachable', error);
+    throw error;
+  }
+  setMode('connected');
 }

@@ -22,7 +22,7 @@ interface Variant {
   icp: string;
   tier: string;
   pricing?: string;
-  status: 'live' | 'wip' | 'planned';
+  status: 'legacy' | 'reference' | 'concept';
   pillars: number;
   description: string;
 }
@@ -33,35 +33,35 @@ const VARIANTS: Variant[] = [
     name: 'Nexus · Executive Coaching',
     icp: 'Executive & Leadership Coaching',
     tier: '$7.5K–$25K one-shot + $750+/an recurring',
-    status: 'live',
+    status: 'legacy',
     pillars: 5,
-    description: 'Spearhead canon. 3 guides YouTube distillés en context-spe Project Picard (lun. 2026-07-03). Zero-PII Agentic Governance en Pilier 5.',
+    description: 'Référence historique issue du Coach OS. Elle ne correspond pas à une offre publiée ni à une installation active dans le Marketplace.',
   },
   {
     id: 'solaris',
     name: 'Solaris AaaS',
     icp: 'Life-OS-2026 / Solarpunk',
     tier: 'Tier 3: Sovereign Box Enterprise',
-    status: 'live',
+    status: 'reference',
     pillars: 5,
-    description: 'Référence d inspiration. Life-OS-2026 Vercel SHA b933e4e4. 8 B2 domaines × 8 B3 squads Marvel/DC.',
+    description: 'Référence d’architecture Life OS / Solarpunk. Blueprint de portefeuille, non publié et non installé dans le Marketplace.',
   },
   {
     id: 'orbiter',
     name: 'Orbiter ABC-OS',
     icp: 'Family Offices / Patrimoines baby-boomers',
     tier: '$5K–$50K MRR sanctuary',
-    status: 'live',
+    status: 'concept',
     pillars: 5,
-    description: 'Family-Office sanctuary. Vault-Redactor (Manhunter) + Vault-Audit (Batman). Cardinal book canon.',
+    description: 'Concept Family Office / Sanctuary. Hypothèse de positionnement, non vendu, non publié et non installé.',
   },
 ];
 
 const VariantBadge: React.FC<{ status: Variant['status'] }> = ({ status }) => {
   const map = {
-    live: { v: 'success' as const, label: '● Live' },
-    wip:  { v: 'warning' as const, label: '◐ WIP' },
-    planned: { v: 'warning' as const, label: '○ Planned' },
+    legacy: { v: 'info' as const, label: 'Legacy · hors Marketplace' },
+    reference: { v: 'info' as const, label: 'Référence · blueprint' },
+    concept: { v: 'warning' as const, label: 'Concept · non publié' },
   };
   return <Badge variant={map[status].v}>{map[status].label}</Badge>;
 };
@@ -80,9 +80,9 @@ export const ProductView: React.FC = () => {
       <BackButton />
 
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Product — AaaS Variants</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Product — Portfolio & blueprints</h1>
         <p className="text-slate-500 text-sm mt-1">
-          A’Space Marketplace structures three product variants (Nexus / Solaris / Orbiter)
+          Nexus / Solaris / Orbiter sont des fiches de portefeuille stratégique, pas des offres publiées dans le catalogue Marketplace.
         </p>
       </div>
 
@@ -111,10 +111,11 @@ export const ProductView: React.FC = () => {
           <Rocket className="w-5 h-5 text-emerald-600" />
           3 Variants AaaS (ADR-L2-AAAS-001)
         </h2>
+        <p className="text-xs text-slate-500">Positionnement et pricing indicatifs : aucun de ces tarifs ne représente une transaction, un revenu ou une offre publiée dans le catalogue Marketplace.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {VARIANTS.map((v) => (
             <Card key={v.id} className="p-5 hover:border-emerald-200 transition-all relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-full h-1 ${v.status === 'live' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <div className={`absolute top-0 left-0 w-full h-1 ${v.status === 'concept' ? 'bg-amber-400' : 'bg-slate-400'}`} />
               <div className="flex items-start justify-between mb-3 mt-2">
                 <h3 className="font-semibold text-slate-900 leading-tight pr-2">{v.name}</h3>
                 <VariantBadge status={v.status} />
@@ -141,7 +142,7 @@ export const ProductView: React.FC = () => {
           Holding → Filiales (matrice lean par ICP)
         </h3>
         <p className="text-sm text-slate-600 leading-relaxed mb-3">
-          Roadmap Holding Nexus → Filiales topologie hybride (plan L2 §5.4). Chaque Filiale = deploy Vercel séparé, sous-ensemble lean de domaines B2 Jerry. Domaines non-listés = dormants (anti-paperclip, Posture C).
+          Modèle cible Holding Nexus → Filiales (plan L2 §5.4) : une filiale pourrait devenir un déploiement Vercel séparé avec un sous-ensemble lean de domaines B2 Jerry. Cette vue décrit la stratégie; elle ne provisionne aucun tenant ni déploiement.
         </p>
         <Link
           to="/filiales"

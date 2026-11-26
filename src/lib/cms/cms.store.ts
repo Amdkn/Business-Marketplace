@@ -74,8 +74,11 @@ interface CmsState {
   /* ── Legacy CRUD (active tenant, flat view) ─────────────────────────── */
   registerCollection: (def: CmsCollectionDef, seedItems: CmsItem[]) => void;
   updateItem: (collectionId: string, id: string, patch: Partial<CmsItem>) => void;
+  updateItemPersisted: (collectionId: string, id: string, patch: Partial<CmsItem>) => Promise<AddItemResult>;
   addItem: (collectionId: string, partial: Omit<CmsItem, 'id'>) => AddItemResult;
+  addItemPersisted: (collectionId: string, partial: Omit<CmsItem, 'id'>) => Promise<AddItemResult>;
   removeItem: (collectionId: string, id: string) => { ok: boolean; error?: string };
+  removeItemPersisted: (collectionId: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 
   /* ── Tenant-aware CRUD (partition shape) ────────────────────────────── */
   registerCollectionFor: (
@@ -260,6 +263,31 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     get().updateItemFor(tenantId, collectionId, id, patch);
   },
 
+  updateItemPersisted: async (collectionId, id, patch) => {
+    const tenantId = get().activeTenantId;
+    const current = get().itemsByTenant[tenantId]?.[collectionId]?.find((item) => item.id === id);
+    if (!current) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
+    const updated: CmsItemTenant = { ...current, ...patch, tenant_id: tenantId };
+    try {
+      await repoUpsertItem(collectionId, updated);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextList = list.map((item) => item.id === id ? updated : item);
+        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: nextList } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true, item: updated };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote update failed.' };
+    }
+  },
+
+
   /* ── Tenant-aware add ──────────────────────────────────────────────── */
   addItemFor: (tenantId, collectionId, partial) => {
     const def = get().collectionsByTenant[tenantId]?.[collectionId];
@@ -292,6 +320,31 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     return get().addItemFor(tenantId, collectionId, partial);
   },
+
+  addItemPersisted: async (collectionId, partial) => {
+    const tenantId = get().activeTenantId;
+    const def = get().collectionsByTenant[tenantId]?.[collectionId];
+    if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    const id = makeId(collectionId);
+    const item: CmsItemTenant = { id, tenant_id: tenantId, ...partial };
+    try {
+      await repoUpsertItem(collectionId, item);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: [...list, item] } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true, item };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote insert failed.' };
+    }
+  },
+
 
   /* ── Tenant-aware remove ───────────────────────────────────────────── */
   removeItemFor: (tenantId, collectionId, id) => {
@@ -330,6 +383,31 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     return get().removeItemFor(tenantId, collectionId, id);
   },
+
+  removeItemPersisted: async (collectionId, id) => {
+    const tenantId = get().activeTenantId;
+    const def = get().collectionsByTenant[tenantId]?.[collectionId];
+    if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    const current = get().itemsByTenant[tenantId]?.[collectionId] ?? [];
+    if (!current.some((item) => item.id === id)) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
+    try {
+      await repoRemoveItem(collectionId, id);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: list.filter((item) => item.id !== id) } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote delete failed.' };
+    }
+  },
+
 
   /* ── Tenant lifecycle ──────────────────────────────────────────────── */
   setTenant: (tenantId) => {

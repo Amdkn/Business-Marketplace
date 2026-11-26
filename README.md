@@ -131,7 +131,7 @@ Rules:
 - [x] Marketplace Supabase URL and public client key configured in Vercel environments.
 - [x] Coach schema adoption migration applied additively to Marketplace Supabase (no source rows copied).
 - [x] Independent Marketplace identity and Control Plane navigation; inherited Coach auth/session bridge remains explicitly isolated for the next refactor.
-- [x] Global B2.1–B2.8 / LD01–LD08 blueprint registry persisted in Supabase and served through a read-only API.
+- [x] Eight Marketplace operating departments and eight Areas OS portfolios persisted in Supabase and served through a read-only API; LD01 B1/B2/B3 holarchy is shown separately from the V5 source specification.
 - [x] Public published-listing read path connected; current catalogue correctly returns zero published offers.
 - [x] Four platform-core foundations represented in the Control Plane.
 - [ ] Tenant-owned domain/department installation, ownership and dependency graph.

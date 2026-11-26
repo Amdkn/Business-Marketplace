@@ -214,6 +214,10 @@ export const useCmsStore = create<CmsState>((set, get) => ({
           };
         });
       }
+    }).catch((err: unknown) => {
+      // Keep the tenant's real collection empty and expose the failure; never
+      // replace a failed remote read with bundled demo records.
+      console.error(`[cms] hydration failed for "${stampedDef.id}"`, err);
     });
   },
 
@@ -244,7 +248,11 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     });
 
     const updated = get().itemsByTenant[tenantId]?.[collectionId]?.find((it) => it.id === id);
-    if (updated) void repoUpsertItem(collectionId, updated);
+    if (updated) {
+      void repoUpsertItem(collectionId, updated).catch((err: unknown) => {
+        console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
+      });
+    }
   },
 
   updateItem: (collectionId, id, patch) => {
@@ -274,7 +282,9 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoUpsertItem(collectionId, item);
+    void repoUpsertItem(collectionId, item).catch((err: unknown) => {
+      console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
+    });
     return { ok: true, item };
   },
 
@@ -310,7 +320,9 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoRemoveItem(collectionId, id);
+    void repoRemoveItem(collectionId, id).catch((err: unknown) => {
+      console.error(`[cms] delete failed for "${collectionId}/${id}"`, err);
+    });
     return { ok: true };
   },
 

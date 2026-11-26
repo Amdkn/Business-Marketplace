@@ -122,9 +122,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    void hydrate();
+    void hydrate().catch((err: unknown) => {
+      setActiveWorkspaceIdCache(null);
+      setIsLoading(false);
+      if (import.meta.env.DEV) {
+        console.error('[auth] tenant hydration failed; Garden repositories remain closed', err);
+      }
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      void hydrate();
+      void hydrate().catch((err: unknown) => {
+        setActiveWorkspaceIdCache(null);
+        setIsLoading(false);
+        if (import.meta.env.DEV) {
+          console.error('[auth] tenant re-hydration failed; Garden repositories remain closed', err);
+        }
+      });
     });
     return () => subscription.unsubscribe();
   }, [hydrate]);

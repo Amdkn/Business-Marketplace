@@ -2450,3 +2450,23 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Reconciled migration accounting conservatively: 69 cloud migration-ledger entries versus 68 exact executable repository migration sources. A catalog-derived reconstruction exists for the historical RLS ACL migration, but it is not byte-identical recovery of the original SQL. Do not claim 69/69 exact source parity until provenance is closed.
 - Refreshed the Day 2 matrix with the same full CI evidence. OAuth Base64URL regression vectors are now confirmed in the passing Vitest suite; this does not constitute Google OAuth provider authorization or a real provider execution.
 - Day 1, Day 2 and Day 3 remain OPEN. The one real user/org/workspace membership chain is preserved; no extra test tenant or provider activity was created.
+
+
+## 13.52 — Vercel full-verify test isolation failure and correction — 2026-11-26
+
+### What the first latest-branch Preview proved
+- Preview deployment [dpl_J47Wb95y9if9T1WVHD9469jFFkgH](https://vercel.com/amd-lab/business-marketplace/J47Wb95y9if9T1WVHD9469jFFkgH) cloned commit `41a6abf`, completed frozen Bun install, app TypeScript and API TypeScript, then ran the full Vitest suite.
+- Result: **547/548 passed** (52/53 files). The only failure was `src/lib/audit/logger.test.ts > audit/logger — appendEvent > #3 appendEvent_mode_demo_memoire`: expected `memory`, received `lost`.
+- Root cause: Vercel injects production Supabase environment variables during build. `logger.test.ts` assumed Supabase was unconfigured but, unlike `queries.test.ts`, did not mock `../supabase`. The test therefore left the in-memory branch and attempted the configured Supabase path.
+- This is a test-isolation defect, not a production logger behavior defect. Do not change production semantics to make this unit test pass.
+
+### Correction committed
+- Commit [5b947b8](https://github.com/Amdkn/Business-Marketplace/commit/5b947b8980af21dc9063238d2cbdfba27dcd06e1) adds a hoisted Vitest mock for `../supabase` in `logger.test.ts`, forcing `supabaseConfigured: false` and a null session. This matches the intended in-memory unit-test contract and the existing isolation in `queries.test.ts`.
+- The new Preview deployment for `5b947b8` is queued as [dpl_5EtNkCuwdet7eHu1j6odDbVPHdqp](https://vercel.com/amd-lab/business-marketplace/5EtNkCuwdet7eHu1j6odDbVPHdqp), URL: https://business-marketplace-aysyf4p1z-amd-lab.vercel.app. At this checkpoint it has not started its build; do not claim the fix is verified yet.
+- GitHub Actions did not expose a workflow run for the new commit through the available run lookup. The prior full CI pass on `dfc3554` remains valid for that commit, but the new test fix still needs a fresh CI/Preview pass.
+
+### Remaining action
+1. Poll deployment `dpl_5EtNkCuwdet7eHu1j6odDbVPHdqp`.
+2. Confirm `logger.test.ts` now passes and the full suite reaches 548/548.
+3. Continue through Vite build and all four runtime benches; only then mark the latest Preview build as green.
+4. Keep Preview SSO enabled and do not promote production. Authenticated browser E2E and the real provider/payment/tenant runtime gates remain open.

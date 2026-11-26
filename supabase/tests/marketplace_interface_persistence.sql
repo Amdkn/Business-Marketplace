@@ -7,7 +7,7 @@ declare
     'marketplace_listings','product_items','product_releases','growth_channels','growth_experiments','deals','invoices',
     'contracts','policies','session_notes','legal_ai_act_checks','legal_frameworks','legal_controls',
     'legal_compliance_policies','legal_evidence','legal_risks','legal_vendors','legal_gaps','personas','memory','codex',
-    'approval_decisions','squads','content','documents','legal_documents','missions'
+    'approval_decisions','squads','content','documents','legal_documents','missions','growth_acquisition','growth_partenariats','product_mvps'
   ];
   t text;
   n integer;
@@ -42,8 +42,8 @@ begin
   if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name='activity_events' and column_name='workspace_id') <> 'NO' then
     raise exception 'activity_events.workspace_id must be required';
   end if;
-  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 39 then
-    raise exception 'workspace_data table count differs from 38 collections + activity_events';
+  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 42 then
+    raise exception 'workspace_data table count differs from 41 collections + activity_events';
   end if;
   if not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='currency')
      or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='client_id')
@@ -55,6 +55,24 @@ begin
   if not exists(select 1 from pg_trigger where tgrelid='workspace_data.missions'::regclass and tgname='missions_agent_delegation_guard' and not tgisinternal) then
     raise exception 'Mission agent delegation guard is missing';
   end if;
+  foreach t in array array['growth_acquisition','growth_partenariats','product_mvps'] loop
+    if not exists (
+      select 1 from pg_constraint
+      where conrelid=to_regclass(format('workspace_data.%I',t))
+        and conname=format('%s_workspace_org_fkey',t)
+        and contype='f'
+    ) then
+      raise exception 'Composite workspace/organization FK missing on %',t;
+    end if;
+    if not exists (
+      select 1 from pg_trigger
+      where tgrelid=to_regclass(format('workspace_data.%I',t))
+        and tgname=format('%s_tenant_guard',t)
+        and not tgisinternal
+    ) then
+      raise exception 'Tenant immutability trigger missing on %',t;
+    end if;
+  end loop;
   if exists (
     with fk as (
       select c.conrelid,c.conkey

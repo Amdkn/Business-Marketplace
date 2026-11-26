@@ -2,7 +2,7 @@
 // Hermes — Agents sub-page (route /agent-root/agents)
 // Extended version of the Overview agent grid with the full Hermes detail
 // surface (orchestrator + 4 specialists, full task summary panel, model
-// routing panel, recent fleet activity). Same data source (omk_saas.agents).
+// routing panel, recent fleet activity). Same data source (dashboard.agents).
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -164,7 +164,7 @@ export const MissionAgentsView = (): React.ReactElement => {
             </h1>
             <p className="font-sans text-[13px] text-cream/65 mt-3 max-w-lg">
               Inspect every specialist, route them to the right model, and watch the heartbeat
-              of the entire fleet in one place. Live data from <code className="font-mono text-cream">omk_saas.agents</code>.
+              of the entire fleet in one place. Live data from <code className="font-mono text-cream">dashboard.agents</code>.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -244,7 +244,7 @@ export const MissionAgentsView = (): React.ReactElement => {
             ))}
           </ul>
           <p className="relative font-mono text-[10px] tracking-wider opacity-80 mt-4">
-            changes apply on next dispatch · live from <code className="font-mono">omk_saas.agents</code>
+            changes apply on next dispatch · live from <code className="font-mono">dashboard.agents</code>
           </p>
         </article>
       </section>

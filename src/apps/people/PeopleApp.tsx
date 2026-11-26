@@ -194,7 +194,7 @@ function Overview() {
                   </span>
                 </div>
                 <p className="text-[12.5px] text-[var(--theme-text-muted)] mt-1 leading-snug">
-                  Runtime telemetry is not connected. Review workspace agent assignments and pending human approvals.
+                  Runtime telemetry is not connected. Review workspace agent assignments and browser-local proposals awaiting a human decision.
                 </p>
               </div>
               <button

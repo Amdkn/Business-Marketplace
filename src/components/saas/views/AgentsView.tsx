@@ -1,5 +1,5 @@
 // src/components/views/AgentsView.tsx
-// Zero Bug Sprint — fully rewritten to match the omk_saas.agents schema and
+// Zero Bug Sprint — fully rewritten for the Marketplace tenant agent directory and
 // prevent the `agent.capabilities.slice()` crash reported by A0 (D6 #95e).
 //
 // Field changes (D6 #98):

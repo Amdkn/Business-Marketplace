@@ -26,7 +26,7 @@
  *
  * DoD 9/9 (Brief E 2026-08-09) — les 2 TODO initiaux (validation cards,
  * pipeline cards) sont branchés : chaque clic ouvre un détail ou navigue
- * vers une autre app ; une mutation CMS `updateItem('clients', id, ...)`
+ * vers une autre app ; une persisted CMS mutation `updateItemPersisted('clients', id, ...)`
  * persiste l'état "pinned" sur les fiches pipeline ; un état vide est
  * rendu sans crash si la collection `clients` est vide ; chaque mutation
  * pousse un toast (succès ou erreur) via `useShellStore.addToast`.

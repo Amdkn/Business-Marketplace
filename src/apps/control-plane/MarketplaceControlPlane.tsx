@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseConfigured } from '../../lib/supabase';
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness,
+  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness, Cpu,
   Building2, Check, ChevronDown, ChevronRight, CircleDot, Cloud, Command, Compass,
   CreditCard, Database, FileText, GitBranch, Globe2, Layers3, LockKeyhole, Menu,
   Network, Plus, Search, Settings2, ShieldCheck, Sparkles, Workflow, Zap,
 } from 'lucide-react';
 import './marketplace.css';
 
-type Section = 'overview' | 'domains' | 'marketplace' | 'adapters' | 'workspaces' | 'agents' | 'workflows' | 'governance';
+type Section = 'overview' | 'core' | 'domains' | 'marketplace' | 'adapters' | 'workspaces' | 'agents' | 'workflows' | 'governance';
 type Domain = { id: string; name: string; code: string; description: string; color: string; axis: 'department' | 'area'; role: string };
 
 const businessDepartments: Domain[] = [
@@ -58,6 +58,7 @@ const adapterFamilies = [
 
 const nav: { id: Section; label: string; icon: typeof Activity; group: string }[] = [
   { id: 'overview', label: 'Overview', icon: Activity, group: 'PLATFORM' },
+  { id: 'core', label: 'Platform Core', icon: Cpu, group: 'PLATFORM' },
   { id: 'domains', label: 'Domain registry', icon: Network, group: 'PLATFORM' },
   { id: 'marketplace', label: 'Marketplace', icon: Blocks, group: 'PLATFORM' },
   { id: 'adapters', label: 'Adapters', icon: Zap, group: 'PLATFORM' },
@@ -69,6 +70,7 @@ const nav: { id: Section; label: string; icon: typeof Activity; group: string }[
 
 const sectionCopy: Record<Section, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'CONTROL PLANE / OVERVIEW', title: 'The business, orchestrated.', description: 'One operating layer for domains, capabilities, integrations and intelligent execution.' },
+  core: { eyebrow: 'PLATFORM / FOUR FOUNDATIONS', title: 'The sovereign platform core.', description: 'Compute, inference, memory and CEL security form the substrate beneath every Marketplace capability.' },
   domains: { eyebrow: 'CONTROL PLANE / DOMAINS', title: 'Map the business.', description: 'A living registry of business domains, ownership, capabilities and dependencies.' },
   marketplace: { eyebrow: 'CATALOG / DISCOVERY', title: 'Compose your stack.', description: 'Business capabilities, solution packs and agent services — designed to work together.' },
   adapters: { eyebrow: 'CONNECTIVITY / ADAPTERS', title: 'Connect the ecosystem.', description: 'A provider-neutral adapter layer for tools, data, models and external systems.' },
@@ -182,6 +184,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
           </div>
 
           {active === 'overview' && <Overview onNavigate={setActive} departments={departments} areas={areas} />}
+          {active === 'core' && <CoreView />}
           {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} />}
           {active === 'adapters' && <AdaptersView />}
           {active === 'marketplace' && <ComingSoon icon={Blocks} title="Capability marketplace" text="The catalog will install versioned business capabilities and solution packs into a workspace. The inherited integration gallery is preserved as runtime material while this lifecycle is built." />}
@@ -193,6 +196,20 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
       </main>
     </div>
   );
+}
+
+
+function CoreView() {
+  const cores = [
+    { code: 'CORE 01', name: 'Compute Core', icon: Cpu, purpose: 'Execution capacity, runtimes, scheduling and resource governance.', boundary: 'Compute providers and execution environments are not connected yet.' },
+    { code: 'CORE 02', name: 'Inference Core', icon: Sparkles, purpose: 'Model routing, inference endpoints, context budgets, fallbacks and evaluation.', boundary: 'Model providers and inference policies remain unconfigured.' },
+    { code: 'CORE 03', name: 'Memory Core', icon: Database, purpose: 'Persistent memory, knowledge retrieval, provenance, retention and portability.', boundary: 'No tenant memory stores or knowledge sources are provisioned.' },
+    { code: 'CORE 04', name: 'CEL Security Core', icon: LockKeyhole, purpose: 'Identity, authorization, policy enforcement, secret boundaries, sandboxing and audit.', boundary: 'Security contracts are specified; tenant policy and runtime enforcement are not yet wired.' },
+  ];
+  return <div className="bm-stack">
+    <div className="bm-notice"><div className="bm-notice-icon"><Cpu size={17}/></div><div><strong>Four foundations. One governed execution fabric.</strong><span>Every department, capability, adapter, agent and workflow depends on these platform cores.</span></div><span className="bm-notice-tag">CORE BLUEPRINT</span></div>
+    <div className="bm-core-grid">{cores.map(({code,name,icon:Icon,purpose,boundary})=><section className="bm-panel bm-core-card" key={code}><div className="bm-core-card-head"><span className="bm-core-icon"><Icon size={21}/></span><span className="bm-core-code">{code}</span></div><h2>{name}</h2><p>{purpose}</p><div className="bm-core-boundary"><LockKeyhole size={13}/>{boundary}</div><div className="bm-core-foot"><span>FOUNDATION SPECIFICATION</span><span>NOT PROVISIONED</span></div></section>)}</div>
+  </div>;
 }
 
 function Overview({ onNavigate, departments, areas }: { onNavigate: (section: Section) => void; departments: Domain[]; areas: Domain[] }) {

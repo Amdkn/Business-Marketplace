@@ -39,14 +39,11 @@ function readNumber(item: Record<string, unknown>, ...keys: string[]): number | 
   return undefined;
 }
 
-/** Crude probability guess from the stage — real deals carry this elsewhere. */
-function probabilityFor(stage: string | undefined, value: number | undefined): number {
-  const s = (stage ?? '').toLowerCase();
-  if (s.includes('won') || s.includes('closed')) return 100;
-  if (s.includes('proposal')) return 60;
-  if (s.includes('qualified')) return 30;
-  if (s.includes('discovery')) return 15;
-  return value ? Math.min(50, Math.round(value / 50)) : 0;
+function formatSalesMoney(amount: number, currency: string): string {
+  if (/^[A-Z]{3}$/.test(currency)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount); } catch { /* unknown currency code */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
 }
 
 const OFFER_BLURBS: Record<string, string> = {
@@ -63,57 +60,39 @@ export function SalesItemDetail(props: ItemDetailProps) {
   const offer = readString(item, 'offer') ?? '';
   const stage = readString(item, 'stage', 'status');
   const amount = readNumber(item, 'value', 'amount');
-  const prob = probabilityFor(stage, amount);
-  const weightedValue = amount !== undefined ? Math.round((amount * prob) / 100) : undefined;
+  const currency = readString(item, 'currency')?.toUpperCase() ?? '';
+  const reportedProbability = readNumber(item, 'probability', 'winProbability');
+  const prob = reportedProbability === undefined ? undefined : Math.max(0, Math.min(100, reportedProbability));
+  const weightedValue = amount !== undefined && prob !== undefined ? Math.round((amount * prob) / 100) : undefined;
   const offerBlurb = OFFER_BLURBS[offer] ?? `Coaching engagement for ${title}. Stage: ${stage ?? 'open'}.`;
   const addToast = useShellStore((s) => s.addToast);
   const clientsItems = useCmsStore((s) => s.items['clients']) ?? [];
   const addItem = useCmsStore((s) => s.addItemPersisted);
-  /** Mark Paid · Send onboarding — wire the deal to a real invoice + client.
-   *  Before, this button only pushed a toast. Now it derives an invoice number
-   *  from the current ISO month, ensures the client exists (matches by
-   *  case-insensitive name), and confirms each side via its own toast. */
+  /** Create a sent invoice from a won deal only when its canonical client and currency are present. */
   const onWonOnboard = async (dealId: string): Promise<void> => {
     if (amount === undefined || amount <= 0) {
       addToast({ source: 'Sales', type: 'warning', message: 'Deal value is missing — cannot invoice.' });
       return;
     }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      addToast({ source: 'Sales', type: 'warning', message: 'Deal currency is missing or invalid — invoice creation refused.' });
+      return;
+    }
+    const clientId = String(item.clientId ?? '');
+    const client = clientsItems.find((candidate) => String(candidate.id) === clientId);
+    if (!client) {
+      addToast({ source: 'Sales', type: 'warning', message: 'This deal is not linked to an existing workspace client. Link the client before invoicing.' });
+      return;
+    }
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
-    const isoMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const clientName = String(item['client'] ?? title).trim() || title;
-
-    const existingClient = clientsItems.find((client) =>
-      String(client.name ?? '').trim().toLowerCase() === clientName.toLowerCase());
-    let clientId = existingClient ? String(existingClient.id) : '';
-    if (!existingClient) {
-      const clientResult = await addItem('clients', {
-        name: clientName,
-        segment: `${offer || 'Coaching'} — ${offer ? 'Citadelle high ticket' : 'coaching'}`,
-        ticket: amount,
-        openThreads: 0,
-        nextSession: 'Not scheduled',
-        health: 100,
-        onboardingStep: '1 / 7',
-        status: 'Onboarding',
-      });
-      if (!clientResult.ok) {
-        addToast({ source: 'Sales', type: 'warning', message: `Client non créé : ${clientResult.error ?? 'erreur inconnue'}.` });
-        return;
-      }
-      if (!clientResult.item?.id) {
-        addToast({ source: 'Sales', type: 'warning', message: 'Client creation returned no persisted record; invoice was not created.' });
-        return;
-      }
-      clientId = String(clientResult.item.id);
-      addToast({ source: 'Sales', type: 'success', message: `Client « ${clientName} » créé et enregistré.` });
-    }
-
+    const clientName = String(client.name ?? client.title ?? client.id);
     const invoiceResult = await addItem('invoices', {
       client: clientName,
       clientId,
-      number: `INV-${isoMonth}-${dealId.slice(-4)}`,
+      number: `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${dealId.slice(-4)}`,
       amount,
+      currency,
       status: 'Sent',
       due: due.toISOString().slice(0, 10),
       dueAt: due.toISOString(),
@@ -122,13 +101,9 @@ export function SalesItemDetail(props: ItemDetailProps) {
       description: `Invoice line · ${offer || 'coaching engagement'} — deal ${dealId}`,
     });
     if (invoiceResult.ok) {
-      addToast({
-        source: 'Sales',
-        type: 'success',
-        message: `Facture créée et enregistrée pour ${clientName} ($${amount.toLocaleString('en-US')}).`,
-      });
+      addToast({ source: 'Sales', type: 'success', message: `Invoice persisted for ${clientName} (${formatSalesMoney(amount, currency)}).` });
     } else {
-      addToast({ source: 'Sales', type: 'warning', message: `Facture non créée : ${invoiceResult.error ?? 'erreur inconnue'}.` });
+      addToast({ source: 'Sales', type: 'warning', message: `Invoice not created: ${invoiceResult.error ?? 'unknown error'}.` });
     }
   };
 
@@ -213,11 +188,11 @@ export function SalesItemDetail(props: ItemDetailProps) {
                   className="text-5xl font-extrabold leading-none mt-1 tabular-nums"
                   style={{ color: accent }}
                 >
-                  ${amount.toLocaleString('en-US')}
+                  {formatSalesMoney(amount, currency)}
                 </div>
                 {weightedValue !== undefined && (
                   <div className="text-xs font-semibold mt-2 flex items-center gap-1 justify-end" style={{ color: 'var(--theme-muted)' }}>
-                    <Target className="w-3 h-3" /> {prob}% likely · ${weightedValue.toLocaleString('en-US')} weighted
+                    <Target className="w-3 h-3" /> {prob}% reported · {formatSalesMoney(weightedValue, currency)} weighted
                   </div>
                 )}
               </div>
@@ -299,10 +274,10 @@ export function SalesItemDetail(props: ItemDetailProps) {
             <ul className="space-y-2.5">
               {[
                 {
-                  label: isWon ? 'Mark Paid · Send onboarding' : 'Send proposal',
+                  label: isWon ? 'Create invoice' : 'Send proposal',
                   message: isWon
-                    ? `Onboarding packet queued for ${title}`
-                    : `Proposal drafted for ${title}`,
+                    ? `Create an invoice for ${title}`
+                    : `Proposal draft for ${title} is not connected to a persisted workflow.`,
                   onClick: isWon ? () => onWonOnboard(String(item.id)) : undefined,
                 },
                 {
@@ -344,7 +319,7 @@ export function SalesItemDetail(props: ItemDetailProps) {
                 Weighted forecast
               </div>
               <div className="text-xl font-extrabold tabular-nums" style={{ color: accent }}>
-                {weightedValue !== undefined ? `$${weightedValue.toLocaleString('en-US')}` : '—'}
+                {weightedValue !== undefined ? formatSalesMoney(weightedValue, currency) : 'Not reported'}
               </div>
             </div>
           </div>

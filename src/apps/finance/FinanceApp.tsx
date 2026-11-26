@@ -220,7 +220,7 @@ export function FinanceApp() {
       : await addItemPersisted('invoices', invoiceDraft);
     setSavingInvoice(false);
     if (result.ok) {
-      addToast({ source: 'Finance', type: 'success', message: `Invoice persisted for ${String(client.name ?? client.id)}.` });
+      addToast({ source: 'Finance', type: 'success', message: isDemoTenant ? `Demo invoice created for ${String(client.name ?? client.id)}.` : `Invoice persisted for ${String(client.name ?? client.id)}.` });
       setComposerClientId('');
       setComposerAmount('');
       setComposerCurrency('');

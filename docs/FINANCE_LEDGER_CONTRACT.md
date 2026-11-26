@@ -102,3 +102,31 @@ The provisioning path is structurally verified only. The live project currently 
 
 
 Finance authorization alignment: the live Edge Function uses a dedicated Finance role gate that accepts S0_SOVEREIGN, B1_CEO, B2_MANAGER and B2.2 (Treasury), matching the database function. This avoids relying on the broader non-finance organization role helper.
+
+## Versioned Fee Policy Engine
+
+The hosted Finance schema now includes `finance.fee_policies` and `finance.order_fee_snapshots`.
+
+A fee policy is owned by a Marketplace operator organization and supports:
+- `PLATFORM` scope or a seller-organization-specific scope.
+- Versioned policy keys, optional currency binding and effective time windows.
+- Percentage commission in basis points (0–10,000), fixed fee, optional minimum/maximum and explicit currency rounding scale (0–6).
+- Draft → Active → Retired lifecycle. Once activated, terms are immutable; a new version is required for a change.
+- Activation rejects overlapping effective windows for the same owner, policy key, scope and currency.
+
+The order fee snapshot is one-per-order and immutable. It records the exact policy/version, gross amount, rate, fixed fee, calculated platform fee, seller net, currency, rounding scale and calculation metadata. Repeated application of the same policy is idempotent; a different policy cannot overwrite an existing snapshot.
+
+Calculation contract:
+1. `round(gross × rate_bps / 10,000 + fixed_fee, rounding_scale)`
+2. Apply configured minimum and maximum fee.
+3. Cap the final fee at gross so seller net never becomes negative.
+4. Seller net = gross − platform fee.
+
+Taxes and payment processing costs are explicitly excluded from this fee snapshot. This is a commission allocation, not tax advice or payment-provider pricing. No default commission rate is seeded: an authorized Finance role must deliberately create and activate a policy. No policy or order snapshot has been fabricated in the empty live tenant environment.
+
+Authenticated Edge actions:
+- `create_fee_policy`
+- `activate_fee_policy`
+- `apply_order_fee_policy`
+
+The SQL boundary rechecks active membership and Finance roles (S0, B1, B2, B2.2), uses SECURITY DEFINER with a pinned search_path, and grants EXECUTE only to `service_role`. The Edge Function uses `requireFinanceRole` and remains JWT-verified.

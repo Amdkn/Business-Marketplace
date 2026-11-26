@@ -21,6 +21,15 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid='workspace_data.invoices'::regclass
+      AND tgname='invoices_deal_client_match'
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Invoice/deal client consistency trigger is missing';
+  END IF;
+
+  IF NOT EXISTS (
     SELECT 1 FROM pg_indexes
     WHERE schemaname='workspace_data' AND tablename='invoices'
       AND indexname='invoices_source_key_uidx'

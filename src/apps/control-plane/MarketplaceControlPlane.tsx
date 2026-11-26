@@ -82,10 +82,12 @@ const sectionCopy: Record<Section, { eyebrow: string; title: string; description
 export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => void }) {
   const [active, setActive] = useState<Section>('overview');
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [registryAxis, setRegistryAxis] = useState<'departments' | 'areas'>('departments');
   const [query, setQuery] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
   const copy = sectionCopy[active];
-  const filteredDomains = useMemo(() => domains.filter(d => `${d.name} ${d.code} ${d.description}`.toLowerCase().includes(query.toLowerCase())), [query]);
+  const axisDomains = registryAxis === 'departments' ? businessDepartments : areasPortfolios;
+  const filteredDomains = useMemo(() => axisDomains.filter(d => `${d.name} ${d.code} ${d.description}`.toLowerCase().includes(query.toLowerCase())), [axisDomains, query]);
   const selected = domains.find(d => d.id === selectedDomain);
 
   return (
@@ -106,7 +108,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
             {nav.filter(item => item.group === group).map(item => {
               const Icon = item.icon;
               return <button key={item.id} className={`bm-nav-item ${active === item.id ? 'active' : ''}`} onClick={() => { setActive(item.id); setSelectedDomain(null); setMobileNav(false); }}>
-                <Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === 'domains' && <span className="bm-nav-count">12</span>}
+                <Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === 'domains' && <span className="bm-nav-count">8 + 8</span>}
               </button>;
             })}
           </div>
@@ -136,7 +138,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
           </div>
 
           {active === 'overview' && <Overview onNavigate={setActive} />}
-          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} />}
+          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} />}
           {active === 'adapters' && <AdaptersView />}
           {active === 'marketplace' && <ComingSoon icon={Blocks} title="Capability marketplace" text="The catalog will install versioned business capabilities and solution packs into a workspace. The inherited integration gallery is preserved as runtime material while this lifecycle is built." />}
           {active === 'workspaces' && <ComingSoon icon={Building2} title="Organization workspaces" text="Organization provisioning, membership and workspace isolation are being connected to the Marketplace identity model." />}
@@ -153,12 +155,12 @@ function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
   return <div className="bm-stack">
     <div className="bm-notice"><div className="bm-notice-icon"><Sparkles size={17} /></div><div><strong>Control plane foundation is online.</strong><span>This preview establishes the product shell. Operational metrics and tenant records are intentionally not fabricated or connected yet.</span></div><span className="bm-notice-tag">NO LIVE TENANT DATA</span></div>
     <div className="bm-metric-grid">
-      {[['12','Business domains','Reference blueprint'],['20','Adapter families','Integration design scope'],['3','Runtime surfaces','Desktop · Garden · Mobile'],['0','Verified connections','Awaiting adapter implementation']].map(([value,label,sub],i) => <div className="bm-metric" key={label}><div className="bm-metric-top"><span>{label}</span><span className="bm-metric-icon">{[<Network size={16}/>,<Zap size={16}/>,<Layers3 size={16}/>,<Activity size={16}/>][i]}</span></div><strong>{value}</strong><small>{sub}</small></div>)}
+      {[['8','Business departments','B2.1 – B2.8'],['8','Areas OS portfolios','LD01 – LD08'],['20','Adapter families','Integration design scope'],['3','Runtime surfaces','Desktop · Garden · Mobile']].map(([value,label,sub],i) => <div className="bm-metric" key={label}><div className="bm-metric-top"><span>{label}</span><span className="bm-metric-icon">{[<Network size={16}/>,<Zap size={16}/>,<Layers3 size={16}/>,<Activity size={16}/>][i]}</span></div><strong>{value}</strong><small>{sub}</small></div>)}
     </div>
     <div className="bm-section-grid">
-      <section className="bm-panel bm-domain-panel"><div className="bm-panel-head"><div><span className="bm-eyebrow">BUSINESS ONTOLOGY</span><h2>Domain landscape</h2></div><button className="bm-text-link" onClick={() => onNavigate('domains')}>Open registry <ArrowRight size={14}/></button></div>
-        <div className="bm-domain-list">{domains.slice(0,6).map(d=><button key={d.id} className="bm-domain-row" onClick={() => onNavigate('domains')}><span className="bm-domain-dot" style={{background:d.color}}/><span className="bm-domain-code">{d.code}</span><span className="bm-domain-name">{d.name}</span><span className="bm-domain-cap">{d.capabilities} caps</span><ChevronRight size={14}/></button>)}</div>
-        <div className="bm-panel-foot">Reference taxonomy · illustrative blueprint, not provisioned tenant data</div>
+      <section className="bm-panel bm-domain-panel"><div className="bm-panel-head"><div><span className="bm-eyebrow">TWO DISTINCT TAXONOMY AXES</span><h2>Business structure × Areas OS</h2></div><button className="bm-text-link" onClick={() => onNavigate('domains')}>Open registry <ArrowRight size={14}/></button></div>
+        <div className="bm-mini-axis-label">BUSINESS DEPARTMENTS · B2.1–B2.8</div><div className="bm-domain-list">{businessDepartments.map(d=><button key={d.id} className="bm-domain-row" onClick={() => onNavigate('domains')}><span className="bm-domain-dot" style={{background:d.color}}/><span className="bm-domain-code">{d.code}</span><span className="bm-domain-name">{d.name}</span><ChevronRight size={14}/></button>)}</div><div className="bm-mini-axis-label bm-mini-axis-second">AREAS OS · LD01–LD08</div><div className="bm-domain-list">{areasPortfolios.map(d=><button key={d.id} className="bm-domain-row" onClick={() => onNavigate('domains')}><span className="bm-domain-dot" style={{background:d.color}}/><span className="bm-domain-code">{d.code}</span><span className="bm-domain-name">{d.name}</span><ChevronRight size={14}/></button>)}</div>
+        <div className="bm-panel-foot">Two separate architectural axes · reference blueprint, not provisioned tenant data</div>
       </section>
       <section className="bm-panel bm-stack-panel"><div className="bm-panel-head"><div><span className="bm-eyebrow">COMPOSITION LAYER</span><h2>Platform building blocks</h2></div><Layers3 size={18}/></div>
         {[['Domains','Business structure & ownership',Network],['Capabilities','Reusable business functions',Blocks],['Adapters','Provider connectivity layer',Zap],['Agents','Delegated execution identities',Sparkles],['Workflows','Human + agent orchestration',Workflow]].map(([name,desc,Icon]: any)=><div className="bm-building-row" key={name}><span className="bm-building-icon"><Icon size={16}/></span><div><strong>{name}</strong><small>{desc}</small></div><span className="bm-building-state">SPECIFIED</span></div>)}

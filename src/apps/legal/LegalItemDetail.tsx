@@ -212,7 +212,7 @@ export function LegalItemDetail(props: ItemDetailProps) {
    * Un toast disparait en cinq secondes et ne laisse aucune trace dans la
    * fiche ni dans la liste : ce n'est pas une fonctionnalite. Les deux
    * ecrivent desormais le statut du document dans le CMS. */
-  const updateItem = useCmsStore((s) => s.updateItem);
+  const updateItem = useCmsStore((s) => s.updateItemPersisted);
   const setDocStatus = (next: string, message: string) => {
     updateItem(def.id, String(item.id), { status: next });
     addToast({ source: 'Legal', type: 'success', message });

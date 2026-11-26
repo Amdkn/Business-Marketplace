@@ -90,7 +90,7 @@ function readAmount(item: DealDetail): number | undefined {
   if (typeof item.amount === 'number' && Number.isFinite(item.amount) && item.amount > 0) return item.amount;
   const valueField = item.fields.find((field) => field.label === 'Value');
   if (!valueField) return undefined;
-  const raw = valueField.value.replace(/[^\\d.]/g, '');
+  const raw = valueField.value.replace(/[^\d.]/g, '');
   const amount = Number(raw);
   return Number.isFinite(amount) && amount > 0 ? amount : undefined;
 }

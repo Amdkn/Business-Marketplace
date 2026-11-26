@@ -73,178 +73,428 @@ function setMode(next: SupabaseMode, err?: unknown): void {
  * `cms_items` (events append-only).
  * ──────────────────────────────────────────────────────────────────── */
 
-const TYPED_TABLES: Record<string, string> = {
-  clients: 'cms_clients',
-  articles: 'cms_articles',
-  team: 'cms_team',
-  people_agents: 'cms_people_agents',
-  runbooks: 'cms_runbooks',
-  incidents: 'cms_incidents',
-  services: 'cms_services',
-  it_experiments: 'cms_it_experiments',
-  deploys: 'cms_deploys',
-  tasks: 'cms_tasks',
-  marketplace_listings: 'cms_marketplace_listings',
-  product_items: 'cms_product_items',
-  product_releases: 'cms_product_releases',
-  growth_channels: 'cms_growth_channels',
-  growth_experiments: 'cms_growth_experiments',
-  deals: 'cms_deals',
-  invoices: 'cms_invoices',
-  contracts: 'cms_contracts',
-  policies: 'cms_policies',
-  session_notes: 'cms_session_notes',
-  demo_coach_apps: 'cms_demo_coach_apps',
-  demo_coach_notes: 'cms_demo_coach_notes',
-  demo_coach_metrics: 'cms_demo_coach_metrics',
+// Each persistent CMS collection has a dedicated typed table in workspace_data.
+const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
+  "clients": {
+    "title": "name",
+    "fields": [
+      "segment",
+      "ticket",
+      "openThreads",
+      "nextSession",
+      "health",
+      "onboardingStep",
+      "status"
+    ]
+  },
+  "articles": {
+    "title": "title",
+    "fields": [
+      "category",
+      "reads",
+      "updated",
+      "body"
+    ]
+  },
+  "team": {
+    "title": "name",
+    "fields": [
+      "role",
+      "focus",
+      "status",
+      "bio"
+    ]
+  },
+  "people_agents": {
+    "title": "name",
+    "fields": [
+      "codename",
+      "role",
+      "status",
+      "task",
+      "rank",
+      "domain",
+      "squad",
+      "cadence"
+    ]
+  },
+  "runbooks": {
+    "title": "title",
+    "fields": [
+      "category",
+      "updated",
+      "steps"
+    ]
+  },
+  "incidents": {
+    "title": "title",
+    "fields": [
+      "when",
+      "severity",
+      "resolution"
+    ]
+  },
+  "services": {
+    "title": "name",
+    "fields": [
+      "note",
+      "status",
+      "detail"
+    ]
+  },
+  "it_experiments": {
+    "title": "title",
+    "fields": [
+      "stage",
+      "meta",
+      "notes"
+    ]
+  },
+  "deploys": {
+    "title": "commit",
+    "fields": [
+      "target",
+      "when",
+      "status"
+    ]
+  },
+  "tasks": {
+    "title": "label",
+    "fields": [
+      "when",
+      "group",
+      "done"
+    ]
+  },
+  "marketplace_listings": {
+    "title": "name",
+    "fields": [
+      "tag",
+      "blurb",
+      "installed",
+      "featured"
+    ]
+  },
+  "product_items": {
+    "title": "title",
+    "fields": [
+      "stage",
+      "meta",
+      "priority"
+    ]
+  },
+  "product_releases": {
+    "title": "name",
+    "fields": [
+      "version",
+      "when",
+      "notes"
+    ]
+  },
+  "growth_channels": {
+    "title": "name",
+    "fields": [
+      "leads",
+      "cac",
+      "trend"
+    ]
+  },
+  "growth_experiments": {
+    "title": "title",
+    "fields": [
+      "lift",
+      "notes"
+    ]
+  },
+  "deals": {
+    "title": "client",
+    "fields": [
+      "offer",
+      "value",
+      "stage"
+    ]
+  },
+  "invoices": {
+    "title": "client",
+    "fields": [
+      "amount",
+      "due",
+      "status"
+    ]
+  },
+  "contracts": {
+    "title": "document",
+    "fields": [
+      "client",
+      "signed",
+      "status"
+    ]
+  },
+  "policies": {
+    "title": "name",
+    "fields": [
+      "updated",
+      "body"
+    ]
+  },
+  "session_notes": {
+    "title": "topic",
+    "fields": [
+      "clientName",
+      "date",
+      "duration",
+      "sentiment",
+      "body"
+    ]
+  },
+  "legal_ai_act_checks": {
+    "title": "label",
+    "fields": [
+      "category",
+      "done",
+      "description",
+      "clearedAt"
+    ]
+  },
+  "legal_frameworks": {
+    "title": "name",
+    "fields": [
+      "family",
+      "short",
+      "scope",
+      "owner",
+      "appliesFrom",
+      "status"
+    ]
+  },
+  "legal_controls": {
+    "title": "code",
+    "fields": [
+      "title",
+      "framework",
+      "severity",
+      "owner",
+      "evidenceCount",
+      "lastTested",
+      "status"
+    ]
+  },
+  "legal_compliance_policies": {
+    "title": "name",
+    "fields": [
+      "version",
+      "owner",
+      "updated",
+      "reviewBy",
+      "body"
+    ]
+  },
+  "legal_evidence": {
+    "title": "title",
+    "fields": [
+      "control",
+      "kind",
+      "location",
+      "collectedAt",
+      "expiresAt"
+    ]
+  },
+  "legal_risks": {
+    "title": "title",
+    "fields": [
+      "area",
+      "likelihood",
+      "impact",
+      "rating",
+      "mitigation",
+      "owner",
+      "status"
+    ]
+  },
+  "legal_vendors": {
+    "title": "name",
+    "fields": [
+      "category",
+      "dataAccess",
+      "dpaSigned",
+      "dpaDate",
+      "lastReview",
+      "risk"
+    ]
+  },
+  "legal_gaps": {
+    "title": "title",
+    "fields": [
+      "control",
+      "framework",
+      "severity",
+      "openedOn",
+      "owner",
+      "status"
+    ]
+  },
+  "personas": {
+    "title": "name",
+    "fields": [
+      "pronouns",
+      "wants",
+      "blockers",
+      "vocabulary",
+      "anchor",
+      "anchorKind",
+      "anchorDate",
+      "domain"
+    ]
+  },
+  "memory": {
+    "title": "fact",
+    "fields": [
+      "fact",
+      "provenance",
+      "retainedOn",
+      "verification",
+      "verifiedBy",
+      "recheckOn",
+      "domain",
+      "notes"
+    ]
+  },
+  "codex": {
+    "title": "situation",
+    "fields": [
+      "situation",
+      "recipe",
+      "why",
+      "appliedCount",
+      "lastApplied",
+      "domain",
+      "owners",
+      "caveats"
+    ]
+  },
+  "approval_decisions": {
+    "title": "scenarioName",
+    "fields": [
+      "scenarioId",
+      "scenarioName",
+      "verdict",
+      "decidedBy",
+      "proposalCount",
+      "rationale",
+      "decidedAt"
+    ]
+  },
+  "squads": {
+    "title": "name",
+    "fields": [
+      "mission",
+      "lead",
+      "members",
+      "rank",
+      "status",
+      "lastSprint"
+    ]
+  },
+  "content": {
+    "title": "title",
+    "fields": [
+      "channel",
+      "audience",
+      "status",
+      "readTime",
+      "hook",
+      "cta"
+    ]
+  }
 };
 
-export function tableFor(collectionId: string): string {
-  return TYPED_TABLES[collectionId] ?? 'cms_items';
+export function tableFor(collectionId: string): string | null {
+  return COLLECTION_FIELDS[collectionId] ? collectionId : null;
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * Original repository — rétro-compat Brief-F (Phase 1) + Brief-B (Phase 4)
- * ──────────────────────────────────────────────────────────────────── */
+function toSnake(key: string): string {
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
 
-let cachedOrgId: string | null | undefined;
-
-/** Resolves the signed-in coach's org_id, or null if there is no session yet
- *  (no auth UI exists in Coach OS today — this is the hook Phase 2 wires into). */
-export async function getCurrentOrgId(): Promise<string | null> {
-  if (!supabaseConfigured) {
-    setMode('unconfigured');
-    return null;
+function fromWorkspaceRow(collectionId: string, row: Record<string, unknown>): CmsItem {
+  const shape = COLLECTION_FIELDS[collectionId];
+  const extra = (row.extra_data && typeof row.extra_data === 'object' ? row.extra_data : {}) as Record<string, unknown>;
+  const item: Record<string, unknown> = { ...extra, id: row.id };
+  if (shape && row.title != null) item[shape.title] = row.title;
+  for (const field of shape?.fields ?? []) {
+    const value = row[toSnake(field)];
+    if (value !== null && value !== undefined) item[field] = value;
   }
-  if (cachedOrgId !== undefined) return cachedOrgId;
+  return item as CmsItem;
+}
 
+function toWorkspaceRow(collectionId: string, item: CmsItem, orgId: string, userId: string): Record<string, unknown> {
+  const shape = COLLECTION_FIELDS[collectionId];
+  if (!shape) throw new Error(`[cms] no dedicated table for collection: ${collectionId}`);
+  const row: Record<string, unknown> = {
+    id: item.id,
+    organization_id: orgId,
+    created_by_user_id: userId,
+    title: item[shape.title] ?? null,
+    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'id')),
+    updated_at: new Date().toISOString(),
+  };
+  for (const field of shape.fields) row[toSnake(field)] = item[field] ?? null;
+  return row;
+}
+
+export async function getCurrentOrgId(): Promise<string | null> {
+  if (!supabaseConfigured) { setMode('unconfigured'); return null; }
+  if (cachedOrgId !== undefined) return cachedOrgId;
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      setMode('no-org');
-      cachedOrgId = null;
-      return null;
-    }
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('org_id')
-      .eq('user_id', session.user.id)
-      .limit(1)
-      .maybeSingle();
-    if (error || !data) {
-      setMode('no-org', error ?? 'no membership row');
-      cachedOrgId = null;
-      return null;
-    }
-    cachedOrgId = data.org_id as string;
-    setMode('connected');
-    return cachedOrgId;
-  } catch (err) {
-    setMode('unreachable', err);
-    cachedOrgId = null;
-    return null;
-  }
+    if (!session?.user) { setMode('no-org'); cachedOrgId = null; return null; }
+    const { data, error } = await supabase.schema('identity')
+      .from('organization_memberships').select('organization_id')
+      .eq('user_id', session.user.id).eq('membership_status', 'ACTIVE')
+      .limit(1).maybeSingle();
+    if (error || !data) { setMode('no-org', error ?? 'no active membership'); cachedOrgId = null; return null; }
+    cachedOrgId = data.organization_id as string; setMode('connected'); return cachedOrgId;
+  } catch (err) { setMode('unreachable', err); cachedOrgId = null; return null; }
 }
 
-/** Hydrates a collection's live items from Supabase for the given org.
- *  Returns null (not []) when there is no session/org yet, so callers can
- *  distinguish "no data" from "not authenticated — use the bundled seed". */
+/** Hydrate one dedicated tenant table; demo-only collections deliberately stay local. */
 export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
   const orgId = await getCurrentOrgId();
-  if (!orgId) return null;
-
+  if (!orgId || !tableFor(collectionId)) return null;
   try {
-    const { data, error } = await supabase
-      .from('cms_items')
-      .select('id, data')
-      .eq('org_id', orgId)
-      .eq('collection_id', collectionId);
-    if (error || !data) return null;
-    return data.map((row) => ({ id: row.id as string, ...(row.data as Record<string, unknown>) }));
-  } catch {
-    return null;
-  }
+    const { data, error } = await supabase.schema('workspace_data').from(collectionId)
+      .select('*').eq('organization_id', orgId).order('created_at', { ascending: false });
+    if (error || !data) { setMode('unreachable', error); return null; }
+    setMode('connected');
+    return data.map((row) => fromWorkspaceRow(collectionId, row as Record<string, unknown>));
+  } catch (err) { setMode('unreachable', err); return null; }
 }
 
-/** Ensures the collection definition itself exists remotely (idempotent upsert). */
-export async function upsertCollectionDef(def: CmsCollectionDef): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return;
+/** Collection metadata lives in source-controlled definitions, not tenant rows. */
+export async function upsertCollectionDef(_def: CmsCollectionDef): Promise<void> { /* definitions are versioned with the app */ }
 
-  try {
-    await supabase.from('cms_collections').upsert({
-      id: def.id,
-      org_id: orgId,
-      name: def.name,
-      singular: def.singular,
-      accent: def.accent,
-      title_field: def.titleField,
-      subtitle_field: def.subtitleField ?? null,
-      badge_field: def.badgeField ?? null,
-      fields: def.fields,
-    });
-  } catch {
-    // best-effort — the in-memory store already has the definition either way
-  }
-}
-
-/** Upserts one item. Fire-and-forget from the caller's perspective — the
- *  Zustand store already updated optimistically before this resolves. */
+/** Persist one item in its dedicated typed collection table. */
 export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
   const orgId = await getCurrentOrgId();
-  if (!orgId) return;
-
+  if (!orgId || !tableFor(collectionId)) return;
   try {
-    const { id, ...data } = item;
-    await supabase.from('cms_items').upsert({
-      id, collection_id: collectionId, org_id: orgId, data, updated_at: new Date().toISOString(),
-    });
-  } catch {
-    // best-effort — local state is the source of truth until Supabase confirms
-  }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const row = toWorkspaceRow(collectionId, item, orgId, session.user.id);
+    const { error } = await supabase.schema('workspace_data').from(collectionId).upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    setMode('connected');
+  } catch (err) { setMode('unreachable', err); throw err; }
 }
 
-/** Removes one item. Fire-and-forget from the caller's perspective — the
- *  Zustand store already updated optimistically before this resolves.
- *  Brief-F (2026-08-07) — la couche d'écriture appelle ce chemin en miroir
- *  de `upsertItem`. Sans lui, `removeItem` du store laissait la ligne dans
- *  Supabase après un rechargement. */
+/** Delete only the matching row within the resolved tenant. */
 export async function removeItem(collectionId: string, id: string): Promise<void> {
   const orgId = await getCurrentOrgId();
-  if (!orgId) return;
-
-  try {
-    await supabase
-      .from('cms_items')
-      .delete()
-      .eq('id', id)
-      .eq('collection_id', collectionId)
-      .eq('org_id', orgId);
-  } catch {
-    // best-effort — local state is the source of truth until Supabase confirms
-  }
+  if (!orgId || !tableFor(collectionId)) return;
+  const { error } = await supabase.schema('workspace_data').from(collectionId)
+    .delete().eq('id', id).eq('organization_id', orgId);
+  if (error) throw error;
 }
 
-/** Append-only event sink used by domain surfaces to record state-changing
- *  decisions without mutating existing rows. D4 append-only compliance, no
- *  UPSERT semantics, no PATCH semantics. */
-export async function appendCmsEvent(args: {
-  collectionId: string;
-  data: Record<string, unknown>;
-}): Promise<string | null> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return null;
-  const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  try {
-    await supabase.from('cms_items').insert({
-      id,
-      collection_id: args.collectionId,
-      org_id: orgId,
-      data: args.data,
-      updated_at: new Date().toISOString(),
-    });
-    return id;
-  } catch {
-    return null;
-  }
-}
+

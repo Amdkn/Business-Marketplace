@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The live project returned **30 applied migration entries**. Thirty source files are tracked in this repository, including the three new Finance & Capital migrations. The 20261126041718 historical event-trigger ACL migration remains a catalog-derived reconstruction, not byte-identical original SQL:
+The connected Marketplace project currently reports **65 applied migration entries**. All 65 have a matching source file in this repository. The cloud version is the database runner's application timestamp; the source filename is the authored migration identity.
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -47,13 +47,55 @@ The live project returned **30 applied migration entries**. Thirty source files 
 | 20261126051720 | adapter_oauth_runtime_guards | migrations/20261126050000_adapter_oauth_runtime_guards.sql |
 | 20261126052043 | google_drive_adapter_manifest_draft | migrations/20261126052200_google_drive_adapter_manifest_draft.sql |
 | 20261126052132 | google_drive_blueprint_contract_status | migrations/20261126052300_google_drive_blueprint_contract_status.sql |
-| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |\n| 20261126061930 | finance_double_entry_foundation | migrations/20261126061930_finance_double_entry_foundation.sql |\n| 20261126062124 | finance_integrity_guards | migrations/20261126062124_finance_integrity_guards.sql |\n| 20261126062317 | finance_payment_fact_immutability | migrations/20261126062317_finance_payment_fact_immutability.sql |\n| 20261126062541 | finance_foreign_key_indexes | migrations/20261126062541_finance_foreign_key_indexes.sql |\n| 20261126062749 | finance_journal_posting_api | migrations/20261126062749_finance_journal_posting_api.sql |
+| 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |
+| 20261126061930 | finance_double_entry_foundation | migrations/20261126061930_finance_double_entry_foundation.sql |
+| 20261126062124 | finance_integrity_guards | migrations/20261126062124_finance_integrity_guards.sql |
+| 20261126062317 | finance_payment_fact_immutability | migrations/20261126062317_finance_payment_fact_immutability.sql |
+| 20261126062541 | finance_foreign_key_indexes | migrations/20261126062541_finance_foreign_key_indexes.sql |
+| 20261126062749 | finance_journal_posting_api | migrations/20261126062749_finance_journal_posting_api.sql |
+| 20261126063639 | finance_chart_of_accounts_provisioning | migrations/20261126070000_finance_chart_of_accounts_provisioning.sql |
+| 20261126063716 | finance_chart_version_regex_fix | migrations/20261126070100_finance_chart_version_regex_fix.sql |
+| 20261126064613 | finance_fee_policy_engine | migrations/20261126073000_finance_fee_policy_engine.sql |
+| 20261126065022 | finance_fee_policy_fk_indexes | migrations/20261126073100_finance_fee_policy_fk_indexes.sql |
+| 20261126065146 | fee_policy_activation_serialization | migrations/20261126073200_fee_policy_activation_serialization.sql |
+| 20261126065710 | finance_captured_payment_posting | migrations/20261126073300_finance_captured_payment_posting.sql |
+| 20261126065755 | captured_payment_posting_retry_safety | migrations/20261126073400_captured_payment_posting_retry_safety.sql |
+| 20261126070301 | finance_refund_fee_allocation_posting | migrations/20261126073500_finance_refund_fee_allocation_posting.sql |
+| 20261126070818 | finance_journal_account_locking | migrations/20261126073600_finance_journal_account_locking.sql |
+| 20261126070925 | finance_paid_payout_ledger_posting | migrations/20261126073700_finance_paid_payout_ledger_posting.sql |
+| 20261126074321 | marketplace_garden_dashboard_tenant_data | migrations/20261126080000_marketplace_garden_dashboard_tenant_data.sql |
+| 20261126080152 | replace_legacy_namespace_with_dashboard | migrations/20261126080100_replace_legacy_namespace_with_dashboard.sql |
+| 20261126080700 | expose_tenant_identity_context_for_dashboard | migrations/20261126080200_expose_tenant_identity_context_for_dashboard.sql |
+| 20261126083638 | marketplace_interface_persistence | migrations/20261126083638_marketplace_interface_persistence.sql |
+| 20261126090124 | workspace_document_records | migrations/20261126090124_workspace_document_records.sql |
+| 20261126091538 | workspace_scoped_data_access | migrations/20261126091538_workspace_scoped_data_access.sql |
+| 20261126092009 | workspace_data_access_hardening | migrations/20261126092009_workspace_data_access_hardening.sql |
+| 20261126092033 | workspace_policy_predicate_definer_boundary | migrations/20261126092033_workspace_policy_predicate_definer_boundary.sql |
+| 20261126092835 | garden_invoice_and_mission_records | migrations/20261126092835_garden_invoice_and_mission_records.sql |
+| 20261126093031 | current_workspace_context_rpc | migrations/20261126093031_current_workspace_context_rpc.sql |
+| 20261126094200 | agent_workspace_delegation_scope | migrations/20261126094200_agent_workspace_delegation_scope.sql |
+| 20261126094206 | workspace_data_fk_indexes | migrations/20261126094206_workspace_data_fk_indexes.sql |
+| 20261126101352 | 20261126103000_agent_assignment_integrity | migrations/20261126101352_20261126103000_agent_assignment_integrity.sql |
+| 20261126104549 | 20261126105000_operations_change_requests | migrations/20261126104549_20261126105000_operations_change_requests.sql |
+| 20261126104707 | 20261126105500_change_request_decision_audit | migrations/20261126104707_20261126105500_change_request_decision_audit.sql |
+| 20261126104811 | 20261126110000_change_request_fk_indexes | migrations/20261126104811_20261126110000_change_request_fk_indexes.sql |
+| 20261126105452 | 20261126110500_sales_deal_client_currency | migrations/20261126105452_20261126110500_sales_deal_client_currency.sql |
+| 20261126110128 | 20261126111500_invoice_deal_source_idempotency | migrations/20261126110128_20261126111500_invoice_deal_source_idempotency.sql |
+| 20261126110342 | 20261126112000_client_ticket_currency | migrations/20261126110342_20261126112000_client_ticket_currency.sql |
+| 20261126110518 | 20261126112500_invoice_deal_client_consistency | migrations/20261126110518_20261126112500_invoice_deal_client_consistency.sql |
+| 20261126111329 | growth_and_product_workspace_collections | migrations/20261126113000_growth_and_product_workspace_collections.sql |
+| 20261126111556 | growth_product_fk_indexes | migrations/20261126113200_growth_product_fk_indexes.sql |
+| 20261126111628 | growth_product_created_by_fk_indexes | migrations/20261126113300_growth_product_created_by_fk_indexes.sql |
+| 20261126112056 | growth_product_extended_collections | migrations/20261126113500_growth_product_extended_collections.sql |
+| 20261126112710 | remaining_workspace_cms_collections | migrations/20261126114000_remaining_workspace_cms_collections.sql |
 
-The first column is the actual cloud migration registry version; the source filename is the versioned migration name authored in Git. These timestamps differ because the cloud migration runner recorded its own application timestamp. Preserve both values in future audits. The 20261126041718 source file reproduces the verified live ACL but is explicitly a reconstruction, not recovered original SQL.
+One historical source, `20261126041718_revoke_public_execution_rls_auto_enable.sql`, is a catalog-derived reconstruction of the live ACL, not a byte-identical recovery of the original SQL. It is already applied in cloud and must not be replayed.
 
-## Current database inventory
+Twenty older/unapplied SQL files were removed from the executable `supabase/migrations/` directory and preserved under `supabase/archive/legacy-unapplied-migrations/` (19 Coach OS-era files plus one duplicate Finance foundation file). They are provenance/archive material, not pending Marketplace migrations. Do not move them back into the CLI migration path.
 
-Read-only live inspection returned 45 application tables, all with RLS enabled:
+## Current live database inventory
+
+Read-only inspection reports **117 application tables, all 117 with RLS enabled**:
 
 | Schema | Tables | RLS |
 |---|---:|---:|
@@ -63,49 +105,48 @@ Read-only live inspection returned 45 application tables, all with RLS enabled:
 | catalog | 4 | 4/4 |
 | commerce | 3 | 3/3 |
 | integration | 8 | 8/8 |
+| finance | 13 | 13/13 |
 | content | 2 | 2/2 |
-| dashboard (tenant operational data) | 2 | 2/2 |
+| dashboard (legacy compatibility) | 2 | 2/2 |
+| workspace_data | 66 | 66/66 |
 
-The reserved `operations`, `trust`, `finance` and `api` namespaces currently have no application tables in the inspected inventory. This does not mean their Day 1–3 target scope is complete.
+The `dashboard` tables remain legacy compatibility artifacts; Garden and Web Desktop use `workspace_data`. The workspace data layer is not interchangeable with the Marketplace's private `enterprise` and `identity` schemas.
 
-## Active Edge Functions at the live recheck
+## Active Edge Functions and source parity
 
-| Function | Version | Gateway JWT | Boundary |
+| Function | Live version | Gateway JWT | Repository source parity |
 |---|---:|---|---|
-| `marketplace-api` | 18 | enabled | Authenticated tenant API; public read-only catalog actions are explicitly scoped |
-| `adapter-api` | 7 | enabled | Authenticated workspace connection and OAuth initiation API |
-| `adapter-worker` | 7 | disabled | Handler enforces exact server-only service-role bearer validation |
-| `adapter-oauth-callback` | 1 | disabled | Public provider callback validates one-time state and PKCE transaction |
+| `marketplace-api` | 29 | enabled | byte-identical |
+| `adapter-api` | 7 | enabled | byte-identical |
+| `adapter-worker` | 7 | disabled | byte-identical; server-only service-role bearer gate |
+| `adapter-oauth-callback` | 1 | disabled | byte-identical; one-time OAuth state + PKCE transaction gate |
 
-The source files are under `functions/`. The deployed versions were listed live; byte-for-byte source parity against this repository is a separate verification gate and must not be assumed from version numbers alone.
+All four deployed `index.ts` files were fetched from the live Supabase project and compared to their corresponding repository files in this checkpoint. The exact equality check passed for all four.
 
 ## Current tenant and provider state
 
-Live exact counts at the recheck:
+Live table counts show one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. The current workspace context resolves to the existing tenant; do not create another identity or organization to manufacture test data.
 
-- Auth users: 0
-- Organizations / memberships: 0 / 0
-- Workspaces: 0
-- Domain / department / holon installations: 0 / 0 / 0
-- Tenant connections: 0
-- OAuth transactions: 0
-- ACTIVE provider manifests: 0
-- Published listings: 0
-- Orders: 0
+- Domain / department / holon installations: 0 / 0 / 0.
+- Canonical agent principals / delegations: 0 / 0.
+- Tenant provider connections / OAuth transactions: 0 / 0.
+- Provider manifests: one Google Drive v1.0.0 manifest in DRAFT; no ACTIVE provider manifest.
+- Published listings / orders: 0 / 0.
+- The 73 provider-level blueprints remain PLANNED. They are not executable integrations.
 
-Google Drive has a version 1.0.0 manifest in **DRAFT**, with a specified OAuth Authorization Code + PKCE contract and six metadata operations. Its provider blueprint remains **PLANNED**; no client credentials, authorized user, connection or real provider round-trip exists. Keep it DRAFT / PLANNED.
+## Current Supabase advisor snapshot
 
-The platform has deployed schema and runtime foundations. It has not passed authenticated tenant E2E, real provider E2E, commercial payment/ledger/payout E2E or full Day 1–3 acceptance.
+- Security: 42 INFO findings for RLS-enabled tables without policies; one WARN for Auth leaked-password protection being disabled.
+- Performance: 63 INFO unindexed-foreign-key findings and 271 INFO unused-index findings.
+- Health: no findings.
 
-## Source layout
+Do not silence the RLS advisor with blanket policies. Review each schema's actual grants and access boundary. Do not add or remove indexes blindly without workload evidence. The leaked-password-protection warning is an Auth configuration item; it is not a SQL migration.
 
-- `migrations/` — tracked source migrations for the applied Marketplace schema, including three Finance & Capital migrations.
-- `functions/marketplace-api/` — tenant lifecycle, structure installation, ownership/dependency/capability engines, catalog and commerce API.
-- `functions/adapter-api/` — connection lifecycle, OAuth initiation and execution control.
-- `functions/adapter-worker/` — Vault-backed provider execution, retries, refresh and manifest validation.
-- `functions/adapter-oauth-callback/` — one-time OAuth callback and PKCE exchange.
-- `tests/` — security baseline, OAuth, Google Drive manifest, capability entitlement and Finance ledger regression SQL. The authenticated `post_finance_journal_entry` action is now deployed in `marketplace-api` v17.\n- `../docs/FINANCE_LEDGER_CONTRACT.md` — accounting, payment, refund, payout and dispute contract.
-- `config.toml` — project binding and Edge Function gateway JWT settings.
+## Acceptance boundary
+
+The backend source, live migrations and four deployed Edge Function sources are reconciled. This does **not** certify Day 1–3 acceptance: authenticated browser CRUD, cross-workspace browser denial, provider OAuth round-trip, payment-provider lifecycle, full workflow execution and the complete Control Tower remain separate end-to-end gates.
+
+## Historical implementation log
 
 ## Continuation
 

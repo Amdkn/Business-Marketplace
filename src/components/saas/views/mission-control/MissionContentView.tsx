@@ -1,7 +1,7 @@
 // src/components/views/mission-control/MissionContentView.tsx
 // Hermes — Content sub-page (route /agent-root/content)
 // Document library: stats strip + grid of recent documents from
-// omk_saas.documents. Title-scoped search filter.
+// Marketplace tenant documents. Title-scoped search filter.
 
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpenText, FileText, Hexagon, Plus, Search } from 'lucide-react';

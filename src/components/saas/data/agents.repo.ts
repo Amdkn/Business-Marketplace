@@ -24,7 +24,7 @@ export const agentsRepo = {
       email: null,
       status: row.principal_status === 'ACTIVE' ? 'active' : row.principal_status === 'SUSPENDED' ? 'paused' : 'archived',
       createdAt: String(row.created_at ?? ''),
-      updatedAt: String(row.created_at ?? ''),
+      updatedAt: String(row.updated_at ?? row.created_at ?? ''),
       agentKey: String(row.agent_key ?? ''),
       agentClass: String(row.agent_class ?? ''),
       runtime: String(row.runtime ?? ''),

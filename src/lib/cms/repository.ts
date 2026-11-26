@@ -395,6 +395,20 @@ function fromWorkspaceRow(collectionId: string, row: Record<string, unknown>): C
     const value = row[toSnake(field)];
     if (value !== null && value !== undefined) item[field] = value;
   }
+  // Invoice typed columns are shared with Garden's invoice repository. Keep
+  // their browser-facing camelCase projection aligned across both interfaces.
+  if (collectionId === 'invoices') {
+    const typedColumns: Record<string, string> = {
+      clientId: 'client_id',
+      currency: 'currency',
+      issuedAt: 'issued_at',
+      dueAt: 'due_at',
+      paidAt: 'paid_at',
+    };
+    for (const [uiKey, dbKey] of Object.entries(typedColumns)) {
+      if (row[dbKey] !== null && row[dbKey] !== undefined) item[uiKey] = row[dbKey];
+    }
+  }
   return item as CmsItem;
 }
 
@@ -426,10 +440,25 @@ function toWorkspaceRow(
     workspace_id: context.workspaceId,
     created_by_user_id: context.userId,
     title: item[shape.title] ?? null,
-    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) => !['id', 'tenant_id', 'createdAt', 'updatedAt', 'orgId'].includes(key))),
+    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) =>
+      !['id', 'tenant_id', 'createdAt', 'updatedAt', 'orgId'].includes(key) &&
+      !(collectionId === 'invoices' && ['clientId', 'currency', 'issuedAt', 'dueAt', 'paidAt'].includes(key))
+    )),
     updated_at: new Date().toISOString(),
   };
   for (const field of shape.fields) row[toSnake(field)] = item[field] ?? null;
+  if (collectionId === 'invoices') {
+    const typedColumns: Record<string, string> = {
+      clientId: 'client_id',
+      currency: 'currency',
+      issuedAt: 'issued_at',
+      dueAt: 'due_at',
+      paidAt: 'paid_at',
+    };
+    for (const [uiKey, dbKey] of Object.entries(typedColumns)) {
+      if (item[uiKey] !== undefined) row[dbKey] = item[uiKey];
+    }
+  }
   return row;
 }
 

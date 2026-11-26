@@ -35,9 +35,9 @@ describe('OAuth scope parsing source contract', () => {
   });
 
   it('splits provider scope strings containing spaces, tabs, or newlines', () => {
-    const scopes = 'openid email\\tprofile\\nhttps://www.googleapis.com/auth/drive.file'
+    const scopes = 'openid email\tprofile\nhttps://www.googleapis.com/auth/drive.file'
       .trim()
-      .split(/\\s+/);
+      .split(/\s+/);
 
     expect(scopes).toEqual([
       'openid',

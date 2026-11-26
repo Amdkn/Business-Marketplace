@@ -71,7 +71,7 @@ The reserved `operations`, `trust`, `finance` and `api` namespaces currently hav
 
 | Function | Version | Gateway JWT | Boundary |
 |---|---:|---|---|
-| `marketplace-api` | 17 | enabled | Authenticated tenant API; public read-only catalog actions are explicitly scoped |
+| `marketplace-api` | 18 | enabled | Authenticated tenant API; public read-only catalog actions are explicitly scoped |
 | `adapter-api` | 7 | enabled | Authenticated workspace connection and OAuth initiation API |
 | `adapter-worker` | 7 | disabled | Handler enforces exact server-only service-role bearer validation |
 | `adapter-oauth-callback` | 1 | disabled | Public provider callback validates one-time state and PKCE transaction |

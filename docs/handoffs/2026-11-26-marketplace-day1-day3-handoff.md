@@ -1524,7 +1524,18 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Added api.provision_finance_chart_of_accounts: active organization + active membership + Finance-capable role required; advisory transaction lock; idempotent organization/currency/version provisioning; conflict detection against existing account codes/system keys; returns the complete chart.
 - Added provision_finance_chart_of_accounts authenticated action to canonical supabase/functions/marketplace-api/index.ts.
 - Applied follow-up migration finance_chart_version_regex_fix, tracked as supabase/migrations/20261126070100_finance_chart_version_regex_fix.sql, to normalize version format checks.
-- Deployed marketplace-api ACTIVE v19, verify_jwt=true.
+- Deployed marketplace-api ACTIVE v20, verify_jwt=true.
 - Structural SQL assertions verified 16 required templates, chart_version column, template normal-balance consistency, function SECURITY DEFINER/search_path, service-role-only EXECUTE and service-role-only template grants.
 - Live organization count remains 0. No account instance or tenant fixture was created. Runtime provisioning idempotency/collision/authorization is implemented but not tenant-E2E verified.
 - Next implementation: versioned fee policies and fee calculation, then order/payment/fee-to-ledger event mapping and settlement posting.
+
+
+### 13.15 Finance role alignment and final deployment — 2026-11-26
+
+- Reviewed the new chart provisioning action against the Marketplace role hierarchy and found the generic organization helper did not include the explicit B2.2 Treasury role.
+- Added a dedicated requireFinanceRole API guard for S0_SOVEREIGN, B1_CEO, B2_MANAGER and B2.2; both chart provisioning and journal posting use it. SQL functions independently enforce active membership and the same Finance-capable role set.
+- Corrected the chart-version parser to accept the intended YYYY.N format and applied the matching SQL constraint/function correction migration.
+- Redeployed canonical marketplace-api: ACTIVE v20, verify_jwt=true.
+- The five SQL regression suites were executed after the chart provisioning and test assertions were added; all completed without assertion exceptions. The role-helper-only Edge Function correction was then deployed; SQL schema and grants were unchanged.
+- Health advisor: no findings. Security advisor: 39 INFO RLS-enabled/no-policy notices; private engine schemas intentionally have no browser grants. Performance advisor findings are informational (61 unindexed FKs elsewhere and 66 unused indexes); Finance foreign keys remain covered by indexes. No blind changes were made.
+- Live Auth users and organizations remain zero. No chart instances, payments or financial transactions were fabricated. Real authenticated provisioning remains blocked until an authorized tenant exists.

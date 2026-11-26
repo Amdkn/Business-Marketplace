@@ -2,7 +2,7 @@
 // Phase C + F — JWT-aware auth context + Edge Function signUp onboarding.
 // Reads 'org_id' + 'role' claims from Supabase session JWT (Phase A: custom_access_token_hook).
 // In saas mode, missing org_id → RLS will silently return 0 rows (warn per ADR-SUPABASE-001).
-// signUp() invokes the Edge Function `sign-up-organization` (Phase F) to atomically
+// signUp() invokes `marketplace-api.create_tenant` to atomically
 // create auth.users + identity.organizations + identity.organization_memberships in one request.
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';

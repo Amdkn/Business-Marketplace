@@ -15,6 +15,7 @@ import { supabase } from './lib/supabase';
 import type { TenantLevel } from './lib/authProviders';
 import { MarketplaceControlPlane } from './apps/control-plane/MarketplaceControlPlane';
 import { useTenantStore } from './stores/tenant.store';
+import { useShellStore } from './stores/shell.store';
 
 type AuthMode = 'pending' | 'supabase' | 'demo';
 type ProductSurface = 'control-plane' | 'business-office';
@@ -59,6 +60,74 @@ function writeBootState(state: AuthBootState): void {
   try { window.localStorage.setItem(AUTH_BOOT_KEY, JSON.stringify(state)); } catch { /* quota / private mode */ }
 }
 
+async function ensureTenantProvisioned(): Promise<void> {
+  const { data: organizationResult, error: organizationError } = await supabase.functions.invoke<{
+    data?: Array<{ id: string; name: string }>;
+  }>('marketplace-api', { body: { action: 'list_organizations' } });
+  if (organizationError) throw new Error(`Unable to resolve organization memberships: ${organizationError.message}`);
+
+  const organizations = organizationResult?.data ?? [];
+  if (organizations.length > 1) {
+    throw new Error('Multiple organizations are available; organization selection must be completed before opening a workspace.');
+  }
+
+  if (organizations.length === 0) {
+    const { data: userResult, error: userError } = await supabase.auth.getUser();
+    if (userError || !userResult.user) throw new Error('Authenticated user could not be resolved for tenant onboarding.');
+    const metadata = userResult.user.user_metadata ?? {};
+    const fullName = [metadata.first_name, metadata.last_name]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' ')
+      .trim();
+    const emailPrefix = userResult.user.email?.split('@')[0] ?? 'My';
+    const organizationName = typeof metadata.organization_name === 'string' && metadata.organization_name.trim()
+      ? metadata.organization_name.trim()
+      : `${fullName || emailPrefix} Workspace`;
+
+    const { data: provisioned, error: provisionError } = await supabase.functions.invoke<{
+      data?: { organization?: { id?: string }; workspace?: { id?: string } };
+    }>('marketplace-api', {
+      body: { action: 'create_tenant', organization_name: organizationName },
+    });
+    if (provisionError) throw new Error(`Tenant onboarding failed: ${provisionError.message}`);
+    if (!provisioned?.data?.organization?.id || !provisioned?.data?.workspace?.id) {
+      throw new Error('Tenant onboarding did not return both an organization and a workspace.');
+    }
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) throw new Error(`Tenant was created but the session could not be refreshed: ${refreshError.message}`);
+    return;
+  }
+
+  const organization = organizations[0];
+  const { data: workspaceResult, error: workspaceError } = await supabase.functions.invoke<{
+    data?: Array<{ id: string; workspace_status: string }>;
+  }>('marketplace-api', {
+    body: { action: 'list_workspaces', organization_id: organization.id },
+  });
+  if (workspaceError) throw new Error(`Unable to resolve workspace memberships: ${workspaceError.message}`);
+  const workspaces = workspaceResult?.data ?? [];
+  if (workspaces.length === 0) {
+    const { data: created, error: createError } = await supabase.functions.invoke<{
+      data?: { id?: string };
+    }>('marketplace-api', {
+      body: {
+        action: 'create_workspace',
+        organization_id: organization.id,
+        workspace_key: 'main',
+        name: 'Main Workspace',
+        description: 'Default workspace provisioned during account onboarding.',
+      },
+    });
+    if (createError) throw new Error(`Default workspace provisioning failed: ${createError.message}`);
+    if (!created?.data?.id) throw new Error('Default workspace provisioning returned no workspace identifier.');
+  } else {
+    const activeWorkspaces = workspaces.filter((workspace) => workspace.workspace_status === 'ACTIVE');
+    if (activeWorkspaces.length !== 1) {
+      throw new Error('The account has multiple or no active workspaces; explicit workspace selection is not yet connected to this entry point.');
+    }
+  }
+}
+
 export default function App() {
   const [boot, setBoot] = useState<AuthBootState>(() => readBootState());
   const [surface, setSurface] = useState<ProductSurface>('control-plane');
@@ -70,6 +139,7 @@ export default function App() {
         const { data } = await supabase.auth.getSession();
         if (cancelled || !data.session) return;
         // A real Supabase session always wins over a stale local demo marker.
+        await ensureTenantProvisioned();
         await useTenantStore.getState().bootstrap();
         if (cancelled) return;
         setBoot({ mode: 'supabase', level: 'architect', email: data.session.user.email ?? undefined });
@@ -80,7 +150,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleAuthenticated = (session: { mode: 'supabase' | 'demo'; level: TenantLevel; email?: string }): void => {
+  const handleAuthenticated = async (session: { mode: 'supabase' | 'demo'; level: TenantLevel; email?: string }): Promise<void> => {
     const next: AuthBootState = {
       mode: session.mode === 'demo' ? 'demo' : 'supabase',
       level: session.level,
@@ -88,10 +158,16 @@ export default function App() {
     };
     writeBootState(next);
     if (next.mode === 'supabase') {
-      void useTenantStore.getState().bootstrap().finally(() => {
+      try {
+        await ensureTenantProvisioned();
+        await useTenantStore.getState().bootstrap();
         setSurface('control-plane');
         setBoot(next);
-      });
+      } catch (reason) {
+        const message = reason instanceof Error ? reason.message : 'Tenant onboarding failed.';
+        useShellStore.getState().addToast({ source: 'auth', type: 'error', message });
+        setBoot({ mode: 'pending', level: 'architect' });
+      }
       return;
     }
     setSurface('control-plane');

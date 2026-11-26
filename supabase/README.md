@@ -307,7 +307,7 @@ Validation is not full browser acceptance: no live browser JWT E2E, cross-worksp
 
 GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) passed on application commit [dfc3554](https://github.com/Amdkn/Business-Marketplace/commit/dfc3554b6f35c782d23b8b7721da5a7c2264c9eb): frozen Bun install, app + Node TypeScript, API TypeScript, Vitest (53 files / 548 tests), Vite build, kernel 27/27, bridge 20/20, adapters 39/39 and RBAC 16/16 (102/102 benchmark tests). This supersedes the earlier run 45855710702 as the latest full CI evidence.
 
-The separate Vercel commit status is currently `failure` with target URL `build-rate-limit`. Treat this as a deployment quota blocker, not as evidence that the source build failed. No Preview for the latest commit is verified. Preview SSO remains enabled; do not promote production or weaken access controls to bypass the blocker.
+This historical Vercel `build-rate-limit` event was superseded. Latest branch head `b7c2b29` now has a READY protected Preview with full hosted `bun run verify` (548/548 tests, app/API TypeScript, Vite build and 102/102 runtime benchmarks). Preview SSO remains enabled; no production promotion occurred.
 
 The current hosted tenant inventory is one real Auth user, one profile, one organization, one active organization membership, one workspace and one active workspace membership. Do not manufacture a second identity or tenant. The absence of installations, provider connections, agent principals, listings, orders and payment activity remains the actual operational state.
 
@@ -336,7 +336,7 @@ The Dashboard currently identifies the project as **Free** and reports **No back
 
 Live records: 1 Auth user/profile/org/org membership/workspace/workspace membership; zero domain/department/holon installations, agent principals/delegations, tenant connections, OAuth transactions, execution jobs, listings, orders, payment intents, refunds, payout batches, journal entries, clients and document records. One provider manifest exists and remains DRAFT. No synthetic records were inserted.
 
-Latest source truth: commit `2fe574f` corrects IT Software Kernel to show architectural targets and unverified P10–P18 objectives instead of fabricated connected statuses, latency/uptime or a sovereignty score. Latest branch head `97cc906` has a Vercel Preview QUEUED; the last fully verified Preview is `ae81359` (548/548 tests, full typecheck/build and 102/102 runtime benchmarks).
+Latest source truth: commit `2fe574f` corrects IT Software Kernel to show architectural targets and unverified P10–P18 objectives instead of fabricated connected statuses, latency/uptime or a sovereignty score. Latest branch head `b7c2b29` has a Vercel Preview READY after full hosted verify; see the latest branch verification section below.
 
 
 ## Latest branch hosted verify — 2026-11-26 21:03 UTC

@@ -15,37 +15,37 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'overview',
     title: 'Overview · /agent-root',
     body:
-      'The Mission Control hub. Live fleet stats: total tasks, average success rate, fast-routing percentage. Reads from dashboard.agents and surfaces Hermes telemetry derived from agent status until the ingest pipeline is live.',
+      'The Mission Control hub. Workspace and agent information is read from canonical tenant-scoped sources. Runtime throughput, success rates and routing telemetry are not reported unless a live ingestion source is connected.',
   },
   {
     id: 'agents',
     title: 'Agents · /agent-root/agents',
     body:
-      'Full Agent configuration surface. One card per specialist with load, tokens, latency, channel, default model. Plus task summary (24h throughput) and model routing panel that lets the operator know which LLM each agent defaults to.',
+      'Canonical agent directory backed by agent principals and explicit workspace delegations. Operators can register a principal with approved permission codes and revoke its workspace assignment. Runtime load, tokens, latency and model telemetry remain unavailable without an ingestion/runtime connection.',
   },
   {
     id: 'tasks',
     title: 'Tasks · /agent-root/tasks',
     body:
-      'Kanban with three columns (To do / In progress / Done). Drag-and-drop powered by @dnd-kit. New-mission form, priority filter (P1/P2/P3), title search. Mission persistence is not yet connected to a canonical tenant table.',
+      'Workspace-backed mission Kanban with To do / In progress / Done columns, persisted creation, priority filtering, title search and drag-and-drop ordering. Status and position changes are written to the workspace mission register; this board does not execute missions.',
   },
   {
     id: 'office',
     title: 'Office · /agent-root/office',
     body:
-      'A 3D city built by the agents. The orchestrator runs HQ at the center; four specialists own towers at the corners. Lit windows = live work. Drag to orbit, scroll to zoom, click a building to open its dossier with load, tasks, success rate, channel, and default model.',
+      'A 3D spatial visualization of the agent-office concept. Buildings and visual states are presentation elements, not evidence of live agent activity. Use the Agent Directory for canonical principals and workspace assignments.',
   },
   {
     id: 'content',
     title: 'Content · /agent-root/content',
     body:
-      'Document library. Document persistence is not yet connected to a canonical tenant table. Title-scoped search. Stats strip showing total docs, agents writing, latest published. Each card opens the document via its fileUrl.',
+      'Workspace document register with title search, persisted document metadata and links to non-placeholder file URLs. The New Doc and upload workflows remain unavailable until document authoring and storage are connected; uploader counts are not agent-execution telemetry.',
   },
   {
     id: 'schedule',
     title: 'Schedule · /agent-root/schedule',
     body:
-      'Weekly grid (Mon–Sun × 08:00–18:00 in 2-hour buckets). Mission density per cell, color-coded by priority. Cells aggregate missions by updated_at timestamp.',
+      'Read-only weekly projection of persisted workspace missions. Schedule metadata is shared with People → Cadence; times are displayed in UTC. Creating or editing schedule entries happens through the canonical People cadence workflow.',
   },
   {
     id: 'chat',
@@ -57,7 +57,7 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'docs',
     title: 'Docs · /agent-root/docs',
     body:
-      'This page. The Mission Control manual — what each sub-route does, where the data comes from, and how to extend it. Maintained alongside the schema migrations in sql/.',
+      'This page. The Mission Control manual documents route behavior and the boundary between persisted workspace data, visual presentation and connected runtime capabilities.',
   },
 ];
 
@@ -72,8 +72,7 @@ export const MissionDocsView = (): React.ReactElement => {
           Docs<span className="text-ember">.</span>
         </h1>
         <p className="font-sans text-[14px] text-her-muted mt-3 max-w-2xl">
-          Eight surfaces in the A’Space Marketplace Mission Control. Each route reads from a single
-          Supabase table, scoped by org_id through Row-Level Security.
+          Mission Control surfaces combine canonical workspace records and visual tools. Supabase access is scoped through organization and workspace authorization; visualizations do not imply a live agent runtime.
         </p>
       </header>
 

@@ -971,6 +971,18 @@ async function applyOrderFeePolicy(user: User, body: Record<string, unknown>) {
   });
 }
 
+async function postPaidPayoutItemFinanceEntry(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const payoutItemId = requiredString(body.payout_item_id, 'payout_item_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.post_paid_payout_item_finance_entry(
+      ${user.id}::uuid,${ownerId}::uuid,${payoutItemId}::uuid
+    ) AS posting`;
+    return rows[0]?.posting;
+  });
+}
+
 async function postSucceededRefundFinanceEntry(user: User, body: Record<string, unknown>) {
   const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
   const refundId = requiredString(body.refund_id, 'refund_id');
@@ -1081,6 +1093,7 @@ Deno.serve(async (req: Request) => {
       case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
       case 'post_captured_order_finance_entry': data = await postCapturedOrderFinanceEntry(user, body); break;
       case 'post_succeeded_refund_finance_entry': data = await postSucceededRefundFinanceEntry(user, body); break;
+      case 'post_paid_payout_item_finance_entry': data = await postPaidPayoutItemFinanceEntry(user, body); break;
       default: return response({ error: 'Unknown action', action }, 404);
     }
     return response({ data, actor_user_id: user.id });

@@ -140,8 +140,6 @@ export function FinanceApp() {
   const courbeDrill = useCollectionDrill('courbe_demande', 'Courbes');
   const budgetDrill = useCollectionDrill('budget_tokens', 'Tokens');
   const formesDrill = useCollectionDrill('formes_prix', 'Formes');
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
   const addItemPersisted = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<FinanceDetailItem | null>(null);
@@ -179,11 +177,8 @@ export function FinanceApp() {
   };
 
 
-  /** Compose a new invoice. The coach enters a client name and an amount; the
-   *  rest of the fields are defaulted to canonical Civadelle values. The
-   *  number is derived from the current ISO month, and the due date is set
-   *  30 days out. The mutation flows through `addItem` so the seed kanban
-   *  sees the new row immediately. */
+  /** Create an invoice for an existing workspace client. The record is
+   *  published to the UI only after the workspace repository confirms the write. */
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerClientId, setComposerClientId] = useState('');
   const [composerAmount, setComposerAmount] = useState('');
@@ -393,7 +388,7 @@ export function FinanceApp() {
                 <input
                   id="invoice-composer-amount"
                   type="number"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   min="0"
                   value={composerAmount}
                   onChange={(e) => setComposerAmount(e.target.value)}
@@ -525,7 +520,7 @@ export function FinanceApp() {
                   >
                     <Check className="w-3.5 h-3.5" />
                     {isPaid ? 'Paid' : 'Payment flow unavailable'}
-                  </button>>
+                  </button>
                 </div>
               </div>
             );

@@ -826,15 +826,15 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
               }}
               data-new-scenario-agent
             >
-              {agentOptionsError && <div role="alert" className="text-[11px] text-rose-700">{agentOptionsError}</div>}
-          {agentOptions.length === 0 && !agentOptionsError && <div className="text-[11px] text-[var(--theme-text-muted)]">Aucun agent actif délégué à ce workspace.</div>}
-          {agentOptions.map((a) => (
+              {agentOptions.length === 0 && <option value="" disabled>Aucun agent actif délégué à ce workspace</option>}
+              {agentOptions.map((a) => (
                 <option key={`${a.source}:${a.code}`} value={a.code}>
                   {a.code} · {a.name} · Workspace
                 </option>
               ))}
             </select>
           </label>
+          {agentOptionsError && <div role="alert" className="text-[11px] text-rose-700">{agentOptionsError}</div>}
 
           {nameError && (
             <div

@@ -23,9 +23,9 @@ interface FormState {
 const initialForm = (): FormState => ({
   firstName: 'Admin',
   lastName: 'User',
-  email: 'admin@omk.com',
+  email: 'owner@aspace.example',
   phone: '+1 234 567 8900',
-  company: 'OMK Services',
+  company: 'A'Space Marketplace',
 });
 
 export const SettingsView: React.FC = () => {

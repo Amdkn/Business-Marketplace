@@ -155,4 +155,4 @@ bun run test
 bun run build
 ```
 
-See [PRODUCT_ARCHITECTURE.md](./docs/PRODUCT_ARCHITECTURE.md) for the initial control-plane contracts and implementation sequence. The read-only backend inventory is documented in [SUPABASE_SCHEMA_AUDIT_2026-11-24.md](./docs/SUPABASE_SCHEMA_AUDIT_2026-11-24.md).
+See [PRODUCT_ARCHITECTURE.md](./docs/PRODUCT_ARCHITECTURE.md) for the initial control-plane contracts and implementation sequence. The read-only backend inventory is documented in [SUPABASE_SCHEMA_AUDIT_2026-11-24.md](./docs/SUPABASE_SCHEMA_AUDIT_2026-11-24.md). Production Auth URL and redirect configuration are recorded in [AUTH_CONFIGURATION_2026-11-26.md](./docs/AUTH_CONFIGURATION_2026-11-26.md).

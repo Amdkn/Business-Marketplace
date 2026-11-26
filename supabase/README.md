@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The live project returned **25 applied migration entries**. Twenty-four source migrations are tracked in this repository:
+The live project returned **25 applied migration entries**. Twenty-five source files are tracked in this repository: 24 source migrations ported from V5 plus one catalog-derived reconstruction for the historical event-trigger ACL migration:
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -32,7 +32,7 @@ The live project returned **25 applied migration entries**. Twenty-four source m
 | 20261126025257 | 20261126025300_adapter_family_blueprints | migrations/20261126025300_adapter_family_blueprints.sql |
 | 20261126025804 | 20261126030000_provider_adapter_blueprints | migrations/20261126030000_provider_adapter_blueprints.sql |
 | 20261126030251 | 20261126030500_ld01_holon_blueprints | migrations/20261126030500_ld01_holon_blueprints.sql |
-| 20261126041718 | revoke_public_execution_rls_auto_enable | **SOURCE GAP — recover exact SQL** |
+| 20261126041718 | revoke_public_execution_rls_auto_enable | migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql (catalog-derived reconstruction; not byte-identical original) |
 | 20261126041811 | tenant_structure_installations | migrations/20261126031500_tenant_structure_installations.sql |
 | 20261126041835 | workspace_membership_and_holon_integrity | migrations/20261126041800_workspace_membership_and_holon_integrity.sql |
 | 20261126042038 | tenant_installation_foreign_key_indexes | migrations/20261126041900_tenant_installation_foreign_key_indexes.sql |
@@ -49,7 +49,7 @@ The live project returned **25 applied migration entries**. Twenty-four source m
 | 20261126052132 | google_drive_blueprint_contract_status | migrations/20261126052300_google_drive_blueprint_contract_status.sql |
 | 20261126053453 | marketplace_capability_entitlements | migrations/20261126053000_marketplace_capability_entitlements.sql |
 
-The first column is the actual cloud migration registry version; the source filename is the versioned migration name authored in Git. These timestamps differ because the cloud migration runner recorded its own application timestamp. Preserve both values in future audits.
+The first column is the actual cloud migration registry version; the source filename is the versioned migration name authored in Git. These timestamps differ because the cloud migration runner recorded its own application timestamp. Preserve both values in future audits. The 20261126041718 source file reproduces the verified live ACL but is explicitly a reconstruction, not recovered original SQL.
 
 ## Current database inventory
 
@@ -98,7 +98,7 @@ The platform has deployed schema and runtime foundations. It has not passed auth
 
 ## Source layout
 
-- `migrations/` — 24 tracked source migrations for the applied Marketplace schema.
+- `migrations/` — 25 tracked source migrations for the applied Marketplace schema (24 ported historical files + one catalog-derived reconstruction).
 - `functions/marketplace-api/` — tenant lifecycle, structure installation, ownership/dependency/capability engines, catalog and commerce API.
 - `functions/adapter-api/` — connection lifecycle, OAuth initiation and execution control.
 - `functions/adapter-worker/` — Vault-backed provider execution, retries, refresh and manifest validation.

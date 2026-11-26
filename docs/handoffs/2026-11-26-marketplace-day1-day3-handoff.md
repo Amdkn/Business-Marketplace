@@ -1379,7 +1379,7 @@ Read directly through the linked **Aspace marketplace** Supabase account on 2026
 - Region: `us-west-2`; PostgreSQL `17.12.0.000`.
 - Project status: `ACTIVE_HEALTHY`.
 - Cloud migration registry: **25 entries**.
-- The canonical source tree in Business-Marketplace now carries the 24 reproducible Marketplace migration files. One historical cloud migration, `revoke_public_execution_rls_auto_enable`, is present in the cloud registry but has no matching SQL file in the V5 PR #63 tree. Recover or document its exact SQL before claiming full source-to-cloud migration parity. Do not replay it.
+- The canonical source tree in Business-Marketplace now carries 25 migration source files: 24 ported historical files and one catalog-derived reconstruction for `revoke_public_execution_rls_auto_enable`. Its exact original SQL text was not recovered, so byte-for-byte historical parity is not claimed. The reconstruction reproduces the verified live ACL. Do not replay it.
 - The applied Coach adoption migration is version `20261124024550` (`coach_schema_adoption_20261124`). The earlier V5 file `20261124024342_coach_schema_adoption.sql` is not the canonical applied source and must not be replayed. The committed `20261124024550_coach_schema_adoption_20261124.sql` is explicitly reconstructed from the live catalog; it is not claimed to be byte-identical to the original historical SQL.
 - Active Edge Functions at the live recheck: `marketplace-api` v16 (JWT enabled), `adapter-api` v7 (JWT enabled), `adapter-worker` v7 (gateway JWT disabled; handler-level service-role bearer validation), and `adapter-oauth-callback` v1 (gateway JWT disabled; one-time OAuth state validation).
 - Exact live tenant/business counts at recheck: Auth users 0; organizations 0; organization memberships 0; workspaces 0; domain installations 0; department installations 0; holon installations 0; tenant connections 0; OAuth transactions 0; ACTIVE provider manifests 0; published listings 0; orders 0.
@@ -1390,7 +1390,7 @@ Read directly through the linked **Aspace marketplace** Supabase account on 2026
 The Business-Marketplace branch now contains the backend source inventory from V5 PR #63:
 
 - 4 Edge Function source files: Marketplace API, adapter API, adapter worker, OAuth callback.
-- 24 versioned migration source files: identity/catalog/commerce foundation, Coach schema adoption, taxonomy, tenant installations, ownership/dependency/capability engines, adapter execution/OAuth, Google Drive draft contract and capability entitlements.
+- 25 versioned migration source files: 24 ported migration files plus the catalog-derived event-trigger ACL reconstruction; identity/catalog/commerce foundation, Coach schema adoption, taxonomy, tenant installations, ownership/dependency/capability engines, adapter execution/OAuth, Google Drive draft contract and capability entitlements.
 - 4 SQL regression suites: Marketplace security baseline, OAuth runtime, Google Drive manifest, capability entitlements.
 - API and Google Drive provider contract documentation.
 - This Day 1–3 handoff, updated with the repository consolidation and the current cloud snapshot.
@@ -1399,7 +1399,7 @@ The migration source files are historical records for the already-applied cloud 
 
 ### 13.4 Next execution sequence
 
-1. Reconcile the 25-entry cloud migration registry against the 24 tracked migration files and recover the missing historical SQL source for `revoke_public_execution_rls_auto_enable`.
+1. Preserve the catalog-derived reconstruction for `revoke_public_execution_rls_auto_enable`; exact original SQL recovery remains a provenance-only gap, not an active privilege-state gap.
 2. Verify byte-for-byte equality between the four deployed Edge Function sources and the four canonical Business-Marketplace function files.
 3. Run the committed structural SQL regression suites against the live project; retain the evidence and exact test outcomes.
 4. Complete signup/email delivery and establish a real authorized Auth user; do not fabricate one.
@@ -1425,7 +1425,7 @@ The migration source files are historical records for the already-applied cloud 
   - `google_drive_adapter_manifest.sql`
   - `marketplace_capability_entitlements.sql`
 - The live inventory query returned 36 application tables; all 36 have RLS enabled.
-- The 25-entry migration registry still has one source-parity gap: cloud version `20261126041718`, migration `revoke_public_execution_rls_auto_enable`, has no exact SQL source file in the V5 PR #63 tree. The repository tracks the other 24 applied migration sources.
+- The 25-entry migration registry now has 25 tracked source files. Cloud version `20261126041718`, migration `revoke_public_execution_rls_auto_enable`, is represented by a catalog-derived reconstruction of the live ACL, not byte-identical original SQL.
 - Vercel deployment for commit `5de0251` was observed in state `BUILDING` at the last check. No READY/build-success claim is made.
 - GitHub PR-triggered workflow lookup returned no runs for this commit at the last poll; the combined commit status showed Vercel `pending`. Recheck after the deployment completes.
 

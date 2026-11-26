@@ -4,7 +4,7 @@
 //
 // Two execution paths:
 //   1. Supabase Cloud (when SUPABASE_READY): queries target `dashboard.*` schema
-//      (per ADR-OMK-004 single SaaS mode). RLS policies filter by `org_id`
+//      (per ADR-DASHBOARD-004 single SaaS mode). RLS policies filter by `org_id`
 //      from the JWT claim injected by `public.custom_access_token_hook`.
 //   2. localStorage (dev fallback): seeded with mocks from constants.ts. RLS
 //      is simulated by the in-memory filter `item.org_id === activeOrgId`.

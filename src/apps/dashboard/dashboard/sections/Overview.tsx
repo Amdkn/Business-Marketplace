@@ -12,6 +12,10 @@ import {
   MessageSquare, Sparkles, TrendingDown, TrendingUp, Wallet, Zap,
 } from 'lucide-react';
 import { COST_TREND, SESSIONS, USAGE_TODAY } from '../seed';
+import { useDashboardDemoMode } from '../demoMode';
+import { useCmsStore } from '../../../../lib/cms/cms.store';
+import { useEffect, useState } from 'react';
+import { listWorkspaceAgents, type WorkspaceAgent } from '../../../people/people.repo';
 import { useDashboardAgents } from '../cmsAgents';
 import {
   ACCENT, GhostButton, IconChip, KpiTile, LiveDot, Panel, Pill,
@@ -31,7 +35,7 @@ function sparklineForLast12h(): number[] {
   return shape.map((v) => +(v * scale).toFixed(3));
 }
 
-export function Overview({ navigateToSection }: { navigateToSection: (id: string) => void } = { navigateToSection: () => {} }) {
+function DemoOverview({ navigateToSection }: { navigateToSection: (id: string) => void } = { navigateToSection: () => {} }) {
   // Agents list comes from the CMS so the "Active agents" KPI and the agent
   // chip column reflect the latest state — including a freshly-created agent
   // from the Agents section. The seed-derived USAGE_TODAY / SESSIONS / COST
@@ -269,3 +273,76 @@ export function _overviewInternal() {
 
 // Suppress unused imports noise (kept for future quick reuse).
 void Clock; void Wallet; void AlertTriangle; void TrendingUp; void TrendingDown;
+
+
+export function Overview(props: { navigateToSection?: (sectionId: string) => void }) {
+  const isDemo = useDashboardDemoMode();
+  return isDemo ? <DemoOverview {...props} /> : <WorkspaceOverview {...props} />;
+}
+
+function WorkspaceOverview({ navigateToSection }: { navigateToSection?: (sectionId: string) => void }) {
+  const clients = useCmsStore((state) => state.items.clients ?? []);
+  const deals = useCmsStore((state) => state.items.deals ?? []);
+  const invoices = useCmsStore((state) => state.items.invoices ?? []);
+  const [agents, setAgents] = useState<WorkspaceAgent[] | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listWorkspaceAgents()
+      .then((rows) => { if (!cancelled) setAgents(rows); })
+      .catch((reason: unknown) => { if (!cancelled) setAgentError(reason instanceof Error ? reason.message : 'Unable to load agent assignments'); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const activeClients = clients.filter((client) => String(client.status ?? '').toLowerCase() === 'active').length;
+  const onboarding = clients.filter((client) => String(client.status ?? '').toLowerCase() === 'onboarding').length;
+  const openDeals = deals.filter((deal) => !['won','lost'].includes(String(deal.stage ?? '').toLowerCase())).length;
+  const unpaidInvoices = invoices.filter((invoice) => String(invoice.status ?? '').toLowerCase() !== 'paid').length;
+
+  const tiles = [
+    { label: 'Clients', value: String(clients.length), detail: `${activeClients} active · ${onboarding} onboarding`, section: 'clients' },
+    { label: 'Open deals', value: String(openDeals), detail: 'Persisted workspace opportunities', section: 'sales' },
+    { label: 'Unpaid invoices', value: String(unpaidInvoices), detail: 'Invoice records not marked paid', section: 'finance' },
+    { label: 'Agent assignments', value: agents === null ? '—' : String(agents.length), detail: 'Canonical principals delegated to this workspace', section: 'agents' },
+  ];
+
+  return (
+    <div className="flex flex-col gap-5 p-7">
+      <SectionTitle eyebrow="Workspace overview" title="Business state" subtitle="Counts from persisted workspace records. Financial totals, runtime activity and inference costs are not inferred from demo fixtures." />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {tiles.map((tile) => <button key={tile.label} type="button" onClick={() => navigateToSection?.(tile.section)}
+          className="rounded-2xl border p-4 text-left transition hover:-translate-y-0.5"
+          style={{ background: 'var(--theme-surface)', borderColor: 'var(--panel-border)' }}>
+          <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--theme-text-muted)' }}>{tile.label}</div>
+          <div className="mt-2 text-3xl font-bold tabular-nums" style={{ color: 'var(--theme-text)' }}>{tile.value}</div>
+          <div className="mt-2 text-[11px]" style={{ color: 'var(--theme-text-dim)' }}>{tile.detail}</div>
+        </button>)}
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Panel pad="p-5">
+          <SectionTitle eyebrow="Identity" title="Agent directory" subtitle="Canonical principal and delegation state." />
+          {agentError ? <p className="text-xs" style={{ color: '#dc2626' }} role="alert">{agentError}</p> :
+            agents === null ? <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }} role="status">Loading workspace assignments…</p> :
+            agents.length === 0 ? <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>No agents are delegated to this workspace.</p> :
+            <ul className="space-y-2">{agents.slice(0, 5).map((agent) => <li key={agent.id} className="flex items-center justify-between gap-3 text-xs">
+              <span className="truncate font-semibold" style={{ color: 'var(--theme-text)' }}>{agent.displayName}</span>
+              <span className="shrink-0" style={{ color: 'var(--theme-text-muted)' }}>{agent.agentClass} · {agent.principalStatus}</span>
+            </li>)}</ul>}
+          <button type="button" onClick={() => navigateToSection?.('agents')} className="mt-4 text-[11px] font-semibold" style={{ color: 'var(--theme-accent)' }}>Open agent directory →</button>
+        </Panel>
+        <Panel pad="p-5">
+          <SectionTitle eyebrow="Runtime" title="Execution telemetry" subtitle="No provider or runtime telemetry feed has been connected." />
+          <div className="grid grid-cols-2 gap-3">
+            {['Sessions','Tokens','Latency','Inference cost'].map((label) => <div key={label} className="rounded-xl border p-3" style={{ borderColor: 'var(--panel-border-subtle)', background: 'var(--theme-surface-hover)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--theme-text-dim)' }}>{label}</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--theme-text)' }}>—</div>
+              <div className="text-[9px]" style={{ color: 'var(--theme-text-muted)' }}>Not reported</div>
+            </div>)}
+          </div>
+          <p className="mt-3 text-[10px] leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>These values will populate only from connected execution events and provider billing records.</p>
+        </Panel>
+      </div>
+    </div>
+  );
+}

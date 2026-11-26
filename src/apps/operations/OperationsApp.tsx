@@ -188,7 +188,7 @@ export function OperationsApp() {
     try {
       const result = await addItem('alerts', {
         title,
-        when: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        when: new Date().toISOString(),
         severity: composerSeverity,
         enrichment: 'raw',
         source: composerSource.trim() || 'manual · ops',
@@ -727,7 +727,7 @@ export function OperationsApp() {
             className="mb-4 rounded-xl border p-3 text-[12px]"
             style={{ background: 'rgba(245,158,11,0.08)', borderColor: '#fcd34d', color: '#92400e' }}
           >
-            <span className="font-extrabold uppercase tracking-wider">{rawCount}</span> alerte{rawCount > 1 ? 's' : ''} non acquittée{rawCount > 1 ? 's' : ''} — cliquer "Trier" sur la fiche pour acquitter.
+            <span className="font-extrabold uppercase tracking-wider">{rawCount}</span> alerte{rawCount > 1 ? 's' : ''} en attente de triage — démarrer le triage depuis la fiche.
           </div>
         ) : null}
         {alerts.length === 0 ? (

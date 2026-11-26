@@ -131,6 +131,8 @@ function DemoRunway() {
 
 export function FinanceApp() {
   const invoices = useCmsStore(s => s.items['invoices']) ?? [];
+  const clients = useCmsStore(s => s.items['clients']) ?? [];
+  const isDemoTenant = useIsDemoTenant();
   const plancherItems = useCmsStore(s => s.items['plancher_marges']) ?? [];
   const budgetItems = useCmsStore(s => s.items['budget_tokens']) ?? [];
   const invoicesDrill = useCollectionDrill('invoices', 'Invoices');
@@ -140,6 +142,7 @@ export function FinanceApp() {
   const formesDrill = useCollectionDrill('formes_prix', 'Formes');
   const updateItem = useCmsStore(s => s.updateItem);
   const addItem = useCmsStore(s => s.addItem);
+  const addItemPersisted = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<FinanceDetailItem | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
@@ -196,8 +199,10 @@ export function FinanceApp() {
    *  30 days out. The mutation flows through `addItem` so the seed kanban
    *  sees the new row immediately. */
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composerClient, setComposerClient] = useState('');
+  const [composerClientId, setComposerClientId] = useState('');
   const [composerAmount, setComposerAmount] = useState('');
+  const [composerCurrency, setComposerCurrency] = useState('');
+  const [savingInvoice, setSavingInvoice] = useState(false);
 
   const submitNewInvoice = (): void => {
     const client = composerClient.trim();

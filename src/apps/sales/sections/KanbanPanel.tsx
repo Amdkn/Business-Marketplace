@@ -139,6 +139,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
         id: String(d.id),
         stage: String(d.stage ?? '—'),
         clientName: String(d.client ?? d.title ?? 'Untitled'),
+        clientId: String(d.clientId ?? ''),
         offer: String(d.offer ?? ''),
         value: Number(d.value ?? 0),
         currency: String(d.currency ?? ''),

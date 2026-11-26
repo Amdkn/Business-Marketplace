@@ -1568,3 +1568,11 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Live inventory: 12 Finance tables, 0 unindexed Finance foreign keys, 0 organizations and 0 Auth users. No fee policies, orders, snapshots or money movement were fabricated.
 - Health Advisor: zero findings. Security Advisor: 41 INFO RLS-enabled/no-policy notices in private schemas. Performance Advisor: 61 unindexed foreign keys across the wider non-Finance project and informational unused indexes; Finance-specific FK coverage is complete.
 - `marketplace-api` remains ACTIVE v21 with `verify_jwt=true`. Tenant-level API execution and end-to-end order→fee→payment→journal validation remain blocked by the empty identity tenant state.
+
+### 13.18 Repository / Preview checkpoint — 2026-11-26
+
+- PR #1 remains OPEN / DRAFT and mergeable; latest PR head is `dd3215abb309e4284af9034f4cab6b39af687e6d`.
+- The Vercel deployment for the fee-engine implementation commit `1b2d79f8940ab2858c455cf49056599999bb3d05` reached **READY**: `https://business-marketplace-5culd1uru-amd-lab.vercel.app`.
+- The current PR head is a later documentation/handoff commit. Its GitHub combined Vercel status currently reports a **build-rate-limit failure** (Vercel target: `upgradeToPro=build-rate-limit`). Do not conflate the READY app-code preview with a successful build for the latest PR HEAD.
+- GitHub Actions returned no PR workflow runs for the current PR head. The live Supabase Edge Function deployment is independently ACTIVE v21 with `verify_jwt=true`.
+- This checkpoint does not mark the overall Day 1–3 plan accepted or complete.

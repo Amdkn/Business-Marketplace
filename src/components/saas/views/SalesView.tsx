@@ -206,8 +206,7 @@ export const SalesView: React.FC = () => {
       ) : (
         <Card className="p-6">
           <p className="text-sm text-slate-500 italic">
-            Agent logs (sales agent swarm) — D2 backlog. Currently no live log stream
-            connected to tenant-scoped sales records.
+            Sales agent execution logs are unavailable because no sales-agent runtime or event-ingestion stream is connected. The pipeline data above remains workspace-persisted.
           </p>
         </Card>
       )}

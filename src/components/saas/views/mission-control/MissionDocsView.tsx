@@ -51,7 +51,7 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'chat',
     title: 'Chat · /agent-root/chat',
     body:
-      'Single-agent chat interface. Pick a specialist, type, get a reply. Replies are deterministic stubs that route by agent role (owner / manager / operator / viewer). The stub acknowledges wiring to a future Edge Function for live model replies.',
+      'Agent directory-linked chat shell. No inference or execution runtime is connected; the composer is disabled and messages are not sent, simulated or stored.',
   },
   {
     id: 'docs',

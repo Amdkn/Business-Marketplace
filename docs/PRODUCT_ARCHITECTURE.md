@@ -111,7 +111,22 @@ Treat that package as a behavioral/domain reference, not as a second persistence
 
 PR #56 also names **six market surfaces**. This Control Plane does not reinterpret or collapse those surfaces into the B2 department axis or the LD Areas OS axis. Their definitions remain a separate architectural dimension to be incorporated from the V5 source specification.
 
-## 6. Adapter contract
+## 6. Adapter family registry versus provider implementation
+
+The platform persists 20 global adapter-family blueprints in `integration.adapter_family_blueprints`. They group provider examples into integration families and are exposed through the public read-only `list_adapter_families` API action.
+
+All 20 records currently have `implementation_status = PLANNED`. A provider example (for example Slack, GitHub or Stripe) is not proof of a provider-specific adapter, OAuth flow, granted scope, connection, sync job or healthy integration.
+
+Keep these lifecycle layers distinct:
+
+1. **Family blueprint:** the integration category and provider examples.
+2. **Provider adapter manifest:** a concrete provider implementation, version, supported operations and auth contract.
+3. **Tenant connection:** authorized provider account, encrypted secret reference, scopes and connection state.
+4. **Runtime execution:** sync/webhook/job, idempotency, audit, health and error recovery.
+
+The first layer is now persisted. The provider manifests, tenant connections and runtime execution layers remain to be implemented and verified.
+
+## 7. Adapter contract
 
 An adapter definition is a reusable platform capability. A connection is a tenant-specific configured instance.
 
@@ -153,7 +168,7 @@ Connection state machine:
 
 Additional terminal/administrative states: `revoked`, `error`. A successful OAuth callback alone does not mean the adapter is healthy; run a scoped health check.
 
-## 7. Agent and workflow governance
+## 8. Agent and workflow governance
 
 An agent is not granted ambient access because it exists in a workspace. Every run resolves:
 
@@ -168,7 +183,7 @@ An agent is not granted ambient access because it exists in a workspace. Every r
 
 Workflow steps must support human approval, retries, idempotency keys, cancellation and compensation where a provider supports it.
 
-## 8. Tenancy and security
+## 9. Tenancy and security
 
 - Supabase Auth identifies the principal; organization membership and role bindings determine tenant access.
 - RLS protects tenant-owned records in exposed schemas.
@@ -179,7 +194,7 @@ Workflow steps must support human approval, retries, idempotency keys, cancellat
 - All cross-tenant operations require an explicit privileged policy path and audit record.
 - Demo mode is an explicit environment/product mode, never an implicit fallback that resembles a live customer workspace.
 
-## 9. Existing implementation caveats
+## 10. Existing implementation caveats
 
 The inherited frontend currently includes Coach OS concepts such as `demo-coach`, `coach-os:*` local-storage keys, Coach onboarding copy and Coach-oriented seed collections. Those are legacy implementation details, not canonical Marketplace entities.
 
@@ -192,7 +207,7 @@ Before routing real users into the inherited Desktop:
 
 Existing Marketplace UI is an integration catalog with local install toggles. It is not yet the provider adapter control plane described here.
 
-## 10. Implementation sequence
+## 11. Implementation sequence
 
 ### Wave 0 — identity and safety
 - Product naming, metadata, README and deployment identity.
@@ -224,7 +239,7 @@ Existing Marketplace UI is an integration catalog with local install toggles. It
 - Digital Garden: executive portfolio and outcomes.
 - Mobile Edge: approvals, field actions and alerts.
 
-## 11. Acceptance gates
+## 12. Acceptance gates
 
 A feature is not complete because it renders. For every vertical slice:
 

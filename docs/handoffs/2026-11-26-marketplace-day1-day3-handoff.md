@@ -1600,3 +1600,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Journal allocation: debit seller payable (seller share), debit platform fee revenue (fee share), credit PSP clearing (refund gross). Zero lines are omitted. Refund journal is immutable/idempotent; original capture is never rewritten.
 - Finance SQL suite passed with refund table/RLS/grant/immutability checks, API SECURITY DEFINER/search_path/EXECUTE checks, capture dependency/idempotency assertions and cumulative rounding examples.
 - No real provider refund, refund allocation or journal has been created. Tenant/provider E2E remains blocked by zero Auth users, zero organizations and no connected provider.
+
+### 13.21 Settled seller payout → ledger posting — 2026-11-26
+
+- Added migration `finance_journal_account_locking`, tracked at `supabase/migrations/20261126073600_finance_journal_account_locking.sql`. The core journal posting function now locks all affected ledger accounts in sorted UUID order before validating and posting, serializing concurrent writes and protecting balance checks.
+- Added migration `finance_paid_payout_ledger_posting`, tracked at `supabase/migrations/20261126073700_finance_paid_payout_ledger_posting.sql`.
+- Added required `finance.payout_batches.owner_organization_id` and its FK/index. The live project had zero payout batches/items when the non-null ownership column was added.
+- Added `api.post_paid_payout_item_finance_entry` and authenticated Edge action `post_paid_payout_item_finance_entry`; deployed `marketplace-api` ACTIVE v24 with `verify_jwt=true`.
+- Posting requires batch and item PAID states, provider batch/payout IDs, `settled_at`, correct owner/currency, active seller-payable and PSP-clearing accounts, and sufficient posted balances in both accounts.
+- Journal allocation: debit seller payable; credit PSP clearing. Payout journal is immutable/idempotent using `payout-settlement:<payout_item_id>`.
+- Finance regression suite passed with payout owner, settlement gates, balance guards, API grants/search_path and account-lock ordering assertions.
+- No payout batch/item or bank transfer was created. Provider submission, payout orchestration and return/reversal handling remain separate work.

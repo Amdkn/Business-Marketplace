@@ -16,6 +16,7 @@ import { CHAT_BY_AGENT, type ChatMessage } from '../seed';
 import { useDashboardAgents } from '../cmsAgents';
 import { useShellStore } from '../../../../stores/shell.store';
 import { ACCENT, GhostButton, IconChip, Panel, Pill, PrimaryButton, SectionTitle } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
 function nowStamp(): string {
   const d = new Date();
@@ -50,7 +51,7 @@ function saveExtras(map: Record<string, ChatMessage[]>): void {
   }
 }
 
-export function Chat() {
+function DemoChat() {
   // Agent list is CMS-driven so a freshly created agent shows up in the
   // rail. The seed `CHAT_BY_AGENT` still owns the canned thread context.
   const agents = useDashboardAgents();
@@ -288,4 +289,12 @@ function EmptyThread({ agent }: { agent: string }) {
       </div>
     </div>
   );
+}
+
+
+export function Chat() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoChat />
+    : <RuntimeUnavailable title="Chat" description="Live agent chat requires a connected model/runtime adapter and persisted conversation records. Sample transcripts are available only in the demo tenant." />;
 }

@@ -394,7 +394,7 @@ export function OperationsApp() {
               value={changeTitle}
               onChange={(e) => setChangeTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void void submitNewChange();
+                if (e.key === 'Enter') void submitNewChange();
                 if (e.key === 'Escape') cancelChangeComposer();
               }}
               placeholder="ex. Add tag-based search to the vault"
@@ -651,7 +651,7 @@ export function OperationsApp() {
               value={composerTitle}
               onChange={(e) => setComposerTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void void submitNewAlert();
+                if (e.key === 'Enter') void submitNewAlert();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire l'incident…"

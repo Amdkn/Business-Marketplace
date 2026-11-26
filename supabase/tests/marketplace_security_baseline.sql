@@ -9,7 +9,7 @@ BEGIN
   SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
     INTO v_bad
   FROM pg_tables
-  WHERE schemaname IN ('identity','enterprise','catalog','commerce','integration','areas','content')
+  WHERE schemaname IN ('identity','enterprise','catalog','commerce','integration','areas','content','workspace_data')
     AND NOT coalesce((SELECT c.relrowsecurity
                       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname=pg_tables.schemaname AND c.relname=pg_tables.tablename
@@ -42,7 +42,7 @@ BEGIN
     INTO v_bad
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid=p.pronamespace
-  WHERE n.nspname IN ('identity','enterprise','catalog','commerce','integration','areas','api')
+  WHERE n.nspname IN ('identity','enterprise','catalog','commerce','integration','areas','api','workspace_data')
     AND p.prosecdef
     AND (
       p.proconfig IS NULL
@@ -81,6 +81,18 @@ BEGIN
          AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
      ) THEN
     RAISE EXCEPTION 'Workspace RLS predicates do not meet the authenticated-user / fixed-search_path contract';
+  END IF;
+
+  IF to_regprocedure('workspace_data.validate_mission_agent_delegation()') IS NULL
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_proc p
+       WHERE p.oid=to_regprocedure('workspace_data.validate_mission_agent_delegation()')
+         AND p.prosecdef
+         AND EXISTS (SELECT 1 FROM unnest(p.proconfig) cfg WHERE cfg LIKE 'search_path=%')
+         AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')
+     ) THEN
+    RAISE EXCEPTION 'Mission agent-delegation trigger boundary is unsafe';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='identity' AND tablename='organizations' AND cmd='SELECT')
@@ -133,7 +145,7 @@ BEGIN
   FROM pg_class c
   JOIN pg_namespace n ON n.oid=c.relnamespace
   WHERE c.relkind='r'
-    AND n.nspname IN ('identity','areas','enterprise','catalog','commerce','integration')
+    AND n.nspname IN ('identity','areas','enterprise','catalog','commerce','integration','workspace_data')
     AND NOT EXISTS (
       SELECT 1 FROM pg_policies pol
       WHERE pol.schemaname=n.nspname AND pol.tablename=c.relname

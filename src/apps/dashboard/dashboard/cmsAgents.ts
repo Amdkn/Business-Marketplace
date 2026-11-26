@@ -22,6 +22,7 @@ import { useMemo } from 'react';
 import { useCmsStore } from '../../../lib/cms/cms.store';
 import type { CmsCollectionDef, CmsItem } from '../../../lib/cms/types';
 import { AGENTS as AGENT_SEED, type DashboardAgent } from './seed';
+import { TENANT_DEMO_COACH } from '../../../stores/tenant.store';
 
 export const AGENTS_COLLECTION_ID = 'dashboard_agents';
 
@@ -78,7 +79,7 @@ export function ensureAgentsCollection(): void {
     registered = true;
     return;
   }
-  state.registerCollection(agentsDef, buildSeedItems());
+  state.registerCollection(agentsDef, state.activeTenantId === TENANT_DEMO_COACH ? buildSeedItems() : []);
   registered = true;
 }
 
@@ -113,10 +114,11 @@ function coalesceAgent(item: CmsItem): DashboardAgent {
 export function useDashboardAgents(): DashboardAgent[] {
   ensureAgentsCollection();
   const items = useCmsStore((s) => s.items[AGENTS_COLLECTION_ID]);
+  const activeTenantId = useCmsStore((s) => s.activeTenantId);
   return useMemo(() => {
-    if (!items) return AGENT_SEED;
+    if (!items) return activeTenantId === TENANT_DEMO_COACH ? AGENT_SEED : [];
     return items.map(coalesceAgent);
-  }, [items]);
+  }, [items, activeTenantId]);
 }
 
 /** Resolve a single agent by id. Returns null if the id is unknown. */

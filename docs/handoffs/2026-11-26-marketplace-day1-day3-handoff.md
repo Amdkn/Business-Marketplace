@@ -2551,6 +2551,7 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 
 ### Verification limitation
 - Latest code commit containing the new tests: `33e20d9e5bcc1eb84a6f30cda517278575d2d669`.
+- Current branch head after documentation-only refreshes: `f457a99b38585fb25ae07805e6eac317c8e07c1d`; the latest application-source change remains `33e20d9`.
 - Vercel's latest available Preview build was commit `d17070b`, before these OAuth changes; it passed 548/548 tests, typechecks, Vite build and 102/102 runtime benchmarks.
 - GitHub Actions returned no workflow run for `33e20d9`.
 - A manual Vercel deployment request for `33e20d9` returned HTTP 402 `api-deployments-free-per-day` with a 24-hour retry window. No further retries; do not claim the new two tests passed.

@@ -424,7 +424,7 @@ function Fleet({ onAgentClick }: { onAgentClick: (agent: FleetAgent) => void }) 
     <div className="p-7 h-full flex flex-col gap-5 overflow-y-auto custom-scrollbar">
       <SectionHead
         title="B3 Agent Bench"
-        subtitle="Squads · live state by Green Lanterns and X-Men"
+        subtitle="Workspace agent assignments · runtime status appears when a real runtime feed is connected"
         action={
           <div className="flex items-center gap-2">
             <Badge tone="accent">{FLEET_AGENTS.length} agents</Badge>
@@ -644,7 +644,7 @@ function Schedule() {
     <div className="p-7 h-full flex flex-col gap-5 overflow-y-auto custom-scrollbar">
       <SectionHead
         title="Standup Cadence"
-        subtitle="Daily standup, sprint review, retrospective · 7-day × 24-hour"
+        subtitle="Planning and runtime telemetry · no persisted schedule or activity feed is connected yet"
         action={<Badge tone="accent">UTC</Badge>}
       />
 
@@ -652,9 +652,9 @@ function Schedule() {
       <div className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— ACTIVITY HEATMAP · 7d × 24h</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— RUNTIME ACTIVITY · NOT YET REPORTED</div>
             <div className="text-[12px] text-[var(--theme-text-muted)] mt-0.5">
-              Clique une case pour voir les tâches prévues
+              Aucune télémétrie horaire n’est encore disponible
               {picked ? ` · ${picked.day} ${String(picked.hour).padStart(2, '0')}:00` : ''}
             </div>
           </div>
@@ -697,7 +697,7 @@ function Schedule() {
                       data-cadence-cell
                       data-day={day}
                       data-hour={h}
-                      aria-label={`${day} ${h}:00 — activity ${SCHEDULE_GRID[dayIdx][h]}${hasTask ? ' · a des tâches prévues' : ''}`}
+                      aria-label={`${day} ${h}:00 — runtime activity not reported${hasTask ? ' · has a planned task' : ''}`}
                       className="h-5 rounded-sm transition-all hover:ring-1 hover:ring-[var(--theme-accent)] focus:outline-none"
                       style={{
                         background: heatColor(SCHEDULE_GRID[dayIdx][h]),
@@ -716,15 +716,15 @@ function Schedule() {
         <div className="mt-4 pt-3 border-t border-[var(--panel-border-subtle)] grid grid-cols-3 gap-4">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Peak hour</div>
-            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{String(peakHour).padStart(2, '0')}:00 UTC</div>
+            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{tasks.length ? `${String(peakHour).padStart(2, '0')}:00 UTC` : '—'}</div>
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Quietest</div>
-            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{String(quietestHour).padStart(2, '0')}:00 UTC</div>
+            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{tasks.length ? `${String(quietestHour).padStart(2, '0')}:00 UTC` : '—'}</div>
           </div>
           <div>
             <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Weekday avg</div>
-            <div className="text-[20px] font-bold mt-0.5" style={{ color: '#15803d' }}>{weekdayAvg}%</div>
+            <div className="text-[20px] font-bold mt-0.5" style={{ color: '#15803d' }}>{tasks.length ? `${weekdayAvg}%` : '—'}</div>
           </div>
         </div>
       </div>
@@ -853,6 +853,8 @@ function Schedule() {
                 </button>
                 <button
                   type="submit"
+                  disabled
+                  title="Task scheduling persistence is not connected to workspace_data.tasks."
                   data-cadence-composer-submit
                   className="h-7 px-3 rounded-lg text-[11px] font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                   style={{ background: ACCENT }}

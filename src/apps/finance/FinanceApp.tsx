@@ -140,6 +140,7 @@ export function FinanceApp() {
   const courbeDrill = useCollectionDrill('courbe_demande', 'Courbes');
   const budgetDrill = useCollectionDrill('budget_tokens', 'Tokens');
   const formesDrill = useCollectionDrill('formes_prix', 'Formes');
+  const addItem = useCmsStore(s => s.addItem);
   const addItemPersisted = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<FinanceDetailItem | null>(null);
@@ -204,7 +205,7 @@ export function FinanceApp() {
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
     setSavingInvoice(true);
-    const result = await addItemPersisted('invoices', {
+    const invoiceDraft = {
       client: String(client.name ?? client.title ?? client.id),
       clientId: String(client.id),
       amount: amountNum,
@@ -213,7 +214,10 @@ export function FinanceApp() {
       due: due.toISOString().slice(0, 10),
       dueAt: due.toISOString(),
       issuedAt: now.toISOString(),
-    });
+    };
+    const result = isDemoTenant
+      ? addItem('invoices', invoiceDraft)
+      : await addItemPersisted('invoices', invoiceDraft);
     setSavingInvoice(false);
     if (result.ok) {
       addToast({ source: 'Finance', type: 'success', message: `Invoice persisted for ${String(client.name ?? client.id)}.` });

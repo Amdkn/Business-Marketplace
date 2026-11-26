@@ -187,7 +187,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
           {active === 'core' && <CoreView />}
           {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} />}
           {active === 'adapters' && <AdaptersView />}
-          {active === 'marketplace' && <ComingSoon icon={Blocks} title="Capability marketplace" text="The catalog will install versioned business capabilities and solution packs into a workspace. The inherited integration gallery is preserved as runtime material while this lifecycle is built." />}
+          {active === 'marketplace' && <MarketplaceCatalogView />}
           {active === 'workspaces' && <ComingSoon icon={Building2} title="Organization workspaces" text="Organization provisioning, membership and workspace isolation are being connected to the Marketplace identity model." />}
           {active === 'agents' && <ComingSoon icon={Sparkles} title="Agent directory" text="Agents will be registered with versioned contracts, scoped tools, policy envelopes and auditable execution receipts." />}
           {active === 'workflows' && <ComingSoon icon={Workflow} title="Workflow orchestration" text="Compose adapters, agents and human approvals into idempotent, observable business processes." />}
@@ -240,6 +240,57 @@ function DomainsView({ domains: list, query, setQuery, onSelect, selected, axis,
       <div className="bm-panel-foot">Reference architecture only · no tenant installation or live operational records implied</div>
     </section>
     <aside className="bm-panel bm-domain-detail">{selected ? <><div className="bm-detail-kicker">{selected.axis==='department'?'BUSINESS DEPARTMENT':'AREAS OS PORTFOLIO'} / {selected.code}</div><h2>{selected.name}</h2><p>{selected.description}</p><div className="bm-detail-stat"><strong>{selected.code}</strong><span>{selected.axis==='department'?'Business Department':'Mission portfolio'}</span></div><h3>Operating responsibility</h3><p>{selected.role}</p><div className="bm-detail-warning"><LockKeyhole size={15}/> Blueprint only. Ownership, dependencies and installations become live after tenant context and the governed registry API are implemented.</div></> : <div className="bm-empty-detail"><Network size={26}/><strong>Select a structural unit</strong><span>Inspect its role without confusing Business Departments with Areas OS mission portfolios.</span></div>}</aside>
+  </div>;
+}
+
+
+type MarketplaceListing = {
+  id: string;
+  listing_key: string;
+  title: string;
+  description: string;
+  price_amount: number | string;
+  currency: string;
+  acceptance_criteria: string[];
+  created_at: string;
+  seller_name: string;
+  capability_key: string;
+  capability_version: number;
+  capability_name: string;
+};
+
+function MarketplaceCatalogView() {
+  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'error' | 'unconfigured'>('loading');
+
+  useEffect(() => {
+    let activeRequest = true;
+    if (!supabaseConfigured) {
+      setState('unconfigured');
+      return () => { activeRequest = false; };
+    }
+    void supabase.functions.invoke('marketplace-api', { body: { action: 'browse_listings' } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (!Array.isArray(data?.data)) throw new Error('Marketplace catalog response has an invalid shape');
+        if (activeRequest) {
+          setListings(data.data as MarketplaceListing[]);
+          setState('ready');
+        }
+      })
+      .catch(() => {
+        if (activeRequest) setState('error');
+      });
+    return () => { activeRequest = false; };
+  }, []);
+
+  return <div className="bm-stack">
+    <div className="bm-notice"><div className="bm-notice-icon"><Blocks size={17}/></div><div><strong>Capability catalogue · live read path</strong><span>Published offers are retrieved from the Marketplace API. Drafts and tenant-private capabilities are not exposed here.</span></div><span className="bm-notice-tag">PUBLIC CATALOG</span></div>
+    {state === 'loading' && <section className="bm-panel bm-catalog-state"><Activity size={22}/><strong>Loading published offers…</strong><span>Reading the public Marketplace catalogue.</span></section>}
+    {state === 'unconfigured' && <section className="bm-panel bm-catalog-state"><Database size={22}/><strong>Backend not configured</strong><span>Connect the Marketplace Supabase project to load published offers.</span></section>}
+    {state === 'error' && <section className="bm-panel bm-catalog-state"><Activity size={22}/><strong>Catalogue unavailable</strong><span>The Marketplace API did not return a valid response. No sample offers are substituted.</span></section>}
+    {state === 'ready' && listings.length === 0 && <section className="bm-panel bm-catalog-empty"><div className="bm-catalog-empty-icon"><Blocks size={25}/></div><span className="bm-eyebrow">LIVE DATABASE RESPONSE</span><h2>No published offers yet.</h2><p>The public catalogue is connected and returned zero published listings. The next lifecycle is provider capability → versioned offer → publish → discover → order.</p><div className="bm-catalog-count"><strong>0</strong><span>published listings</span></div></section>}
+    {state === 'ready' && listings.length > 0 && <><div className="bm-catalog-summary"><strong>{listings.length}</strong><span>published offers returned by the Marketplace API</span></div><div className="bm-listing-grid">{listings.map(item=><article className="bm-panel bm-listing-card" key={item.id}><div className="bm-listing-top"><span>{item.capability_key}</span><span>v{item.capability_version}</span></div><h2>{item.title}</h2><p>{item.description}</p><div className="bm-listing-seller">Provided by <strong>{item.seller_name}</strong></div><div className="bm-listing-bottom"><strong>{new Intl.NumberFormat(undefined,{style:'currency',currency:item.currency}).format(Number(item.price_amount))}</strong><span>{item.capability_name}</span></div></article>)}</div></>}
   </div>;
 }
 

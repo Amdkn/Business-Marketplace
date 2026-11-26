@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { base64Url } from './oauth-encoding';
-import { assertOAuthScopesAllowed, parseOAuthScopes } from '../../supabase/functions/_shared/oauth-scopes.ts';
+import { assertOAuthScopesAllowed, parseOAuthScopes } from '../../../supabase/functions/_shared/oauth-scopes.ts';
 
 describe('base64Url', () => {
   it('replaces both Base64 special characters', () => {

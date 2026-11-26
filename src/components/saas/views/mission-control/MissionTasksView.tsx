@@ -186,7 +186,9 @@ export const MissionTasksView = (): React.ReactElement => {
     if (!targetCol && COLUMN_ORDER.includes(overId as Column)) targetCol = overId as Column;
     if (!sourceCol || !targetCol) return;
 
-    const sourceItems = grouped[sourceCol];
+    const sourceItems = missions
+      .filter((mission) => mission.status === sourceCol)
+      .sort((left, right) => left.position - right.position);
     const moving = sourceItems.find((mission) => mission.id === activeId);
     if (!moving) return;
 
@@ -208,8 +210,7 @@ export const MissionTasksView = (): React.ReactElement => {
             : mission)
           : previous);
       } else {
-        const targetItems = grouped[targetCol];
-        const nextPosition = targetItems.length;
+        const nextPosition = missions.filter((mission) => mission.status === targetCol).length;
         const updated = await missionsRepo.update(activeId, {
           status: targetCol,
           position: nextPosition,

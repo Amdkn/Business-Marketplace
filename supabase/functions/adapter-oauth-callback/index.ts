@@ -1,4 +1,5 @@
 import postgres from 'npm:postgres@3.4.5';
+import { assertOAuthScopesAllowed, parseOAuthScopes } from '../_shared/oauth-scopes.ts';
 
 const dbUrl = Deno.env.get('SUPABASE_DB_URL') ?? '';
 if (!dbUrl) throw new Error('Private database environment is missing');
@@ -141,9 +142,8 @@ Deno.serve(async (req: Request) => {
     const expiresIn=Number(tokens.expires_in ?? 3600);
     if(!Number.isFinite(expiresIn) || expiresIn<1 || expiresIn>31536000) throw new Error('OAUTH_EXPIRY_INVALID');
     const requested=Array.isArray(context.default_scopes)?context.default_scopes:[];
-    const granted=typeof tokens.scope==='string' && tokens.scope.trim()
-      ? tokens.scope.trim().split(/\s+/) : requested;
-    if(granted.some((scope:string)=>!requested.includes(scope))) throw new Error('OAUTH_SCOPE_ESCALATION_REJECTED');
+    const granted = parseOAuthScopes(tokens.scope, requested);
+    assertOAuthScopesAllowed(granted, requested);
     const secretJson=JSON.stringify({
       access_token:tokens.access_token,
       refresh_token:tokens.refresh_token ?? null,

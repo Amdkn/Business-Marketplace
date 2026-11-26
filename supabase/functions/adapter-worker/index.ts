@@ -1,4 +1,5 @@
 import postgres from 'npm:postgres@3.4.5';
+import { assertOAuthScopesAllowed, parseOAuthScopes } from '../_shared/oauth-scopes.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -213,10 +214,9 @@ async function refreshOAuthSecret(job: Job, config: any): Promise<Record<string,
     }
     const expiresIn=Number(tokens.expires_in ?? 3600);
     if (!Number.isFinite(expiresIn) || expiresIn<1 || expiresIn>31536000) throw new Error('OAUTH_EXPIRY_INVALID');
-    const nextScopes = typeof tokens.scope==='string' && tokens.scope.trim()
-      ? tokens.scope.trim().split(/\s+/) : (Array.isArray(current.scopes)?current.scopes:[]);
     const allowedScopes = Array.isArray(current.scopes)?current.scopes:[];
-    if (nextScopes.some((scope: string)=>!allowedScopes.includes(scope))) throw new Error('OAUTH_SCOPE_ESCALATION_REJECTED');
+    const nextScopes = parseOAuthScopes(tokens.scope, allowedScopes);
+    assertOAuthScopesAllowed(nextScopes, allowedScopes);
     const next = {
       access_token:tokens.access_token,
       refresh_token:typeof tokens.refresh_token==='string' && tokens.refresh_token ? tokens.refresh_token : current.refresh_token,

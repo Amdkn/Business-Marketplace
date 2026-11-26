@@ -201,7 +201,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
         </div>
         <div className="bm-org-switch">
           <div className="bm-org-avatar">A</div>
-          <div className="bm-org-copy"><strong>Platform blueprint</strong><span>Preview environment</span></div>
+          <div className="bm-org-copy"><strong>Tenant context</strong><span>Select an organization in Workspaces</span></div>
           <ChevronDown size={15} />
         </div>
         {['PLATFORM', 'OPERATIONS', 'SYSTEM'].map(group => (
@@ -222,7 +222,7 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
             <button aria-label="Open Business Office" onClick={onOpenOffice}><ArrowUpRight size={15} /></button>
           </div>
           <button className="bm-nav-item bm-settings" onClick={() => setActive('governance')}><Settings2 size={17} /><span>Platform settings</span></button>
-          <div className="bm-user"><div className="bm-user-avatar">A0</div><div><strong>Amadeus / Admin</strong><span>Platform operator · preview</span></div><ChevronDown size={14} /></div>
+          <div className="bm-user"><div className="bm-user-avatar">A0</div><div><strong>Authenticated operator</strong><span>Session-scoped identity</span></div><ChevronDown size={14} /></div>
         </div>
       </aside>
 

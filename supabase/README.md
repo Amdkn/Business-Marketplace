@@ -135,8 +135,12 @@ The current live Finance foundation supersedes the earlier inventory snapshot ab
 - 16 required template accounts in version 2026.1.
 - finance.ledger_accounts.chart_version marks tenant-installed template accounts.
 - api.provision_finance_chart_of_accounts is service-role-only, SECURITY DEFINER, pinned search_path, tenant membership/role checked, collision-safe and advisory-lock serialized.
-- Authenticated action provision_finance_chart_of_accounts is exposed by marketplace-api v19 (verify_jwt=true).
+- Authenticated action provision_finance_chart_of_accounts is exposed by marketplace-api v20 (verify_jwt=true).
 - The chart is a provider-neutral baseline; no tenant chart is installed because there are no live organizations.
 - Two additive migrations: 20261126070000_finance_chart_of_accounts_provisioning and 20261126070100_finance_chart_version_regex_fix.
 
 Do not interpret the presence of templates as tenant provisioning, financial activity or Day 2 acceptance. Continue with fee policy versioning and the order-to-fee-to-ledger posting contract.
+
+
+### Finance authorization alignment — 2026-11-26
+The Finance actions now use a dedicated API authorization helper for S0_SOVEREIGN, B1_CEO, B2_MANAGER and B2.2 Treasury roles. This matches the SQL authorization boundary. marketplace-api is ACTIVE v20 with verify_jwt=true.

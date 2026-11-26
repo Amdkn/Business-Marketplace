@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase, supabaseConfigured } from '../../lib/supabase';
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness,
   Building2, Check, ChevronDown, ChevronRight, CircleDot, Cloud, Command, Compass,
@@ -31,8 +32,6 @@ const areasPortfolios: Domain[] = [
   { id: 'ld07-mc-sandbox', name: 'MC Sandbox', code: 'LD07', axis: 'area', description: 'Experimental space for prototypes, exploration and controlled simulations.', role: 'Mission portfolio for experimentation without contaminating operational systems.', color: '#d56e64' },
   { id: 'ld08-civilizer', name: 'Civilizer / ABC OS', code: 'LD08', axis: 'area', description: 'Civilizational systems, collective coordination and ABC OS initiatives.', role: 'Meta-project portfolio for long-horizon civilizational design and coordination.', color: '#555b57' },
 ];
-
-const domains = [...businessDepartments, ...areasPortfolios];
 
 const adapterFamilies = [
   ['Identity & access', 'Google Workspace · Microsoft 365 · Auth0 · Clerk', 'ShieldCheck'],
@@ -85,10 +84,55 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
   const [registryAxis, setRegistryAxis] = useState<'departments' | 'areas'>('departments');
   const [query, setQuery] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
+  const [taxonomy, setTaxonomy] = useState({ businessDepartments, areasPortfolios });
+  const [taxonomySource, setTaxonomySource] = useState<'loading' | 'database' | 'fallback'>('loading');
   const copy = sectionCopy[active];
-  const axisDomains = registryAxis === 'departments' ? businessDepartments : areasPortfolios;
+  const departments = taxonomy.businessDepartments;
+  const areas = taxonomy.areasPortfolios;
+  const axisDomains = registryAxis === 'departments' ? departments : areas;
   const filteredDomains = useMemo(() => axisDomains.filter(d => `${d.name} ${d.code} ${d.description}`.toLowerCase().includes(query.toLowerCase())), [axisDomains, query]);
-  const selected = domains.find(d => d.id === selectedDomain);
+  const selected = [...departments, ...areas].find(d => d.id === selectedDomain);
+
+  useEffect(() => {
+    let activeRequest = true;
+    if (!supabaseConfigured) {
+      setTaxonomySource('fallback');
+      return () => { activeRequest = false; };
+    }
+    void supabase.functions.invoke('marketplace-api', { body: { action: 'list_taxonomy_blueprints' } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const payload = data?.data;
+        if (!payload || !Array.isArray(payload.business_departments) || !Array.isArray(payload.areas_domains)) {
+          throw new Error('Marketplace taxonomy response has an invalid shape');
+        }
+        const mapRows = (rows: Array<{ code: string; name: string; description: string; responsibility: string }>, axis: 'department' | 'area', palette: Domain[]): Domain[] =>
+          rows.map(row => ({
+            id: row.code.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            code: row.code,
+            name: row.name,
+            description: row.description,
+            role: row.responsibility,
+            axis,
+            color: palette.find(item => item.code === row.code)?.color ?? '#8b9887',
+          }));
+        const nextTaxonomy = {
+          businessDepartments: mapRows(payload.business_departments, 'department', businessDepartments),
+          areasPortfolios: mapRows(payload.areas_domains, 'area', areasPortfolios),
+        };
+        if (activeRequest) {
+          if (nextTaxonomy.businessDepartments.length !== 8 || nextTaxonomy.areasPortfolios.length !== 8) {
+            throw new Error('Marketplace taxonomy must contain exactly eight entries per axis');
+          }
+          setTaxonomy(nextTaxonomy);
+          setTaxonomySource('database');
+        }
+      })
+      .catch(() => {
+        if (activeRequest) setTaxonomySource('fallback');
+      });
+    return () => { activeRequest = false; };
+  }, []);
 
   return (
     <div className="bm-shell">
@@ -137,8 +181,8 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
             <div className="bm-page-actions"><span className="bm-blueprint-pill"><CircleDot size={12} /> FOUNDATION MODE</span></div>
           </div>
 
-          {active === 'overview' && <Overview onNavigate={setActive} />}
-          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} />}
+          {active === 'overview' && <Overview onNavigate={setActive} departments={departments} areas={areas} />}
+          {active === 'domains' && <DomainsView domains={filteredDomains} query={query} setQuery={setQuery} onSelect={setSelectedDomain} selected={selected} axis={registryAxis} setAxis={setRegistryAxis} source={taxonomySource} />}
           {active === 'adapters' && <AdaptersView />}
           {active === 'marketplace' && <ComingSoon icon={Blocks} title="Capability marketplace" text="The catalog will install versioned business capabilities and solution packs into a workspace. The inherited integration gallery is preserved as runtime material while this lifecycle is built." />}
           {active === 'workspaces' && <ComingSoon icon={Building2} title="Organization workspaces" text="Organization provisioning, membership and workspace isolation are being connected to the Marketplace identity model." />}

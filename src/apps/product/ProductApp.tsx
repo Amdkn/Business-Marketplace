@@ -503,7 +503,7 @@ export function ProductApp() {
                   autoFocus
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
                   placeholder="ex. Export de 3 posts LinkedIn"
                   className="text-[12px] rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -515,7 +515,7 @@ export function ProductApp() {
                 <input
                   value={composerFeature}
                   onChange={(e) => setComposerFeature(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
                   placeholder="ex. Bouton Export sur transcript"
                   className="text-[12px] rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -527,7 +527,7 @@ export function ProductApp() {
                 <input
                   value={composerClient}
                   onChange={(e) => setComposerClient(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
                   placeholder="ex. Priya N."
                   className="text-[12px] rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -539,7 +539,7 @@ export function ProductApp() {
                 <input
                   value={composerWeeks}
                   onChange={(e) => setComposerWeeks(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewMvp(); if (e.key === 'Escape') cancelComposer(); }}
                   type="number"
                   min="0.5"
                   step="0.5"

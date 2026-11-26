@@ -1505,3 +1505,12 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Extended and re-ran the Finance regression suite; it now checks the posting function's existence, SECURITY DEFINER/search_path and exact role grants. It completed without assertion exceptions.
 - No production journal, account, payment or tenant fixture was created. This is an available guarded posting API, not a claim that production accounting has started.
 - Current Finance source contract and README record the new migration and API.
+
+
+### 13.13 Finance API deployment verification — 2026-11-26
+
+- Added and applied `20261126062749 finance_journal_posting_api`; exact SQL source is tracked in the Marketplace repository.
+- Added the authenticated `post_finance_journal_entry` action to the canonical Edge Function source. The request parser validates decimal strings (up to six fractional digits), line count and exactly-one-sided debit/credit semantics before calling the database function.
+- Deployed the canonical `marketplace-api` source to the existing Supabase project. Live deployment reports **ACTIVE v18**, `verify_jwt=true`. This replaces v17; v18 includes the decimal parser correction.
+- Finance regression suite passed after verifying the API function, pinned SECURITY DEFINER search_path, service_role-only EXECUTE grant and finance FK index coverage.
+- The API is not exercised against a real organization because the hosted project still has no Auth users or tenant fixtures. No synthetic financial data was created.

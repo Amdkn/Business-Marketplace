@@ -1,4 +1,4 @@
-/** OMK RH canvas — hierarchy + mandate stack.
+/** A’Space RH canvas — hierarchy + mandate stack.
  *
  *  Why this layout, not the landing template:
  *  RH & Meta-Gouvernance is about WHO reports to WHOM and WHAT each agent is
@@ -266,7 +266,7 @@ export function RhCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

@@ -150,3 +150,6 @@ The Finance actions now use a dedicated API authorization helper for S0_SOVEREIG
 Two private Finance tables now define versioned fee policy terms and immutable order fee snapshots. The fee engine supports platform-wide or seller-scoped commissions, basis-point percentage rates, fixed fees, optional floors/caps, explicit currency rounding, effective windows and draft/active/retired policy lifecycle. Activated terms and applied order snapshots are immutable. There is no seeded commission rate; an authorized Finance operator must create and activate a policy. Edge actions: `create_fee_policy`, `activate_fee_policy`, `apply_order_fee_policy`. See `docs/FINANCE_LEDGER_CONTRACT.md`.
 
 Fee activation concurrency is serialized by the logical policy identity (owner + key + scope + seller scope + currency), with an overlap check under the same advisory lock. Migration: `20261126073200_fee_policy_activation_serialization`. Fee-policy foreign keys are indexed; the Finance schema currently has no unindexed foreign keys.
+
+
+Fee engine hardening: migrations `20261126073100_finance_fee_policy_fk_indexes` and `20261126073200_fee_policy_activation_serialization` add fee-policy FK indexes and serialize competing policy activations by logical policy identity. No unindexed Finance foreign keys remain.

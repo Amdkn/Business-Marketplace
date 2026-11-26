@@ -971,6 +971,18 @@ async function applyOrderFeePolicy(user: User, body: Record<string, unknown>) {
   });
 }
 
+async function postCapturedOrderFinanceEntry(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const paymentIntentId = requiredString(body.payment_intent_id, 'payment_intent_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.post_captured_order_finance_entry(
+      ${user.id}::uuid,${ownerId}::uuid,${paymentIntentId}::uuid
+    ) AS posting`;
+    return rows[0]?.posting;
+  });
+}
+
 async function postFinanceJournalEntry(user: User, body: Record<string, unknown>) {
   const organizationId = requiredString(body.organization_id, 'organization_id');
   const entryNumber = requiredString(body.entry_number, 'entry_number', 100);
@@ -1055,6 +1067,7 @@ Deno.serve(async (req: Request) => {
       case 'activate_fee_policy': data = await activateFeePolicy(user, body); break;
       case 'apply_order_fee_policy': data = await applyOrderFeePolicy(user, body); break;
       case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
+      case 'post_captured_order_finance_entry': data = await postCapturedOrderFinanceEntry(user, body); break;
       default: return response({ error: 'Unknown action', action }, 404);
     }
     return response({ data, actor_user_id: user.id });

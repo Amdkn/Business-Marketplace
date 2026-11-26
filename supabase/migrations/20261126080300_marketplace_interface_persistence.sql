@@ -754,9 +754,10 @@ create policy activity_events_member_read on workspace_data.activity_events for 
 create policy activity_events_operator_insert on workspace_data.activity_events for insert to authenticated with check (created_by_user_id=(select auth.uid()) and exists(select 1 from identity.organization_memberships m join identity.role_bindings r on r.organization_id=m.organization_id and r.subject_user_id=m.user_id where m.organization_id=activity_events.organization_id and m.user_id=(select auth.uid()) and m.membership_status='ACTIVE' and r.binding_status='ACTIVE' and r.role_code=any(array['S0_SOVEREIGN','B1_CEO','B2_MANAGER','B2.2'])));
 create or replace function workspace_data.guard_tenant_row() returns trigger language plpgsql set search_path=pg_catalog,workspace_data as $$
 begin
- if tg_op='UPDATE' and (new.organization_id is distinct from old.organization_id or new.created_by_user_id is distinct from old.created_by_user_id or new.id is distinct from old.id) then
-  raise exception 'Tenant ownership, creator and primary key are immutable';
+ if tg_op='UPDATE' and (new.organization_id is distinct from old.organization_id or new.id is distinct from old.id) then
+  raise exception 'Tenant ownership and primary key are immutable';
  end if;
+ if tg_op='UPDATE' then new.created_by_user_id := old.created_by_user_id; end if;
  new.updated_at=now();
  return new;
 end $$;

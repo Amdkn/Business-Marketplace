@@ -192,7 +192,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     // Best-effort persistence (Supabase side, single-tenant today).
     void upsertCollectionDef(stampedDef);
     void hydrateCollection(stampedDef.id).then((liveItems) => {
-      if (liveItems && liveItems.length > 0) {
+      if (liveItems !== null) {
         const stamped = liveItems.map((it) => stampTenant(it, tenantId));
         set((s) => {
           const tenantItemsMap = (s.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;

@@ -34,6 +34,6 @@ The 42 RLS-enabled tables without policies are not a reason to add broad policie
 
 GitHub Actions run [45856152162](https://github.com/Amdkn/Business-Marketplace/actions/runs/45856152162) passed on application commit [dfc3554](https://github.com/Amdkn/Business-Marketplace/commit/dfc3554b6f35c782d23b8b7721da5a7c2264c9eb): frozen Bun install, app/Node/API TypeScript, 53 Vitest files / 548 tests, Vite build and 102/102 runtime benchmarks. The OAuth Base64URL vectors are included in this passing suite.
 
-The Vercel status remains a separate `build-rate-limit` failure; there is no verified Preview for the latest commit. Do not interpret CI success as browser acceptance. The current hosted tenant remains one real user/org/workspace membership chain; do not create another tenant for test convenience.
+Latest branch head `b7c2b29` now has a READY Vercel Preview with full hosted verify (548/548 tests, app/API typechecks, Vite build, 102/102 runtime benchmarks). Do not interpret Preview readiness or CI success as authenticated browser acceptance. The current hosted tenant remains one real user/org/workspace membership chain; do not create another tenant for test convenience.
 
 Migration source accounting is intentionally conservative: 69 cloud migration-ledger entries versus 68 exact executable repository migration sources. A catalog-derived reconstruction exists for the historical RLS ACL migration, but it is not represented as byte-identical recovery of the original SQL. Preserve that exception until exact provenance is available.

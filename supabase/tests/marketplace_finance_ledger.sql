@@ -200,3 +200,35 @@ BEGIN
  RAISE NOTICE 'PASS: Refund posting access, immutable allocation and cumulative rounding';
 END
 $refund_posting_test$;
+
+DO $payout_posting_test$
+DECLARE v_def text; v_lock_def text; v_count integer;
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance'
+  AND table_name='payout_batches' AND column_name='owner_organization_id' AND is_nullable='NO')
+ THEN RAISE EXCEPTION 'Payout batch Finance owner is missing'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='api' AND p.proname='post_paid_payout_item_finance_entry' AND p.prosecdef
+  AND p.proconfig @> ARRAY['search_path=pg_catalog, identity, finance, api']::text[])
+ THEN RAISE EXCEPTION 'Payout posting API missing or unsafe'; END IF;
+ IF has_function_privilege('anon','api.post_paid_payout_item_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.post_paid_payout_item_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.post_paid_payout_item_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'Payout posting grants are unsafe'; END IF;
+ SELECT pg_get_functiondef('api.post_paid_payout_item_finance_entry(uuid,uuid,uuid)'::regprocedure) INTO v_def;
+ IF position('provider_payout_id' in v_def)=0 OR position('provider_batch_id' in v_def)=0
+ OR position('Insufficient seller payable balance' in v_def)=0 OR position('Insufficient PSP clearing balance' in v_def)=0
+ OR position('payout-settlement:' in v_def)=0 OR position('payout_status' in v_def)=0
+ THEN RAISE EXCEPTION 'Payout posting settlement and liquidity guards are incomplete'; END IF;
+ SELECT pg_get_functiondef('api.post_finance_journal_entry(uuid,uuid,text,text,text,uuid,text,character,jsonb)'::regprocedure) INTO v_lock_def;
+ IF position('ORDER BY a.id FOR UPDATE' in v_lock_def)=0
+ THEN RAISE EXCEPTION 'Journal account-level serialization is missing'; END IF;
+ SELECT count(*) INTO v_count FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
+ JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='finance' AND c.contype='f'
+ AND NOT EXISTS(SELECT 1 FROM pg_index i WHERE i.indrelid=c.conrelid AND i.indisvalid
+  AND (SELECT array_agg(k.attnum ORDER BY k.attnum) FROM unnest(c.conkey) k(attnum))
+      <@ (SELECT array_agg(a.attnum ORDER BY a.attnum) FROM unnest(i.indkey) a(attnum) WHERE a.attnum>0));
+ IF v_count<>0 THEN RAISE EXCEPTION 'Finance foreign keys lack covering indexes'; END IF;
+ RAISE NOTICE 'PASS: Payout settlement gate, balance checks, account locking and indexes';
+END
+$payout_posting_test$;

@@ -1691,3 +1691,13 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Rechecked those five source files: zero remaining matches.
 - Live Supabase schema inventory had already confirmed no schema name containing the legacy label. Historical applied migration files and handoff provenance are retained; do not rewrite applied migration history merely to erase historical references.
 - PR #1 remains OPEN / DRAFT. Re-fetch the branch HEAD before continuation; the handoff update itself advances the branch. Vercel status on the preceding code head: `failure` with description `Deployment rate limited — retry in 24 hours`; no GitHub Actions check runs.
+
+
+### 13.27 Interface-wide legacy naming sweep — 2026-11-26 03:26 ET
+
+- Extended the initial source cleanup across the Garden/Sidebar views, Sidebar data repositories, Mission Control, Web Desktop landing page registry, and all nine landing-page canvases.
+- Removed remaining `omk_saas.*` UI labels, `ADR-OMK-001` comments, `OMK` product names, old `omknexus.io` demo domains, and legacy mock tenant/service labels.
+- Updated product/landing branding to A’Space/Marketplace terminology; replaced legacy demo domains with local-only `*.aspace.local` labels rather than claiming a production domain.
+- Scanned the primary app entrypoints and seed files under `src/apps`, the full Garden view set, Sidebar data repositories, and the Mission Control views. No active-source matches remained in the inspected paths at this checkpoint.
+- `src/components/saas` and `src/apps` now use Marketplace identity in the inspected surfaces. Historical migration SQL and prior handoff text are retained only as provenance and are not active schemas or product UI.
+- Important: this was a naming cleanup, not a completion of the remaining Sidebar persistence integration. `dashboard.clients` / `dashboard.agents`, CMS `workspace_data.*`, and canonical `identity.*` still need the planned consolidation described in §13.25.

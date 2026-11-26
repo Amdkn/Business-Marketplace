@@ -19,7 +19,7 @@ import { useTenantStore } from './stores/tenant.store';
 type AuthMode = 'pending' | 'supabase' | 'demo';
 type ProductSurface = 'control-plane' | 'business-office';
 
-const AUTH_BOOT_KEY = 'coach-os:auth:v1';
+const AUTH_BOOT_KEY = 'aspace-marketplace:auth:v1';
 
 interface AuthBootState {
   mode: AuthMode;
@@ -64,23 +64,21 @@ export default function App() {
   const [surface, setSurface] = useState<ProductSurface>('control-plane');
 
   useEffect(() => {
-    if (boot.mode !== 'pending') return;
     let cancelled = false;
     void (async () => {
       try {
         const { data } = await supabase.auth.getSession();
+        if (cancelled || !data.session) return;
+        // A real Supabase session always wins over a stale local demo marker.
+        await useTenantStore.getState().bootstrap();
         if (cancelled) return;
-        if (data.session) {
-          await useTenantStore.getState().bootstrap();
-          if (cancelled) return;
-          setBoot({ mode: 'supabase', level: 'architect', email: data.session.user.email ?? undefined });
-        }
+        setBoot({ mode: 'supabase', level: 'architect', email: data.session.user.email ?? undefined });
       } catch {
-        // No active session — keep the sign-in gate visible.
+        // Keep the explicit demo state or the sign-in gate; never fabricate a session.
       }
     })();
     return () => { cancelled = true; };
-  }, [boot.mode]);
+  }, []);
 
   const handleAuthenticated = (session: { mode: 'supabase' | 'demo'; level: TenantLevel; email?: string }): void => {
     const next: AuthBootState = {

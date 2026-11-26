@@ -161,3 +161,7 @@ Added `api.post_captured_order_finance_entry` and the authenticated `post_captur
 ## Successful Refund Ledger Reversal — 2026-11-26
 
 Added immutable `finance.refund_fee_allocations` and `api.post_succeeded_refund_finance_entry`. A provider-confirmed successful refund reverses seller payable and platform fee revenue, and credits PSP clearing for the refund gross. Platform-fee reversal is calculated cumulatively against the original fee snapshot so partial-refund rounding reconciles exactly. The original capture journal remains immutable. Authenticated action: `post_succeeded_refund_finance_entry`; `marketplace-api` ACTIVE v23 (`verify_jwt=true`). No provider refund or journal fixture is created.
+
+## Settled Payout Ledger Posting — 2026-11-26
+
+Payout batches now require an owning Finance organization. The new `post_paid_payout_item_finance_entry` action posts only provider-confirmed PAID batch/items with provider IDs and settlement timestamp. It checks available seller-payable and PSP-clearing balances, then debits seller payable and credits PSP clearing through the idempotent journal API. Journal posting now locks affected account rows in sorted order to serialize concurrent postings. Live Marketplace API v24; no payout or bank transfer was fabricated.

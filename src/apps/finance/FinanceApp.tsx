@@ -397,7 +397,7 @@ export function FinanceApp() {
                   value={composerAmount}
                   onChange={(e) => setComposerAmount(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewInvoice();
+                    if (e.key === 'Enter') void submitNewInvoice();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="1200"

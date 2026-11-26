@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase, supabaseConfigured } from '../../lib/supabase';
 import {
   Activity, ArrowRight, ArrowUpRight, Blocks, Box, BriefcaseBusiness, Cpu,
@@ -9,6 +9,21 @@ import {
 import './marketplace.css';
 
 type Section = 'overview' | 'core' | 'domains' | 'marketplace' | 'adapters' | 'workspaces' | 'agents' | 'workflows' | 'governance';
+
+function createSecureIdempotencyKey(): string {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error('Secure randomness is unavailable; installation was not submitted.');
+  }
+  if (typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+  const bytes = new Uint8Array(16);
+  cryptoApi.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 type Domain = { id: string; name: string; code: string; description: string; color: string; axis: 'department' | 'area'; role: string };
 
 const businessDepartments: Domain[] = [
@@ -264,6 +279,7 @@ type InstalledStructure = {
 };
 
 function WorkspacesView({ departments, areas }: { departments: Domain[]; areas: Domain[] }) {
+  const pendingInstallKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
   const [organizationId, setOrganizationId] = useState('');
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
@@ -383,17 +399,27 @@ function WorkspacesView({ departments, areas }: { departments: Domain[]; areas: 
   const install = async () => {
     setSaving(true); setError(''); setNotice('');
     try {
-      const idempotencyKey = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : 'install-' + Date.now();
+      const includeHolarchy = includeLd01Holarchy && domainCodes.includes('LD01');
+      const fingerprint = JSON.stringify({
+        organizationId, workspaceId,
+        domainCodes: [...domainCodes].sort(),
+        departmentKeys: [...departmentKeys].sort(),
+        includeLd01Holarchy: includeHolarchy,
+      });
+      if (!pendingInstallKey.current || pendingInstallKey.current.fingerprint !== fingerprint) {
+        pendingInstallKey.current = { fingerprint, key: createSecureIdempotencyKey() };
+      }
       const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', {
         body: {
           action: 'install_structure', organization_id: organizationId, workspace_id: workspaceId,
-          idempotency_key: idempotencyKey, domain_codes: domainCodes, department_keys: departmentKeys,
-          include_ld01_holarchy: includeLd01Holarchy && domainCodes.includes('LD01'),
+          idempotency_key: pendingInstallKey.current.key, domain_codes: domainCodes, department_keys: departmentKeys,
+          include_ld01_holarchy: includeHolarchy,
         },
       });
       if (invokeError) throw invokeError;
       const counts = data?.data?.counts;
       if (!counts) throw new Error('Installation returned an invalid result.');
+      pendingInstallKey.current = null;
       setNotice('Installation complete · ' + counts.domains + ' domains · ' + counts.departments + ' departments · ' + counts.holons + ' LD01 holons.');
       await loadStructure(organizationId, workspaceId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Structure installation failed.'); }

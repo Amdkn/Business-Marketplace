@@ -83,15 +83,6 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
       "body"
     ]
   },
-  "team": {
-    "title": "name",
-    "fields": [
-      "role",
-      "focus",
-      "status",
-      "bio"
-    ]
-  },
   "runbooks": {
     "title": "title",
     "fields": [

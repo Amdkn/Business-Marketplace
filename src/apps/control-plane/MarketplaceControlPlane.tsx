@@ -313,7 +313,8 @@ function WorkspacesView({ departments, areas }: { departments: Domain[]; areas: 
   }, []);
 
   useEffect(() => {
-    if (!organizationId) { setWorkspaces([]); setWorkspaceId(''); setStructure({ domains: [], departments: [], holons: [] }); return; }
+    setWorkspaces([]); setWorkspaceId(''); setStructure({ domains: [], departments: [], holons: [] });
+    if (!organizationId) return;
     let alive = true;
     void (async () => {
       try {

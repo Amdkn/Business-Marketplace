@@ -136,9 +136,10 @@ export function GrowthApp() {
   const strategieDrill = useCollectionDrill('growth_strategie', 'Strategie');
   const partenariatsDrill = useCollectionDrill('growth_partenariats', 'Partenariats');
   const aeoDrill = useCollectionDrill('growth_aeo', 'AEO');
-  const updateItem = useCmsStore(s => s.updateItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<GrowthDetailItem | null>(null);
+  const [mutatingGrowthId, setMutatingGrowthId] = useState<string | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
 
   useEffect(() => {
@@ -153,8 +154,9 @@ export function GrowthApp() {
    *  cut or rework → hold steady → invest more. The global score stays the
    *  same — what changes is the team's stance. The brief calls for a
    *  mutation, not a re-computation: the rerating would be a separate flow. */
-  const cycleVerdict = (id: string): void => {
-    const item = acquisition.find((a) => a.id === id);
+  const cycleVerdict = async (id: string): Promise<void> => {
+    if (mutatingGrowthId) return;
+    const item = acquisition.find((entry) => entry.id === id);
     if (!item) return;
     const currentKey = String(item.verdict).split(' ·')[0];
     const order = ['invest more', 'hold steady', 'cut or rework'];
@@ -162,9 +164,13 @@ export function GrowthApp() {
     const next = idx === -1 ? 'hold steady' : order[(idx + 1) % order.length];
     const global = Number(item.global ?? 0);
     const nextVerdict = `${next} · ${global}/100`;
-    const result = updateItem('growth_acquisition', id, { verdict: nextVerdict });
-    if (result !== undefined) {
-      addToast({ source: 'Growth', type: 'success', message: `${String(item.name)} → ${next}` });
+    setMutatingGrowthId(id);
+    try {
+      const result = await updateItem('growth_acquisition', id, { verdict: nextVerdict });
+      if (result.ok) addToast({ source: 'Growth', type: 'success', message: `${String(item.name)} → ${next} · saved` });
+      else addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Acquisition verdict not saved.' });
+    } finally {
+      setMutatingGrowthId(null);
     }
   };
 
@@ -233,8 +239,10 @@ export function GrowthApp() {
     const [composerOpen, setComposerOpen] = useState(false);
     const [composerName, setComposerName] = useState('');
     const [composerCategory, setComposerCategory] = useState('Marketplace');
-    const addItem = useCmsStore(s => s.addItem);
-    const submitNewChannel = (): void => {
+    const [savingChannel, setSavingChannel] = useState(false);
+    const addItem = useCmsStore(s => s.addItemPersisted);
+    const submitNewChannel = async (): Promise<void> => {
+      if (savingChannel) return;
       const name = composerName.trim();
       if (name.length === 0) {
         addToast({ source: 'Growth', type: 'warning', message: 'Channel name is required.' });
@@ -248,7 +256,8 @@ export function GrowthApp() {
         addToast({ source: 'Growth', type: 'warning', message: `"${name}" is already in Acquisition.` });
         return;
       }
-      const result = addItem('growth_acquisition', {
+      setSavingChannel(true);
+      const result = await addItem('growth_acquisition', {
         name,
         category: composerCategory.trim() || 'Marketplace',
         virality: 0,
@@ -261,13 +270,14 @@ export function GrowthApp() {
         whatFailed: '',
       });
       if (result.ok) {
-        addToast({ source: 'Growth', type: 'success', message: `Channel added: ${name}` });
+        addToast({ source: 'Growth', type: 'success', message: `Channel saved: ${name}` });
         setComposerName('');
         setComposerCategory('Marketplace');
         setComposerOpen(false);
       } else {
-        addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Could not add channel.' });
+        addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Could not save channel.' });
       }
+      setSavingChannel(false);
     };
     const cancelComposer = (): void => {
       setComposerName('');
@@ -318,7 +328,7 @@ export function GrowthApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChannel();
+                    if (e.key === 'Enter') void submitNewChannel();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Podcast guest appearances"
@@ -371,7 +381,8 @@ export function GrowthApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewChannel}
+                onClick={() => void submitNewChannel()}
+                disabled={savingChannel}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
@@ -456,7 +467,8 @@ export function GrowthApp() {
                 >
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); cycleVerdict(String(a.id)); }}
+                    onClick={(e) => { e.stopPropagation(); void cycleVerdict(String(a.id)); }}
+                    disabled={mutatingGrowthId === String(a.id)}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                     style={{
                       background: 'var(--theme-surface-hover)',
@@ -493,17 +505,23 @@ export function GrowthApp() {
   };
 
   const Partenariats = () => {
-    const updateItem = useCmsStore(s => s.updateItem);
+    const updateItem = useCmsStore(s => s.updateItemPersisted);
     const partenariats = useCmsStore(s => s.items['growth_partenariats']) ?? [];
-    const cyclePartnerState = (id: string): void => {
+    const [mutatingPartnerId, setMutatingPartnerId] = useState<string | null>(null);
+    const cyclePartnerState = async (id: string): Promise<void> => {
+      if (mutatingPartnerId) return;
       const item = partenariats.find((p) => p.id === id);
       if (!item) return;
       const order = ['prospect', 'en discussion', 'actif', 'dormant'];
       const idx = order.indexOf(String(item.state));
       const next = idx === -1 ? 'prospect' : order[(idx + 1) % order.length];
-      const result = updateItem('growth_partenariats', id, { state: next });
-      if (result !== undefined) {
-        addToast({ source: 'Growth', type: 'success', message: `${String(item.name)} → ${next}` });
+      setMutatingPartnerId(id);
+      try {
+        const result = await updateItem('growth_partenariats', id, { state: next });
+        if (result.ok) addToast({ source: 'Growth', type: 'success', message: `${String(item.name)} → ${next} · saved` });
+        else addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Partner state not saved.' });
+      } finally {
+        setMutatingPartnerId(null);
       }
     };
     // Composeur inline pour ajouter un partenaire. Comme pour Acquisition,
@@ -511,8 +529,10 @@ export function GrowthApp() {
     const [composerOpen, setComposerOpen] = useState(false);
     const [composerName, setComposerName] = useState('');
     const [composerType, setComposerType] = useState('Media');
-    const addItem = useCmsStore(s => s.addItem);
-    const submitNewPartner = (): void => {
+    const [savingPartner, setSavingPartner] = useState(false);
+    const addItem = useCmsStore(s => s.addItemPersisted);
+    const submitNewPartner = async (): Promise<void> => {
+      if (savingPartner) return;
       const name = composerName.trim();
       if (name.length === 0) {
         addToast({ source: 'Growth', type: 'warning', message: 'Partner name is required.' });
@@ -523,7 +543,8 @@ export function GrowthApp() {
         addToast({ source: 'Growth', type: 'warning', message: `"${name}" is already in Partenariats.` });
         return;
       }
-      const result = addItem('growth_partenariats', {
+      setSavingPartner(true);
+      const result = await addItem('growth_partenariats', {
         name,
         type: composerType.trim() || 'Media',
         brings: '',
@@ -533,13 +554,14 @@ export function GrowthApp() {
         touched: 'never',
       });
       if (result.ok) {
-        addToast({ source: 'Growth', type: 'success', message: `Partner added: ${name}` });
+        addToast({ source: 'Growth', type: 'success', message: `Partner saved: ${name}` });
         setComposerName('');
         setComposerType('Media');
         setComposerOpen(false);
       } else {
-        addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Could not add partner.' });
+        addToast({ source: 'Growth', type: 'warning', message: result.error ?? 'Could not save partner.' });
       }
+      setSavingPartner(false);
     };
     const cancelComposer = (): void => {
       setComposerName('');
@@ -590,7 +612,7 @@ export function GrowthApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewPartner();
+                    if (e.key === 'Enter') void submitNewPartner();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Indie Hackers"
@@ -643,7 +665,8 @@ export function GrowthApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewPartner}
+                onClick={() => void submitNewPartner()}
+                disabled={savingPartner}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
@@ -726,7 +749,8 @@ export function GrowthApp() {
                 >
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); cyclePartnerState(String(p.id)); }}
+                    onClick={(e) => { e.stopPropagation(); void cyclePartnerState(String(p.id)); }}
+                    disabled={mutatingPartnerId === String(p.id)}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                     style={{
                       background: 'var(--theme-surface-hover)',

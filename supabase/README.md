@@ -168,38 +168,46 @@ Added immutable `finance.refund_fee_allocations` and `api.post_succeeded_refund_
 Payout batches now require an owning Finance organization. The new `post_paid_payout_item_finance_entry` action posts only provider-confirmed PAID batch/items with provider IDs and settlement timestamp. It checks available seller-payable and PSP-clearing balances, then debits seller payable and credits PSP clearing through the idempotent journal API. Journal posting now locks affected account rows in sorted order to serialize concurrent postings. Live Marketplace API v24; no payout or bank transfer was fabricated.
 
 
-## Dashboard tenant data — 2026-11-26
+## Retired Garden dashboard namespace — 2026-11-26
 
-The Garden Dashboard uses the tenant-scoped `dashboard` schema:
-- `dashboard.clients` — organization-owned client records.
-- `dashboard.agents` — organization-owned agent directory and optional runtime telemetry.
-- Both tables have RLS enabled, four tenant/role policies each, authenticated-only grants, and `(org_id, created_at)` indexes.
-- PostgREST exposes `dashboard` alongside `public`; the frontend uses `dashboard` as its tenant-facing data schema.
-- The tables are intentionally empty until real clients and agents are created. No demo rows are seeded.
-- Canonical identity, organization, workspace, domain, catalog, commerce and finance records remain in their respective Marketplace schemas.
+The transitional `dashboard.clients` / `dashboard.agents` schema is not the active interface data source. Garden Sidebar and Web Desktop must use the shared `workspace_data` records, with identity resolved through `identity.get_current_workspace_context()`. Do not add new reads or writes to the legacy `dashboard` schema. Historical migrations remain in the migration ledger for audit; any physical schema cleanup must be a separate reviewed migration after dependency checks.
 
+## Marketplace interface persistence — current hosted contract (2026-11-26)
 
-## Marketplace interface persistence — 2026-11-26
+The Garden Sidebar and Web Desktop share one persistence contract in `workspace_data`.
 
-The two existing interfaces now have a first shared persistence layer derived from the actual CMS collection definitions in `src/lib/cms/seed.ts`:
+- 37 workspace-owned collection tables plus `workspace_data.activity_events` = **38 tables**.
+- Every table has a required `workspace_id`; there are no organization-only records in this interface data layer.
+- All 38 tables have RLS enabled. The current policy inventory is **150 policies**: four workspace-member/operator policies on each business collection table and two append-only policies on activity events.
+- Read policies use `identity.is_active_workspace_member(organization_id, workspace_id)`; write policies use `identity.can_manage_workspace(organization_id, workspace_id)`.
+- Tenant/workspace IDs and creator attribution are immutable after creation. Activity events remain append-only.
+- `workspace_data.missions` is a real agent mission record, separate from the general CMS `workspace_data.tasks` collection. An assigned agent must have an active delegation to the target workspace.
+- `workspace_data.invoices` has typed client, currency, issue, due and paid fields. Currency is ISO-4217-shaped when present; no USD default is fabricated. The client FK is composite with organization/workspace to prevent cross-workspace invoice references.
+- Garden and Web Desktop share the single Supabase client. Both resolve tenant/workspace context through the authenticated `identity.get_current_workspace_context()` RPC; the browser does not query private `enterprise` tables directly.
+- Garden human membership and AI agent read models are served by authenticated `marketplace-api` actions `list_workspace_members` and `list_workspace_agents`. Agent identity remains canonical in `identity.agent_principals` and `identity.agent_delegations`.
+- Demo CMS fixtures are restricted to the explicit local demo tenant. Real Marketplace tenants start empty and hydrate from their own workspace rows.
 
-- `workspace_data` contains **34 dedicated tenant-scoped tables**, one for each persistent collection used by the Garden/Sidebar and Web Desktop CMS surfaces.
-- Each collection table has typed columns derived from its declared CMS fields, plus `organization_id`, optional `workspace_id`, creator metadata, timestamps and `extra_data` for forward-compatible fields.
-- Three `demo_coach_*` showcase collections remain local presentation fixtures and deliberately have no tenant tables.
-- `workspace_data.activity_events` provides a tenant-scoped event sink.
-- All 34 collection tables have RLS, four policies (active-member read; B1/S0/B2 operator insert/update/delete), authenticated-only table grants, organization/workspace indexes and an immutability trigger for tenant ownership and primary key. The creator is preserved on update.
-- PostgREST now exposes `workspace_data`; browser roles cannot use the schema or tables anonymously.
-- `src/lib/cms/repository.ts` now hydrates, upserts and deletes against the dedicated table for each collection. Organization resolution uses `identity.organization_memberships`, not the legacy public memberships table.
-- `src/lib/cms/cms.store.ts` now replaces the bundled sample rows with an empty live tenant result. An empty tenant no longer sees the fictional seed dataset.
-- Regression: `supabase/tests/marketplace_interface_persistence.sql` passed against the hosted project. Live catalog verification: 35 tables including activity_events, 138 policies, zero RLS-disabled tables, zero anon table grants, and zero rows inserted by the probe.
+Migrations are tracked under `supabase/migrations/` and match the hosted migration ledger:
+- `20261126083638_marketplace_interface_persistence.sql`
+- `20261126090124_workspace_document_records.sql`
+- `20261126091538_workspace_scoped_data_access.sql`
+- `20261126092009_workspace_data_access_hardening.sql`
+- `20261126092033_workspace_policy_predicate_definer_boundary.sql`
+- `20261126092835_garden_invoice_and_mission_records.sql`
+- `20261126093031_current_workspace_context_rpc.sql`
 
-Important scope boundary: this is the shared CMS persistence foundation, not yet full acceptance of every Web Desktop and Sidebar module. The separate Sidebar repository still has its own `dashboard.clients` / `dashboard.agents` data path; identity-backed People/Agent projection, workspace-level scoping, remaining app-local stores, real browser JWT E2E and deployment validation remain follow-on work. Do not claim the two interfaces are fully unified until those paths are migrated and verified.
+`marketplace-api` is ACTIVE v25 with `verify_jwt=true`. The current authenticated tenant context resolves to the first real organization/workspace and role `B1_CEO`. No agent principal or fake business record has been created.
 
+## Shared Garden / Web Desktop persistence — live checkpoint
 
-## Shared Garden / Web Desktop persistence
+Both user-facing interfaces use the same `workspace_data` schema and authenticated workspace context. Garden repositories filter reads, updates and deletes by both `organization_id` and `workspace_id`; creates write both IDs. The Web Desktop CMS uses the same dedicated collection tables and refuses to hydrate a real tenant from demo seeds.
 
-Both user-facing interfaces use the tenant-owned workspace_data schema. Garden repositories must use the explicit table mapping documented in docs/PRODUCT_ARCHITECTURE.md and implemented in src/components/saas/data/repository.ts; the Web Desktop CMS uses the same collection tables. Do not add new Garden reads or writes to the legacy dashboard schema.
+The private `enterprise` schema is not queried directly by the browser. `identity.get_current_workspace_context()` is the authenticated, caller-bound RPC that resolves exactly one active organization and one active workspace. Garden AuthProvider, the tenant store and the CMS repository all use this RPC. The same Supabase client singleton is shared by both interfaces.
 
-The Garden Documents and Legal Data Room modules have dedicated tables: workspace_data.documents and workspace_data.legal_documents. Migration: 20261126090124_workspace_document_records.sql. Both tables have RLS, member-read and role-gated operator write policies, creator attribution and organization/workspace indexes.
+The Garden People view reads actual active workspace memberships through `marketplace-api:list_workspace_members`. The AI Agents view reads canonical agent principals with active workspace delegations through `marketplace-api:list_workspace_agents`. The two directories are no longer inferred from a mixed `people_agents` roster. No agent principal exists yet, so the AI Agent view correctly shows an empty state.
 
-Cloud checkpoint after this migration: 37 workspace_data base tables, 146 policies. The first real tenant exists (one Auth user, organization, organization membership, workspace and workspace membership). No demonstration business records were inserted.
+The Garden Mission Board maps to `workspace_data.missions`, not `workspace_data.tasks`. Finance invoice mapping uses typed `client_id`, `currency`, `issued_at`, `due_at` and `paid_at` fields. No default currency is inserted.
+
+Latest SQL verification: `marketplace_security_baseline.sql`, `marketplace_interface_persistence.sql`, `adapter_oauth_runtime.sql`, `google_drive_adapter_manifest.sql`, `marketplace_capability_entitlements.sql` and `marketplace_finance_ledger.sql` all pass against the hosted project. The authenticated workspace-context RPC was also exercised under the `authenticated` database role and returned the expected first tenant context. A transaction-scoped CRUD probe was rolled back; no probe row remains.
+
+Validation is not full browser acceptance: no live browser JWT E2E, cross-workspace browser denial, TypeScript/Vitest/Vite build, or new Vercel deployment has been verified in this tranche. Do not mark Day 1–3 accepted until those gates pass.

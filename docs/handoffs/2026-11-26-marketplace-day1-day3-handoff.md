@@ -1812,3 +1812,30 @@ A deeper read of the actual People/Agents interfaces found additional non-persis
 - Garden `AgentRootView` derives load, success rate, latency, task counts and default model from row index/status when telemetry is absent. These are synthetic metrics and must be replaced with explicit unknown/unavailable values, never displayed as live telemetry.
 - Next identity architecture: `identity.agent_principals` is the canonical agent identity; `identity.agent_delegations` is the authority boundary. Workspace-specific assignments and telemetry belong in a linked workspace projection with a foreign key to the principal, not a second identity registry. Human team identity similarly comes from `identity.profiles` and organization/workspace memberships.
 - No agent principals, runtime profiles, telemetry, tasks or synthetic agent rows were created during this audit.
+
+
+### 13.34 People & Agents demo telemetry removal — 2026-11-26
+
+**Code changes committed**
+- `src/components/saas/views/AgentRootView.tsx` was replaced with a tenant-record directory. It no longer fabricates load, success rate, latency, tokens, task counts, task descriptions, channel, model routing, or fleet share from row index/status. Only fields returned by the current repository are displayed; runtime state/task/model/telemetry are explicitly marked unavailable.
+- `src/apps/people/fleet.ts`: removed the five hardcoded FleetAgent fixtures; the active Web Desktop agent bench no longer presents demo agents as tenant runtime agents. Replaced the synthetic 7×24 heatmap values with an all-zero/unreported baseline and removed the hardcoded schedule tasks.
+- `src/apps/people/PeopleApp.tsx`: updated People/Squads/Cadence copy to stop calling the fixture feed live; schedule activity labels now indicate that runtime activity is not reported, and peak/quietest/weekday metrics render unavailable when no schedule records exist. The task-submit control is disabled because it is not yet connected to persistent `workspace_data.tasks`.
+
+**Live schema/security findings**
+- `identity.agent_principals` is the canonical identity table with unique (organization_id, agent_key), class/runtime/status fields and creator FK.
+- `identity.agent_delegations` references the canonical principal by composite (agent_principal_id, organization_id) FK and carries permission scope/status/time window.
+- `workspace_data.people_agents` currently has no `agent_principal_id` column or FK to `identity.agent_principals`; it therefore remains a separate workspace record and is not yet a canonical agent assignment projection.
+- `identity.agent_principals` and `identity.agent_delegations` both have RLS enabled but no authenticated table SELECT/INSERT/UPDATE grants were found in the current role privilege check. They cannot simply be queried by the browser client as-is.
+- `workspace_data.people_agents` has authenticated SELECT/INSERT/UPDATE grants and policies scoped by active workspace membership / workspace management.
+- No new agent principal, delegation, runtime profile, telemetry row, or fake tenant row was created. No schema migration was applied.
+
+**Remaining architecture work (not yet complete)**
+1. Define the secure browser-facing identity read/write boundary for agent principals and delegations. Do not expose these tables by granting broad authenticated access; implement narrowly scoped policies/RPC or an authorized server boundary after reviewing the existing identity functions.
+2. Introduce a workspace assignment/runtime projection with a composite FK to the canonical principal and explicit organization/workspace scope. Decide whether to evolve `people_agents` or create a dedicated assignment table; current schema is insufficient to claim unification.
+3. Refactor Garden `agentsRepo` and Web Desktop PeopleApp to join/use canonical principal identity through that boundary; the Garden repository still maps `agents` to `workspace_data.people_agents`.
+4. Replace the temporary empty/unreported state with actual persisted task scheduling and runtime ingestion, then add contract tests.
+
+**Validation boundary**
+- The Supabase information_schema, pg_constraint, pg_policies and role privilege queries above were executed against the connected Marketplace project.
+- No browser-authenticated CRUD or cross-workspace test was run. No TypeScript, Vitest, build, deployment or browser smoke test was run after these code changes.
+- Latest branch head and PR checks must be refreshed before any acceptance decision. Day 1–3 remain OPEN / PR #1 remains DRAFT.

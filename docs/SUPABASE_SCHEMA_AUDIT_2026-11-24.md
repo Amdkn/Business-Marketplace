@@ -1,3 +1,5 @@
+> **Historical snapshot notice (2026-11-26):** This file records the read-only 2026-11-24 inventory. Its follow-up note in §7 that the later tenant migrations were only proposed is now superseded: the subsequent Day 1–3 migrations and Edge Functions have been applied/deployed to the existing Marketplace project. Use [`supabase/README.md`](../supabase/README.md) for the current live schema, migration registry and function status, and [`docs/handoffs/2026-11-26-marketplace-day1-day3-handoff.md`](./handoffs/2026-11-26-marketplace-day1-day3-handoff.md) for the complete scope and acceptance gates.
+
 # Marketplace Supabase — Schema Audit
 
 **Audited:** 2026-11-24 UTC  

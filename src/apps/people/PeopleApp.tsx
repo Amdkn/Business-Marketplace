@@ -12,7 +12,7 @@
  *  2-level subpage nav: section (left sidebar) → item detail (drill via CMS). */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Users, Bot, Heart, Cpu, FileText, Calendar, Zap,
+  Users, Bot, Heart, FileText, Calendar, Zap,
   Atom, LayoutDashboard, Crown, Activity, CheckCircle2, Play,
   UserSearch, Brain, BookMarked,
   ListChecks, Plus, Trash2, X,

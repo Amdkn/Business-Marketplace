@@ -87,3 +87,15 @@ Still required:
 The SQL regression suite `supabase/tests/marketplace_finance_ledger.sql` checks all nine tables, RLS, browser privilege isolation, service-role access, ledger balance/immutability triggers, payment/webhook/refund/payout guards, SECURITY DEFINER search_path/EXECUTE restrictions and full finance foreign-key index coverage.
 
 Passing this structural suite does not mean payment-provider, capture, payout or accounting E2E has passed.
+
+## Standard Chart of Accounts — version 2026.1
+
+The hosted project now contains a versioned global template catalogue in finance.chart_account_templates and an optional chart_version marker on tenant ledger accounts. Version 2026.1 defines 16 required accounts across assets, liabilities, equity, revenue and expenses. Each tenant receives its own currency-specific account instances; the global templates are reference definitions only.
+
+System keys and account codes are stable within a chart version. The template set includes operating cash, PSP clearing, receivables, seller/refund/tax/chargeback payables, retained earnings, owner contributions, platform fee/subscription/service revenue, payment processing and refund/chargeback expenses, compute/inference cost of service and platform operations expense.
+
+api.provision_finance_chart_of_accounts(actor, organization, currency, chart_version) is the guarded provisioning boundary. It requires an active organization, active membership and an active Finance-capable role; takes an organization/currency/version advisory lock; rejects collisions with existing custom or differently defined accounts; inserts missing accounts and returns the complete chart. Repeated calls for the same tenant/currency/version reuse the same accounts. The SQL function is SECURITY DEFINER with a pinned search_path and EXECUTE is granted only to service_role.
+
+The authenticated marketplace-api action is provision_finance_chart_of_accounts, with organization_id, currency and optional chart_version (default 2026.1). The Edge Function rechecks organization role before invoking SQL. The live deployment is marketplace-api v19 with verify_jwt=true.
+
+The provisioning path is structurally verified only. The live project currently has zero organizations and zero Auth users, so no tenant chart was provisioned and no account fixture was fabricated. Real-tenant idempotency, collision and authorization tests remain blocked until an authorized tenant exists. The chart is a practical Marketplace baseline, not a jurisdiction-specific statutory chart or tax determination.

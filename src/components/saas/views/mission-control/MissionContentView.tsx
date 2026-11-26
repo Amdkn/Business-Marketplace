@@ -4,10 +4,9 @@
 // Marketplace tenant documents. Title-scoped search filter.
 
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpenText, FileText, Hexagon, Plus, Search } from 'lucide-react';
+import { BookOpenText, FileText, Hexagon, Search } from 'lucide-react';
 import { documentsRepo } from '../../data/documents.repo';
-import { agentsRepo } from '../../data/agents.repo';
-import type { Agent, Document } from '../../lib/types';
+import type { Document } from '../../lib/types';
 import { EmptyState } from '../../components/EmptyState';
 import { safeArray } from '../../lib/safe';
 
@@ -25,14 +24,13 @@ const isPlaceholderUrl = (url: string | null): boolean => {
 
 export const MissionContentView = (): React.ReactElement => {
   const [documents, setDocuments] = useState<Document[] | null>(null);
-  const [agents, setAgents] = useState<Agent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([documentsRepo.list(), agentsRepo.list()])
-      .then(([d, a]) => { if (!cancelled) { setDocuments(d); setAgents(safeArray<Agent>(a)); } })
+    documentsRepo.list()
+      .then((rows) => { if (!cancelled) setDocuments(rows); })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
       });
@@ -45,7 +43,7 @@ export const MissionContentView = (): React.ReactElement => {
     return safeArray<Document>(documents).filter((d) => q.length === 0 || d.title.toLowerCase().includes(q));
   }, [documents, search]);
 
-  const agentIdsWriting = useMemo(() => {
+  const distinctUploaders = useMemo(() => {
     if (!documents) return 0;
     const set = new Set<string>();
     for (const d of safeArray<Document>(documents)) {
@@ -81,9 +79,10 @@ export const MissionContentView = (): React.ReactElement => {
           <h1 className="font-display leading-[0.95] tracking-tight mt-2 text-ink" style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>
             Library<span className="text-ember">.</span>
           </h1>
+          <p className="mt-2 max-w-xl text-sm text-her-muted">Workspace document register. File upload and document authoring remain unavailable until a storage integration is connected.</p>
         </div>
-        <button type="button" className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl bg-her-surface border-l-2 border-ember text-ink font-mono text-[11px] tracking-wider uppercase hover:border-l-4 hover:bg-cream transition">
-          <Plus className="size-3.5" /> New Doc
+        <button type="button" disabled aria-disabled="true" title="File storage and document authoring are not connected" className="inline-flex items-center gap-2 px-4 h-11 rounded-2xl bg-her-surface border border-her-border text-her-muted font-mono text-[11px] tracking-wider uppercase cursor-not-allowed opacity-60">
+          New Doc unavailable
         </button>
       </header>
 
@@ -95,9 +94,9 @@ export const MissionContentView = (): React.ReactElement => {
           </div>
         </div>
         <div className="rounded-3xl bg-her-surface border border-her-border border-t-2 border-t-ink p-5">
-          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-her-muted">Agents Writing</div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-her-muted">Distinct uploaders</div>
           <div className="font-display tabular-nums mt-1 text-ink" style={{ fontSize: 'clamp(24px, 2.4vw, 34px)' }}>
-            {agentIdsWriting} / {agents.length}
+            {distinctUploaders}
           </div>
         </div>
         <div className="rounded-3xl bg-her-surface border border-her-border border-t-2 border-t-ember p-5">
@@ -128,7 +127,7 @@ export const MissionContentView = (): React.ReactElement => {
       {documents.length === 0 ? (
         <EmptyState
           title="Library empty"
-          description="No documents have been written yet. Agents will publish here as they work."
+          description="No workspace documents are recorded yet. Uploaded files will appear here when storage integration is connected."
           icon={<BookOpenText className="size-10 text-her-muted" />}
         />
       ) : filtered.length === 0 ? (

@@ -163,3 +163,40 @@ BEGIN
  RAISE NOTICE 'PASS: Captured payment posting gates, idempotency and balanced allocation';
 END
 $capture_posting_test$;
+
+DO $refund_posting_test$
+DECLARE v_count integer; v_def text; v_first numeric; v_second numeric; v_final numeric;
+BEGIN
+ SELECT count(*) INTO v_count FROM information_schema.tables
+ WHERE table_schema='finance' AND table_name='refund_fee_allocations';
+ IF v_count<>1 THEN RAISE EXCEPTION 'Refund fee allocation table missing'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='finance' AND c.relname='refund_fee_allocations' AND c.relrowsecurity)
+ THEN RAISE EXCEPTION 'Refund allocation RLS missing'; END IF;
+ IF has_table_privilege('anon','finance.refund_fee_allocations','SELECT,INSERT,UPDATE,DELETE')
+ OR has_table_privilege('authenticated','finance.refund_fee_allocations','SELECT,INSERT,UPDATE,DELETE')
+ THEN RAISE EXCEPTION 'Browser role has refund allocation access'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='api' AND p.proname='post_succeeded_refund_finance_entry' AND p.prosecdef
+  AND p.proconfig @> ARRAY['search_path=pg_catalog, identity, commerce, finance, api']::text[])
+ THEN RAISE EXCEPTION 'Refund posting API missing or unsafe'; END IF;
+ IF has_function_privilege('anon','api.post_succeeded_refund_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.post_succeeded_refund_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.post_succeeded_refund_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'Refund posting grants are unsafe'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+  JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='finance'
+  AND c.relname='refund_fee_allocations' AND t.tgname='refund_fee_allocation_immutable')
+ THEN RAISE EXCEPTION 'Refund allocation immutability trigger missing'; END IF;
+ v_first:=round(10.00*33.00/100.00,2);
+ v_second:=round(10.00*66.00/100.00,2)-v_first;
+ v_final:=round(10.00*100.00/100.00,2)-v_first-v_second;
+ IF v_first<>3.30 OR v_second<>3.30 OR v_final<>3.40 OR v_first+v_second+v_final<>10.00
+ THEN RAISE EXCEPTION 'Cumulative refund fee allocation rounding failed'; END IF;
+ SELECT pg_get_functiondef('api.post_succeeded_refund_finance_entry(uuid,uuid,uuid)'::regprocedure) INTO v_def;
+ IF position('refund-settlement:' in v_def)=0 OR position('payment-capture:' in v_def)=0
+ OR position('provider_refund_id' in v_def)=0 OR position('cumulative_fee_target' in v_def)=0
+ THEN RAISE EXCEPTION 'Refund posting capture dependency/idempotency/rounding guards missing'; END IF;
+ RAISE NOTICE 'PASS: Refund posting access, immutable allocation and cumulative rounding';
+END
+$refund_posting_test$;

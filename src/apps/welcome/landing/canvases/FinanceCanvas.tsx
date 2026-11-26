@@ -1,4 +1,4 @@
-/** OMK Finance canvas — ledger table + billing schedule + ROI numbers.
+/** A’Space Finance canvas — ledger table + billing schedule + ROI numbers.
  *
  *  Why this layout, not the landing template:
  *  Finance is the most data-dense of the 8 domaines. The proof isn't a
@@ -207,7 +207,7 @@ export function FinanceCanvas({ page, activePageId, onSelectPage }: {
             <div className="grid grid-cols-2 gap-6 px-6 py-4 border-b border-[var(--panel-border-subtle)]">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-dim)]">De</div>
-                <div className="text-sm text-[var(--theme-text)] mt-1">Coach OS · OMK Services</div>
+                <div className="text-sm text-[var(--theme-text)] mt-1">Coach OS · A’Space Services</div>
                 <div className="text-xs text-[var(--theme-text-muted)]">US-hosted · CCPA + Colorado AI Act</div>
               </div>
               <div>
@@ -265,7 +265,7 @@ export function FinanceCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

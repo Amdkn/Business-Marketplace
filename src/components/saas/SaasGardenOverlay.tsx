@@ -10,7 +10,7 @@ import { useShellStore } from '../../stores/shell.store';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './auth/AuthProvider';
 
-// Import all real functional views ported from 00-omk-saas-os
+// Import all real functional views ported from A'Space Digital Garden
 import { DashboardView } from './views/DashboardView';
 import { ClientsView } from './views/ClientsView';
 import { ClientDetailView } from './views/ClientDetailView';

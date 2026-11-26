@@ -61,6 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hydrate = useCallback(async () => {
     if (!SUPABASE_READY) {
+      setActiveOrgIdCache(null);
+      setActiveWorkspaceIdCache(null);
       setIsLoading(false);
       return;
     }
@@ -68,6 +70,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!session) {
       setUser(null);
       setOrganization(null);
+      setActiveOrgIdCache(null);
+      setActiveWorkspaceIdCache(null);
       setIsLoading(false);
       return;
     }

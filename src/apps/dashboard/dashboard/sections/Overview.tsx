@@ -35,7 +35,7 @@ function sparklineForLast12h(): number[] {
   return shape.map((v) => +(v * scale).toFixed(3));
 }
 
-function DemoOverview({ navigateToSection }: { navigateToSection: (id: string) => void } = { navigateToSection: () => {} }) {
+function DemoOverview({ navigateToSection = () => {} }: { navigateToSection?: (id: string) => void } = {}) {
   // Agents list comes from the CMS so the "Active agents" KPI and the agent
   // chip column reflect the latest state — including a freshly-created agent
   // from the Agents section. The seed-derived USAGE_TODAY / SESSIONS / COST

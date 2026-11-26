@@ -1,9 +1,9 @@
 // src/data/repository.ts
-// ADR-OMK-001 D4 + ADR-OMK-005 (Phase A→F) + Phase I (D6 #97 default mapper)
+// ADR-DASHBOARD-001 D4 + ADR-TENANT-005 (Phase A→F) + Phase I (D6 #97 default mapper)
 // + Zero Bug Sprint (D6 #99, D6 #101) — expanded mapper coverage.
 //
 // Two execution paths:
-//   1. Supabase Cloud (when SUPABASE_READY): queries target `omk_saas.*` schema
+//   1. Supabase Cloud (when SUPABASE_READY): queries target `dashboard.*` schema
 //      (per ADR-OMK-004 single SaaS mode). RLS policies filter by `org_id`
 //      from the JWT claim injected by `public.custom_access_token_hook`.
 //   2. localStorage (dev fallback): seeded with mocks from constants.ts. RLS
@@ -147,7 +147,7 @@ export function makeRepository<T extends { id: string }>(
   seed: T[],
   options: MakeRepositoryOptions<T> = {},
 ): Repository<T> {
-  const lsKey = `omk_${table}`;
+  const lsKey = `marketplace_dashboard_${table}`;
   // D6 #97: prefer the custom mapper if passed; otherwise use the auto mapper.
   const mapper: Mapper<T> = options.mapper ?? defaultMapper<T>();
 

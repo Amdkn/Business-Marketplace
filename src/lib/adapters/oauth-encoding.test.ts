@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { base64Url } from '../../../../supabase/functions/_shared/oauth-encoding.ts';
+import { base64Url } from './oauth-encoding';
 
 describe('base64Url', () => {
   it('replaces both Base64 special characters', () => {

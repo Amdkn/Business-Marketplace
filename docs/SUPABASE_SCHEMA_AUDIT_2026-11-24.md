@@ -106,3 +106,15 @@ Do not seed the 12 frontend reference domains into customer organizations automa
 - It does not verify runtime health of any adapter.
 - It does not provision demo or customer organizations.
 - It does not change schema, data, RLS, grants or policies.
+
+
+## 7. Follow-up tenant installation change set (2026-11-26)
+
+The audit above is a historical read-only snapshot from 2026-11-24. A follow-up change set is now proposed in the open A’Space OS V5 draft PR #63:
+
+- Migration: `20261126031500_tenant_structure_installations.sql`.
+- Adds `enterprise.workspaces`, `areas.domain_installations`, `enterprise.department_installations`, `areas.holon_installations`, `enterprise.structure_installation_requests` and `enterprise.structure_installation_events`.
+- Adds authenticated API actions for workspace creation/listing, installed-structure reads and idempotent structure installation.
+- Adds a Workspaces Control Plane flow in Business Marketplace PR #1.
+
+**Deployment status:** proposed and committed to draft branches only. The connected Supabase account currently does not expose project `swegnrvaxxgfrnshdpxx` in its project list, so this migration has not been applied or runtime-verified. The earlier 52-table inventory must not be treated as proof that these proposed tables exist in the hosted database.

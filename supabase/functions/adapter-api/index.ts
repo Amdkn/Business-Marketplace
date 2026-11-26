@@ -1,6 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
 import postgres from 'npm:postgres@3.4.5';
-import { base64Url } from '../_shared/oauth-encoding.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -243,6 +242,11 @@ async function createConnection(user: User, body: Record<string, unknown>) {
 }
 
 
+function base64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 function envSuffix(providerKey: string): string {
   return providerKey.toUpperCase().replace(/[^A-Z0-9]/g,'_');
 }

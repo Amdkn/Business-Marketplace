@@ -2227,7 +2227,7 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - These checks validate the workspace SQL path and mapper storage contract, not a browser interaction test.
 
 **Acceptance boundary**
-- Latest code commit: cf8467d8228e25f703e9f997d0f684d5ef7c1906 — Garden procedure execution action is explicitly non-operational until a runtime exists.
+- Latest code commit: c7634a7a065fd88d1cc8b46f2d92e554e7e1bf42 — Garden SOP cards label the unavailable runtime affordance as Execution status, not Execute.
 - PR #1 remains OPEN / DRAFT and mergeable. No new migration or Edge Function deployment was required.
 - The Desktop Commander device remains OFFLINE; TypeScript, Vitest, Vite build and browser E2E remain NOT RUN. GitHub Actions still reports no workflow runs for the branch, and the Vercel status remains the external build-rate-limit failure.
 - Day 1–3 remain OPEN. Do not mark frontend acceptance complete until the app is compiled and browser-authenticated CRUD is exercised.

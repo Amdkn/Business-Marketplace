@@ -92,19 +92,6 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {
       "bio"
     ]
   },
-  "people_agents": {
-    "title": "name",
-    "fields": [
-      "codename",
-      "role",
-      "status",
-      "task",
-      "rank",
-      "domain",
-      "squad",
-      "cadence"
-    ]
-  },
   "runbooks": {
     "title": "title",
     "fields": [

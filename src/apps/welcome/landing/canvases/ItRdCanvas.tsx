@@ -1,4 +1,4 @@
-/** OMK IT & R&D canvas — layered infra stack + MCP wiring + vault log.
+/** A’Space IT & R&D canvas — layered infra stack + MCP wiring + vault log.
  *
  *  Why this layout, not the landing template:
  *  IT is the only domaine where the proof is the architecture itself. Coaches
@@ -266,7 +266,7 @@ export function ItRdCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

@@ -117,84 +117,26 @@ export const useTenantStore = create<TenantState & TenantActions>((set, get) => 
         return;
       }
 
-      const { data: memberships, error: membershipError } = await supabase
+      // enterprise is intentionally private; resolve the caller's unique active
+      // organization/workspace through the authenticated identity RPC.
+      const { data: contexts, error: contextError } = await supabase
         .schema('identity')
-        .from('organization_memberships')
-        .select('organization_id')
-        .eq('user_id', session.user.id)
-        .eq('membership_status', 'ACTIVE');
-      if (membershipError) throw membershipError;
-      if (!memberships?.length) {
+        .rpc('get_current_workspace_context');
+      if (contextError) throw contextError;
+      const context = Array.isArray(contexts) ? contexts[0] : contexts;
+      if (!context) {
         set({
           activeTenantId: TENANT_DEFAULT as TenantId,
-          displayName: 'No active organization',
+          displayName: 'Workspace context unavailable',
           knownTenants: [],
           isLoading: false,
-        });
-        return;
-      }
-      if (memberships.length !== 1) {
-        set({
-          activeTenantId: TENANT_DEFAULT as TenantId,
-          displayName: 'Select an organization',
-          knownTenants: [],
-          isLoading: false,
-          error: 'Multiple active organizations require an explicit organization selector.',
+          error: 'An active organization and exactly one active workspace membership are required.',
         });
         return;
       }
 
-      const organizationId = memberships[0].organization_id as string;
-      const { data: organization, error: organizationError } = await supabase
-        .schema('identity')
-        .from('organizations')
-        .select('name')
-        .eq('id', organizationId)
-        .maybeSingle();
-      if (organizationError) throw organizationError;
-
-      const { data: workspaceMemberships, error: workspaceError } = await supabase
-        .schema('enterprise')
-        .from('workspace_memberships')
-        .select('workspace_id')
-        .eq('organization_id', organizationId)
-        .eq('user_id', session.user.id)
-        .eq('membership_status', 'ACTIVE');
-      if (workspaceError) throw workspaceError;
-      if (!workspaceMemberships?.length) {
-        set({
-          activeTenantId: TENANT_DEFAULT as TenantId,
-          displayName: 'No active workspace',
-          knownTenants: [],
-          isLoading: false,
-        });
-        return;
-      }
-      if (workspaceMemberships.length !== 1) {
-        set({
-          activeTenantId: TENANT_DEFAULT as TenantId,
-          displayName: 'Select a workspace',
-          knownTenants: [],
-          isLoading: false,
-          error: 'Multiple active workspaces require an explicit workspace selector.',
-        });
-        return;
-      }
-
-      const { data: workspace, error: workspaceNameError } = await supabase
-        .schema('enterprise')
-        .from('workspaces')
-        .select('name, workspace_status')
-        .eq('id', workspaceMemberships[0].workspace_id)
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (workspaceNameError) throw workspaceNameError;
-      if (!workspace || workspace.workspace_status !== 'ACTIVE') {
-        throw new Error('The active workspace is unavailable.');
-      }
-
-      const displayName = (organization?.name as string | undefined) ?? workspace.name;
-      const tenantId = organizationId as TenantId;
+      const tenantId = context.organization_id as TenantId;
+      const displayName = context.organization_name as string;
       persistTenant(tenantId);
       set({
         activeTenantId: tenantId,

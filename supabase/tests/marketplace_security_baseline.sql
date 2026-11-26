@@ -148,6 +148,18 @@ BEGIN
     RAISE EXCEPTION 'Provider manifest secret-key guard is missing';
   END IF;
 
+  IF has_function_privilege('public', 'finance.guard_fee_policy_mutation()', 'EXECUTE')
+     OR has_function_privilege('anon', 'finance.guard_fee_policy_mutation()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'finance.guard_fee_policy_mutation()', 'EXECUTE')
+     OR has_function_privilege('public', 'finance.reject_order_fee_snapshot_mutation()', 'EXECUTE')
+     OR has_function_privilege('anon', 'finance.reject_order_fee_snapshot_mutation()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'finance.reject_order_fee_snapshot_mutation()', 'EXECUTE')
+     OR has_function_privilege('public', 'finance.reject_refund_fee_allocation_mutation()', 'EXECUTE')
+     OR has_function_privilege('anon', 'finance.reject_refund_fee_allocation_mutation()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'finance.reject_refund_fee_allocation_mutation()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Finance trigger-only functions must not be directly executable by public/browser roles';
+  END IF;
+
   IF has_function_privilege('public', 'public.rls_auto_enable()', 'EXECUTE')
      OR has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.rls_auto_enable()', 'EXECUTE') THEN

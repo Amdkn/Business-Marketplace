@@ -5,9 +5,9 @@
  *    - Overview  → operating doctrine + today's standup
  *    - Team      → human squad (X-Men)
  *    - Agents    → agent list
- *    - Squads    → B3 bench: 5 specialist AI agents with state/load/latency/tokens
+ *    - Squads    → canonical workspace agent principals and delegations
  *    - Content   → per-agent docs library
- *    - Cadence   → 7-day × 24-hour standup heatmap + sprint tasks
+ *    - Cadence   → persisted weekly mission planning
  *    - Culture   → operating values
  *  2-level subpage nav: section (left sidebar) → item detail (drill via CMS). */
 import { useEffect, useMemo, useState } from 'react';
@@ -134,7 +134,7 @@ function Overview() {
           Domaine 01 · RH & Méta-Gouvernance
         </span>
         <h1 className="text-[28px] font-bold tracking-tight text-[var(--theme-text)]" style={{ fontFamily: 'var(--theme-font-display)' }}>
-          Your Agent Factory. Your daily standup.
+          Your Agent Directory. Your daily governance.
         </h1>
         <p className="text-[13.5px] text-[var(--theme-text-muted)] max-w-2xl leading-relaxed">
           Govern canonical agent identities and workspace delegations here. Runtime status and execution metrics appear only after a real runtime feed is connected.
@@ -218,7 +218,7 @@ function Overview() {
               </button>
             </div>
 
-            {/* Standup metrics — act / idle / blocked */}
+            {/* Runtime telemetry is unavailable until a runtime feed is connected. */}
             <div className="grid grid-cols-3 gap-3 mt-5">
               <div
                 className="rounded-xl p-3.5"
@@ -226,7 +226,7 @@ function Overview() {
               >
                 <div className="flex items-center gap-1.5">
                   <Activity className="w-3.5 h-3.5" style={{ color: '#15803d' }} />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#15803d' }}>Active</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#15803d' }}>Runtime state</span>
                 </div>
                 <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#166534' }}>—</div>
                 <div className="text-[10.5px] mt-0.5 truncate" style={{ color: '#15803d' }}>
@@ -236,7 +236,7 @@ function Overview() {
               <div className="rounded-xl bg-[var(--theme-surface-hover)] border border-[var(--panel-border-subtle)] p-3.5">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-muted)]">Idle</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-muted)]">Current activity</span>
                 </div>
                 <div className="text-[24px] font-bold text-[var(--theme-text)] mt-1 tabular-nums">—</div>
                 <div className="text-[10.5px] text-[var(--theme-text-muted)] mt-0.5 truncate">
@@ -249,7 +249,7 @@ function Overview() {
               >
                 <div className="flex items-center gap-1.5">
                   <Heart className="w-3.5 h-3.5" style={{ color: '#b45309' }} />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#b45309' }}>Blocked</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#b45309' }}>Telemetry</span>
                 </div>
                 <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#92400e' }}>—</div>
                 <div className="text-[10.5px] mt-0.5 truncate" style={{ color: '#b45309' }}>
@@ -279,7 +279,7 @@ function Overview() {
 
       {/* Footer micro-CTA (i-have-adhd: action-first, one primary) */}
       <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)]">
-        <span>Coach OS ships what you approve. Nothing more.</span>
+        <span>Marketplace agent identities and delegated authority remain under workspace governance.</span>
         <span className="font-mono uppercase tracking-wider text-[9.5px]">v2.0 · SOB Convergence</span>
       </div>
     </div>
@@ -373,7 +373,7 @@ const TASK_KIND_COLOR: Record<ScheduleKind, string> = {
 };
 
 /** Map task kind to the SOB sprint cadence terminology coaches actually use. */
-const TASK_KIND_LABEL: Record<ScheduleTask['kind'], string> = {
+const TASK_KIND_LABEL: Record<ScheduleKind, string> = {
   sync:     'Daily Standup',
   run:      'Sprint Work',
   audit:    'Sprint Review',

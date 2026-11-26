@@ -878,7 +878,7 @@ async function provisionFinanceChartOfAccounts(user: User, body: Record<string, 
   const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
   const chartVersion = body.chart_version === undefined ? '2026.1' : requiredString(body.chart_version, 'chart_version', 16);
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
-  if (!/^\\d{4}\\.\\d+$/.test(chartVersion)) throw new Error('Invalid chart_version');
+  if (!/^\\d{4}[.]\\d+$/.test(chartVersion)) throw new Error('Invalid chart_version');
   return await withServiceRole(async (tx) => {
     await requireOrgRole(tx, user.id, organizationId);
     const rows = await tx`SELECT api.provision_finance_chart_of_accounts(

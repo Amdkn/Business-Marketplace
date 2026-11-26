@@ -14,7 +14,7 @@ import { Badge } from '../components/Badge';
 import { clientsRepo } from '../data/clients.repo';
 import { agentsRepo } from '../data/agents.repo';
 import type { Client, Agent } from '../lib/types';
-import { CLIENT_STATUS_LABEL, AGENT_ROLE_LABEL, AGENT_STATUS_LABEL } from '../lib/statusLabels';
+import { CLIENT_STATUS_LABEL, AGENT_STATUS_LABEL } from '../lib/statusLabels';
 import { RefreshCw, CheckCircle, Activity, BarChart3, ArrowUpRight, Briefcase, Cpu } from 'lucide-react';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
@@ -185,7 +185,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                           <div className="flex items-center gap-2 mt-1">
                             <Briefcase className="w-3 h-3 text-slate-400" />
                             <span className="text-xs text-slate-500">
-                              {safeStr(client.service, '—')}
+                              {safeStr(client.segment, '—')}
                             </span>
                           </div>
                         </div>
@@ -208,7 +208,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <span className="px-2 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">{agents.length} assigned</span>
             </div>
             {agents.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">No agents configured yet.</p>
+              <p className="text-sm text-slate-400 italic">No agent delegation is active in this workspace.</p>
             ) : (
               <div className="space-y-4">
                 {agents.slice(0, 4).map((agent) => (
@@ -221,7 +221,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                       <div className="min-w-0">
                         <span className="text-sm font-medium truncate block">{agent.name}</span>
                         <span className="text-[10px] text-slate-400 truncate block">
-                          {agent.role ? AGENT_ROLE_LABEL[agent.role] : '—'}
+                          {safeStr(agent.agentClass, 'Agent class not assigned')} · {safeStr(agent.runtime, 'runtime not configured')}
                         </span>
                       </div>
                     </div>

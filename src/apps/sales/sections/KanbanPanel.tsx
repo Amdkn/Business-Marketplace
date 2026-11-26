@@ -23,18 +23,27 @@ function nextStage(current: string): DealStageValue {
 
 export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void }): ReactElement {
   const deals = useCmsStore(s => s.items['deals']) ?? [];
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
 
-  const advance = (id: string, name: string, current: string): void => {
+  const [saving, setSaving] = useState(false);
+
+  const advance = async (id: string, name: string, current: string): Promise<void> => {
     const next = nextStage(current);
     if (next === current) {
       addToast({ source: 'Sales', type: 'warning', message: `${name} is already at the final stage.` });
       return;
     }
-    updateItem('deals', id, { stage: next });
-    addToast({ source: 'Sales', type: 'success', message: `${name} → ${next}` });
+    if (saving) return;
+    setSaving(true);
+    try {
+      const result = await updateItem('deals', id, { stage: next });
+      if (result.ok) addToast({ source: 'Sales', type: 'success', message: `${name} → ${next} · saved` });
+      else addToast({ source: 'Sales', type: 'warning', message: result.error ?? 'Deal stage was not saved.' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   /** Compose a new deal inline. The coach enters the client name, picks an
@@ -46,7 +55,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
   const [composerOffer, setComposerOffer] = useState<'Citadelle' | 'Programme'>('Citadelle');
   const [composerValue, setComposerValue] = useState('1800');
 
-  const submitNewDeal = (): void => {
+  const submitNewDeal = async (): Promise<void> => {
     const client = composerClient.trim();
     if (client.length === 0) {
       addToast({ source: 'Sales', type: 'warning', message: 'Client name is required.' });
@@ -57,12 +66,15 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
       addToast({ source: 'Sales', type: 'warning', message: 'Deal value must be a positive number.' });
       return;
     }
-    const result = addItem('deals', {
+    if (saving) return;
+    setSaving(true);
+    const result = await addItem('deals', {
       client,
       offer: composerOffer,
       value: valueNum,
       stage: 'Qualified',
     });
+    setSaving(false);
     if (result.ok) {
       addToast({ source: 'Sales', type: 'success', message: `Deal added: ${client} ($${valueNum.toLocaleString('en-US')}).` });
       setComposerClient('');
@@ -152,7 +164,8 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
           <div className="mt-2 flex items-center justify-end">
             <button
               type="button"
-              onClick={() => advance(d.id, d.clientName, d.stage)}
+              onClick={() => void advance(d.id, d.clientName, d.stage)}
+              disabled={saving}
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
               style={{
                 background: 'var(--theme-surface-hover)',
@@ -323,14 +336,15 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
               </button>
               <button
                 type="button"
-                onClick={submitNewDeal}
+                onClick={() => void submitNewDeal()}
+                disabled={saving}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Create deal
+                {saving ? 'Saving…' : 'Create deal'}
               </button>
             </div>
           </div>

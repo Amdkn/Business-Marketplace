@@ -283,7 +283,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];
         const nextList = list.map((item) => item.id === id ? updated : item);
-        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: nextList } };
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: nextList } };
         const isActive = state.activeTenantId === tenantId;
         return {
           itemsByTenant: nextItemsByTenant,
@@ -342,7 +342,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
       set((state) => {
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];
-        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: [...list, item] } };
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: [...list, item] } };
         const isActive = state.activeTenantId === tenantId;
         return {
           itemsByTenant: nextItemsByTenant,
@@ -406,7 +406,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
       set((state) => {
         const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
         const list = tenantItems[collectionId] ?? [];
-        const nextItemsByTenant = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: list.filter((item) => item.id !== id) } };
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: list.filter((item) => item.id !== id) } };
         const isActive = state.activeTenantId === tenantId;
         return {
           itemsByTenant: nextItemsByTenant,

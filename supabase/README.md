@@ -355,6 +355,6 @@ Source audit found that OAuth callback and refresh worker both used an over-esca
 - `adapter-oauth-callback` deployed **v2**, ACTIVE, `verify_jwt=false` (public callback remains protected by one-time SHA-256 state, expiry/consumption, PKCE verifier, provider allowlist and stored tenant/connection context).
 - `adapter-worker` deployed **v8**, ACTIVE, `verify_jwt=false` (worker retains its exact service-role bearer-key check).
 - Both deployed `index.ts` files were retrieved and compared byte-for-byte with the repository versions; exact parity confirmed.
-- Both now split scopes with `split(/\\s+/)`. Two Vitest regression checks were added to `src/lib/adapters/oauth-encoding.test.ts`, covering the exact Edge Function source patterns and space/tab/newline-separated scope strings.
+- Both now split scopes with `split(/\s+/)`. Two Vitest regression checks were added to `src/lib/adapters/oauth-encoding.test.ts`, covering the exact Edge Function source patterns and space/tab/newline-separated scope strings.
 - The new tests are **not yet executed**. The previous hosted verify (548 tests) predates this commit; GitHub has no run for latest code commit `33e20d9`, and manual Vercel deployment creation is blocked by the 24-hour `api-deployments-free-per-day` quota. Do not mark the new tests passed until a later hosted CI run.
 - No OAuth client credentials, active manifest, tenant connection, OAuth transaction or execution was created. Real Google OAuth acceptance remains open.

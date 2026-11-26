@@ -404,6 +404,10 @@ function WorkspacesView({ departments, areas }: { departments: Domain[]; areas: 
     setter(values.includes(value) ? values.filter(item => item !== value) : [...values, value]);
 
   if (loading) return <section className="bm-panel bm-workspace-state"><Activity size={22}/><strong>Loading organization context…</strong><span>Resolving authenticated memberships and workspace access.</span></section>;
+  if (!organizations.length && error) return <div className="bm-stack">
+    <div className="bm-notice"><div className="bm-notice-icon"><Building2 size={17}/></div><div><strong>Tenant provisioning requires an authenticated session.</strong><span>Demo mode is read-only. Sign in with a Supabase Auth account before creating an organization or workspace.</span></div><span className="bm-notice-tag">AUTH REQUIRED</span></div>
+    <div className="bm-workspace-alert error"><strong>Organization access unavailable</strong><span>{error}</span></div>
+  </div>;
 
   return <div className="bm-stack">
     <div className="bm-notice"><div className="bm-notice-icon"><Building2 size={17}/></div><div><strong>Tenant installation engine</strong><span>Global blueprints become organization-owned instances only after an authorized installation request. No organization or workspace is created automatically.</span></div><span className="bm-notice-tag">AUTHENTICATED CONTROL</span></div>

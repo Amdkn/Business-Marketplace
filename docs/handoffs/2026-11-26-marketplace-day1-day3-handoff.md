@@ -2543,7 +2543,7 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - This was a genuine OAuth round-trip blocker that the prior 548-test suite did not cover.
 
 ### Fix and live deployment
-- Repository callback corrected to `split(/\\s+/)`; deployed as **adapter-oauth-callback v2**, ACTIVE.
+- Repository callback corrected to `split(/\s+/)`; deployed as **adapter-oauth-callback v2**, ACTIVE.
 - Repository worker corrected identically; deployed as **adapter-worker v8**, ACTIVE.
 - Both functions keep their prior `verify_jwt=false` settings intentionally: callback uses one-time SHA-256 state/expiry/consumption plus PKCE and provider host allowlist; worker checks the exact service-role bearer secret before claiming jobs.
 - Retrieved both deployed functions after deployment. Complete deployed `index.ts` content matches the corresponding repository file exactly.

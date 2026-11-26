@@ -2270,6 +2270,6 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 
 **Next continuation**
 1. Re-run the branch Preview typecheck/build when Vercel build capacity is available; inspect the next compiler output rather than assuming the first eight errors were exhaustive.
-2. Run `npm ci`, `npm run typecheck`, `npm run typecheck:api`, `npm test`, `npm run build` and runtime benches on an available local runner. The Amd-PC Desktop Commander runner was previously offline; current availability remains unverified.
+2. Run `npm ci`, `npm run typecheck`, `npm run typecheck:api`, `npm test`, `npm run build` and runtime benches on an available local runner. The Amd-PC Desktop Commander device is confirmed OFFLINE (last seen 1096h ago), so these commands could not be run locally.
 3. Complete authenticated browser CRUD for Client edit/delete, SOP archive/restore, mission create/reorder/status transitions, document-link behavior, and agent register/revoke. Verify UI refresh and visible failure behavior.
 4. Keep PR #1 Draft and Day 1–3 OPEN until frontend CI/build and authenticated browser acceptance are demonstrated.

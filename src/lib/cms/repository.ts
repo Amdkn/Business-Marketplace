@@ -204,6 +204,45 @@ const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table
       "notes"
     ]
   },
+  "growth_acquisition": {
+    "title": "name",
+    "fields": [
+      "category",
+      "virality",
+      "conversion",
+      "cost",
+      "ease",
+      "global",
+      "verdict",
+      "whatWorks",
+      "whatFailed"
+    ]
+  },
+  "growth_partenariats": {
+    "title": "name",
+    "fields": [
+      "type",
+      "brings",
+      "expects",
+      "state",
+      "contact",
+      "touched"
+    ]
+  },
+  "product_mvps": {
+    "title": "name",
+    "fields": [
+      "feature",
+      "client",
+      "body",
+      "overflow",
+      "weeksToShip",
+      "eta",
+      "owner",
+      "successMetric",
+      "notes"
+    ]
+  },
   "deals": {
     "title": "client",
     "fields": [
@@ -426,12 +465,24 @@ function toSnake(key: string): string {
 
 function fromWorkspaceRow(collectionId: string, row: Record<string, unknown>): CmsItem {
   const shape = COLLECTION_FIELDS[collectionId];
-  const extra = (row.extra_data && typeof row.extra_data === 'object' ? row.extra_data : {}) as Record<string, unknown>;
+  const extra = row.extra_data && typeof row.extra_data === 'object'
+    ? { ...(row.extra_data as Record<string, unknown>) }
+    : {};
+  // Ownership and audit metadata are database-managed, never CMS fields.
+  for (const reserved of [
+    'tenant_id', 'orgId', 'organizationId', 'workspaceId',
+    'organization_id', 'workspace_id', 'created_by_user_id',
+    'createdAt', 'updatedAt', 'created_at', 'updated_at',
+  ]) delete extra[reserved];
   const item: Record<string, unknown> = { ...extra, id: row.id };
   if (shape && row.title != null) item[shape.title] = row.title;
   for (const field of shape?.fields ?? []) {
     const value = row[toSnake(field)];
-    if (value !== null && value !== undefined) item[field] = value;
+    if (value !== null && value !== undefined) {
+      item[field] = collectionId === 'tasks' && field === 'done'
+        ? ['true', 'yes', '1', 'done'].includes(String(value).toLowerCase())
+        : value;
+    }
   }
   // Invoice typed columns are shared with Garden's invoice repository. Keep
   // their browser-facing camelCase projection aligned across both interfaces.
@@ -484,7 +535,12 @@ function toWorkspaceRow(
     )),
     updated_at: new Date().toISOString(),
   };
-  for (const field of shape.fields) row[toSnake(field)] = item[field] ?? null;
+  for (const field of shape.fields) {
+    const value = item[field];
+    row[toSnake(field)] = collectionId === 'tasks' && field === 'done' && typeof value === 'boolean'
+      ? String(value)
+      : value ?? null;
+  }
   if (collectionId === 'invoices') {
     const typedColumns: Record<string, string> = {
       clientId: 'client_id',

@@ -219,7 +219,7 @@ export const DocumentsView: React.FC = () => {
               </div>
             </div>
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              Preview not implemented yet — file metadata only.
+              File preview is unavailable because private document storage is not configured. This record currently exposes metadata only.
             </div>
           </div>
         )}

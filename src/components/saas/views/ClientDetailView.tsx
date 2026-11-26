@@ -28,7 +28,9 @@ import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { clientsRepo } from '../data/clients.repo';
 import { documentsRepo } from '../data/documents.repo';
+import { activityRepo } from '../data/activity.repo';
 import type { Client, Document } from '../lib/types';
+import type { ClientActivityEvent } from '../data/activity.repo';
 import { CLIENT_STATUS_LABEL } from '../lib/statusLabels';
 import { useToast } from '../contexts/ToastContext';
 import { formatDate, safeArray, safeStr } from '../lib/safe';
@@ -37,7 +39,7 @@ type LoadState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'not_found' }
-  | { kind: 'ready'; client: Client; docs: Document[] };
+  | { kind: 'ready'; client: Client; docs: Document[]; activity: ClientActivityEvent[] };
 
 const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'danger' | 'info'> = {
   active: 'success',
@@ -71,14 +73,14 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
       return;
     }
     setState({ kind: 'loading' });
-    Promise.all([clientsRepo.findById(id), documentsRepo.list()])
-      .then(([client, allDocs]) => {
+    Promise.all([clientsRepo.findById(id), documentsRepo.list(), activityRepo.listForClient(id)])
+      .then(([client, allDocs, activity]) => {
         if (!client) {
           setState({ kind: 'not_found' });
           return;
         }
         const linkedDocs = safeArray<Document>(allDocs).filter((d) => d.clientId === client.id);
-        setState({ kind: 'ready', client, docs: linkedDocs });
+        setState({ kind: 'ready', client, docs: linkedDocs, activity });
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Failed to load client';
@@ -385,14 +387,25 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
         )}
       </Card>
 
-      {/* Activity timeline placeholder (D2) */}
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-slate-400" /> Activity Timeline
+          <Activity className="w-4 h-4 text-slate-400" /> Activity Timeline ({state.activity.length})
         </h3>
-        <p className="text-sm text-slate-400 italic">
-          Activity timeline — D2 backlog (activity event persistence is still pending).
-        </p>
+        {state.activity.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">No activity events have been recorded for this client yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {state.activity.map((event) => (
+              <li key={event.id} className="flex items-start justify-between gap-4 border-l-2 border-emerald-200 pl-4 py-1">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{event.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{event.clientName || state.client.name}</p>
+                </div>
+                <time className="text-xs text-slate-500 shrink-0">{formatDate(event.createdAt)}</time>
+              </li>
+            ))}
+          </ol>
+        )}
       </Card>
     </div>
   );

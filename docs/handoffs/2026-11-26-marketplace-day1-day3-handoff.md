@@ -1758,3 +1758,36 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Supabase assigned the hosted migration version 20261126090124 to workspace_document_records. The source migration has been renamed to supabase/migrations/20261126090124_workspace_document_records.sql to match the cloud ledger.
 - References in this handoff and supabase/README.md were updated. The old provisional 20261126090500 filename was removed from the active branch.
 - Latest branch head must be fetched again after this handoff commit. The cloud table inventory remains 37 workspace_data tables / 146 policies; documents and legal_documents are both empty by design.
+
+
+### 13.31 Garden/Web Desktop workspace-scoped CRUD hardening — 2026-11-26 04:19 ET
+
+**Live database re-inventory**
+- Rechecked the connected Marketplace Supabase project directly.
+- `workspace_data`: 37 base tables, all 37 with RLS enabled, 146 policies.
+- First real tenant remains intact: 1 Auth user, 1 profile, 1 organization, 1 active organization membership, 1 workspace, 1 active workspace membership.
+- `workspace_data` currently contains 0 tenant rows. No test/demo/business rows were inserted.
+- Inspected all eight Garden-targeted table contracts (clients, people_agents, documents, invoices, legal_documents, tasks, deals, runbooks): each has non-null `organization_id` and `workspace_id`. The active policies call `identity.is_active_workspace_member(organization_id, workspace_id)` for reads and `identity.can_manage_workspace(organization_id, workspace_id)` for writes.
+
+**New code changes committed on the working branch**
+- `src/components/saas/lib/tenant.ts`: added an active-workspace cache alongside the organization cache.
+- `src/components/saas/auth/AuthProvider.tsx`: resolves the signed-in user's unique ACTIVE `enterprise.workspace_memberships` row, populates the workspace cache, fails closed if no unique active workspace exists, and clears both tenant caches when the session ends.
+- `src/components/saas/data/repository.ts`: all Garden list/find/create/update/delete operations now scope by both `organization_id` and `workspace_id`; creates include `workspace_id`. This closes the previous mismatch where Garden filtered only by organization while Web Desktop CMS filtered by both.
+- Garden invoice hydration no longer fabricates USD when currency metadata is absent; the UI receives an empty/unset currency instead.
+- `src/lib/cms/repository.ts`: configured production writes now fail explicitly when authenticated workspace context is missing or a collection has no persistent table. Hydration database/API failures reject rather than masquerading as an empty collection. Supabase mode retains the latest error even when the mode label does not change.
+- `src/lib/cms/cms.store.ts`: catches hydration/write/delete promise failures and reports the exact collection/item in the console instead of leaving unhandled promise rejections. Failed remote reads never populate a real tenant with demo seed records.
+
+**Validation boundary**
+- Database metadata, RLS predicates, table nullability and tenant counts were queried live and verified.
+- No authenticated browser JWT was available to these remote repository/database tools. Garden and Web Desktop browser CRUD, cross-workspace denial, and UI smoke tests are NOT claimed as passed.
+- No local Node runtime was available through the connected GitHub/Supabase tools, so TypeScript, Vitest, and Vite build have NOT been executed after these code edits.
+- No deployment was triggered; previous Vercel rate-limit status must be refreshed against the latest branch head.
+
+**Next implementation tranche**
+1. Unify Garden People/Agents with canonical `identity.profiles`, `identity.agent_principals` and `identity.agent_delegations`; `workspace_data.team` and `workspace_data.people_agents` must not become competing identity registries. Preserve UI-only telemetry in a separate agent runtime projection if required.
+2. Audit every Garden view and every Web Desktop app for local seed arrays, hardcoded data and independent stores; migrate each operational view to its canonical source (identity, enterprise, areas, catalog, commerce, integration, finance, or workspace_data only where it is genuinely workspace content).
+3. Reconcile CMS and Garden field contracts for the eight shared collections, including invoice currency, IDs, date/status types and update semantics.
+4. Add automated contract tests for mapper round-trips and repository query scoping; run typecheck, Vitest, build and CI.
+5. Perform browser-authenticated CRUD and cross-workspace denial with the real tenant JWT; only then accept the shared interface persistence tranche.
+
+**Branch:** `foundation/marketplace-product-identity`. **PR #1:** OPEN / DRAFT. Day 1–3 remain OPEN; no E2E or deployment acceptance is implied by this code tranche.

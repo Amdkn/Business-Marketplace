@@ -12,14 +12,14 @@ type Section = 'overview' | 'core' | 'domains' | 'marketplace' | 'adapters' | 'w
 type Domain = { id: string; name: string; code: string; description: string; color: string; axis: 'department' | 'area'; role: string };
 
 const businessDepartments: Domain[] = [
-  { id: 'product-ip', name: 'Product & IP', code: 'B2.1', axis: 'department', description: 'Product portfolios, intellectual property, research and offer design.', role: 'Create and steward the assets and capabilities the Marketplace brings to market.', color: '#e6a04b' },
-  { id: 'growth-distribution', name: 'Growth & Distribution', code: 'B2.2', axis: 'department', description: 'Brand, demand generation, audience, channels and distribution systems.', role: 'Create reach, discoverability and repeatable demand across the ecosystem.', color: '#b58ae0' },
-  { id: 'people-talent', name: 'People & Talent', code: 'B2.3', axis: 'department', description: 'Talent, people operations, roles, learning and human-agent collaboration.', role: 'Compose the human and agent capabilities required to operate the business.', color: '#79ad76' },
-  { id: 'legal-trust', name: 'Legal & Trust', code: 'B2.4', axis: 'department', description: 'Legal structure, contracts, privacy, trust, risk and compliance.', role: 'Establish the rules, protections and legitimacy under which value is exchanged.', color: '#c7c9c1' },
-  { id: 'tech-intelligence', name: 'Tech & Intelligence', code: 'B2.5', axis: 'department', description: 'Platform engineering, data, compute, inference, memory and intelligence systems.', role: 'Build and operate the technical and intelligence substrate.', color: '#555b57' },
-  { id: 'operations-delivery', name: 'Operations & Delivery', code: 'B2.6', axis: 'department', description: 'Service operations, production, fulfillment, quality and continuous improvement.', role: 'Turn offers and commitments into reliable delivered outcomes.', color: '#78a9d8' },
-  { id: 'finance-capital', name: 'Finance & Capital', code: 'B2.7', axis: 'department', description: 'Financial operations, capital allocation, accounting, treasury and unit economics.', role: 'Measure, allocate and steward the economic resources of the Marketplace.', color: '#d6bd59' },
-  { id: 'sales-partnerships', name: 'Sales & Partnerships', code: 'B2.8', axis: 'department', description: 'Sales, commercial relationships, alliances, suppliers and strategic partnerships.', role: 'Convert qualified demand into durable commercial relationships.', color: '#d56e64' },
+  { id: 'product-ip', name: 'Product & IP', code: 'DEPT 01', axis: 'department', description: 'Product portfolios, intellectual property, research and offer design.', role: 'Create and steward the assets and capabilities the Marketplace brings to market.', color: '#e6a04b' },
+  { id: 'growth-distribution', name: 'Growth & Distribution', code: 'DEPT 02', axis: 'department', description: 'Brand, demand generation, audience, channels and distribution systems.', role: 'Create reach, discoverability and repeatable demand across the ecosystem.', color: '#b58ae0' },
+  { id: 'people-talent', name: 'People & Talent', code: 'DEPT 03', axis: 'department', description: 'Talent, people operations, roles, learning and human-agent collaboration.', role: 'Compose the human and agent capabilities required to operate the business.', color: '#79ad76' },
+  { id: 'legal-trust', name: 'Legal & Trust', code: 'DEPT 04', axis: 'department', description: 'Legal structure, contracts, privacy, trust, risk and compliance.', role: 'Establish the rules, protections and legitimacy under which value is exchanged.', color: '#c7c9c1' },
+  { id: 'tech-intelligence', name: 'Tech & Intelligence', code: 'DEPT 05', axis: 'department', description: 'Platform engineering, data, compute, inference, memory and intelligence systems.', role: 'Build and operate the technical and intelligence substrate.', color: '#555b57' },
+  { id: 'operations-delivery', name: 'Operations & Delivery', code: 'DEPT 06', axis: 'department', description: 'Service operations, production, fulfillment, quality and continuous improvement.', role: 'Turn offers and commitments into reliable delivered outcomes.', color: '#78a9d8' },
+  { id: 'finance-capital', name: 'Finance & Capital', code: 'DEPT 07', axis: 'department', description: 'Financial operations, capital allocation, accounting, treasury and unit economics.', role: 'Measure, allocate and steward the economic resources of the Marketplace.', color: '#d6bd59' },
+  { id: 'sales-partnerships', name: 'Sales & Partnerships', code: 'DEPT 08', axis: 'department', description: 'Sales, commercial relationships, alliances, suppliers and strategic partnerships.', role: 'Convert qualified demand into durable commercial relationships.', color: '#d56e64' },
 ];
 
 const areasPortfolios: Domain[] = [
@@ -32,6 +32,16 @@ const areasPortfolios: Domain[] = [
   { id: 'ld07-mc-sandbox', name: 'MC Sandbox', code: 'LD07', axis: 'area', description: 'Experimental space for prototypes, exploration and controlled simulations.', role: 'Mission portfolio for experimentation without contaminating operational systems.', color: '#d56e64' },
   { id: 'ld08-civilizer', name: 'Civilizer / ABC OS', code: 'LD08', axis: 'area', description: 'Civilizational systems, collective coordination and ABC OS initiatives.', role: 'Meta-project portfolio for long-horizon civilizational design and coordination.', color: '#555b57' },
 ];
+
+const ld01DcManagers = [
+  ['B2.1', 'Operations'], ['B2.2', 'Trésorerie'], ['B2.3', 'Legal'], ['B2.4', 'R&D'],
+  ['B2.5', 'Alliances'], ['B2.6', 'Infra'], ['B2.7', 'IT'], ['B2.8', 'Gouvernance'],
+] as const;
+
+const ld01MarvelSquads = [
+  'B3.1_Marvel_Squad', 'B3.2_Marvel_Squad', 'B3.3_Marvel_Squad', 'B3.4_Marvel_Squad',
+  'B3.5_Marvel_Squad', 'B3.6_Marvel_Squad', 'B3.7_Marvel_Squad', 'B3.8_Marvel_Squad',
+] as const;
 
 const adapterFamilies = [
   ['Identity & access', 'Google Workspace · Microsoft 365 · Auth0 · Clerk', 'ShieldCheck'],
@@ -108,16 +118,20 @@ export function MarketplaceControlPlane({ onOpenOffice }: { onOpenOffice: () => 
         if (!payload || !Array.isArray(payload.business_departments) || !Array.isArray(payload.areas_domains)) {
           throw new Error('Marketplace taxonomy response has an invalid shape');
         }
-        const mapRows = (rows: Array<{ code: string; name: string; description: string; responsibility: string }>, axis: 'department' | 'area', palette: Domain[]): Domain[] =>
-          rows.map(row => ({
-            id: row.code.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            code: row.code,
-            name: row.name,
-            description: row.description,
-            role: row.responsibility,
-            axis,
-            color: palette.find(item => item.code === row.code)?.color ?? '#8b9887',
-          }));
+        const mapRows = (rows: Array<{ code?: string; key?: string; name: string; description: string; responsibility: string; sort_order: number }>, axis: 'department' | 'area', palette: Domain[]): Domain[] =>
+          rows.map(row => {
+            const stableKey = row.key ?? row.code ?? `entry-${row.sort_order}`;
+            const displayCode = axis === 'department' ? `DEPT ${String(row.sort_order).padStart(2, '0')}` : row.code ?? stableKey;
+            return {
+              id: stableKey,
+              code: displayCode,
+              name: row.name,
+              description: row.description,
+              role: row.responsibility,
+              axis,
+              color: palette.find(item => item.id === stableKey || item.code === row.code)?.color ?? '#8b9887',
+            };
+          });
         const nextTaxonomy = {
           businessDepartments: mapRows(payload.business_departments, 'department', businessDepartments),
           areasPortfolios: mapRows(payload.areas_domains, 'area', areasPortfolios),

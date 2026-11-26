@@ -127,3 +127,16 @@ The 61 unindexed-FK findings are performance INFO findings. Review query paths a
 ### Historical migration source reconstruction
 
 Cloud migration `20261126041718 / revoke_public_execution_rls_auto_enable` has now been reconstructed from the live function ACL. The function ACL is `postgres=X/postgres,service_role=X/postgres`; PUBLIC, anon and authenticated have no EXECUTE privilege. The event trigger `ensure_rls` remains enabled and invokes `public.rls_auto_enable()`. The canonical source tree includes `migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql` to reproduce the verified end state. This is a **catalog-derived reconstruction**, not a byte-for-byte recovery of the original migration text. It is already applied in cloud; do not replay it.
+
+## Finance & Capital — Chart of Accounts continuation (2026-11-26)
+
+The current live Finance foundation supersedes the earlier inventory snapshot above:
+- 10 Finance tables (the original nine plus chart_account_templates), all with RLS enabled and browser-role access revoked.
+- 16 required template accounts in version 2026.1.
+- finance.ledger_accounts.chart_version marks tenant-installed template accounts.
+- api.provision_finance_chart_of_accounts is service-role-only, SECURITY DEFINER, pinned search_path, tenant membership/role checked, collision-safe and advisory-lock serialized.
+- Authenticated action provision_finance_chart_of_accounts is exposed by marketplace-api v19 (verify_jwt=true).
+- The chart is a provider-neutral baseline; no tenant chart is installed because there are no live organizations.
+- Two additive migrations: 20261126070000_finance_chart_of_accounts_provisioning and 20261126070100_finance_chart_version_regex_fix.
+
+Do not interpret the presence of templates as tenant provisioning, financial activity or Day 2 acceptance. Continue with fee policy versioning and the order-to-fee-to-ledger posting contract.

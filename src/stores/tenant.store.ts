@@ -52,8 +52,8 @@ export const TENANT_DEMO_COACH: TenantId = 'demo-coach' as TenantId;
 // elle (legacy) ou avec une version antérieure, on retombe sur le
 // tenant par défaut. La clé `STORAGE_KEY` reste inchangée pour le
 // bridge.
-const STORAGE_KEY = 'coach-os:activeTenantId';
-const VERSION_KEY = 'coach-os:activeTenantId.version';
+const STORAGE_KEY = 'aspace-marketplace:activeTenantId';
+const VERSION_KEY = 'aspace-marketplace:activeTenantId.version';
 const SCHEMA_VERSION = 1;
 
 function readPersistedTenant(): TenantId {

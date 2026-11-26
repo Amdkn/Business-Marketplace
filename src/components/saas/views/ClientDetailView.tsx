@@ -1,5 +1,5 @@
 // src/components/views/ClientDetailView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.clients schema.
+// Zero Bug Sprint — rewritten to match Marketplace tenant client records.
 //
 // Bug fixes (D6 #98, D6 #105a):
 //   - `client.progress` removed (no DB column). Derived from status via STATUS_PROGRESS.
@@ -297,7 +297,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
         </Card>
       </div>
 
-      {/* Linked documents (from omk_saas.documents, filtered by clientId) */}
+      {/* Linked documents (from Marketplace tenant documents, filtered by clientId) */}
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <FileText className="w-4 h-4 text-slate-400" /> Documents ({docs.length})
@@ -328,7 +328,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
           <Activity className="w-4 h-4 text-slate-400" /> Activity Timeline
         </h3>
         <p className="text-sm text-slate-400 italic">
-          Activity timeline — D2 backlog (no omk_saas.activity table yet).
+          Activity timeline — D2 backlog (activity event persistence is still pending).
         </p>
       </Card>
     </div>

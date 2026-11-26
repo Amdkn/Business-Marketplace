@@ -7,11 +7,8 @@
  * We branch on the offer (Citadelle vs Programme) and on the stage to
  * give each deal a distinct surface — they're not interchangeable.
  *
- * Cause D — chaînage deal Won : sur un deal au stade 'Won', le bouton
- * « Mark Paid · Send onboarding » crée réellement un client (s'il
- * n'existe pas) ET une facture miroir du montant/deal/client, puis
- * confirme par un toast. Avant, c'était un toast vide — la
- * fonctionnalité la plus attendue de cette famille d'app.
+ * Won-deal action: create a single invoice linked to the deal's existing
+ * workspace client. Payment capture and onboarding remain separate workflows.
  */
 import { Building2, Handshake, Sparkles, Target } from 'lucide-react';
 import type { ItemDetailProps } from '../../components/cms/itemDetailRegistry';

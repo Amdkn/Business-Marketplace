@@ -3,7 +3,7 @@
 do $$
 declare
   expected text[] := array[
-    'clients','articles','team','people_agents','runbooks','incidents','services','it_experiments','deploys','tasks',
+    'clients','articles','team','people_agents','runbooks','incidents','services','it_experiments','deploys','tasks','change_requests',
     'marketplace_listings','product_items','product_releases','growth_channels','growth_experiments','deals','invoices',
     'contracts','policies','session_notes','legal_ai_act_checks','legal_frameworks','legal_controls',
     'legal_compliance_policies','legal_evidence','legal_risks','legal_vendors','legal_gaps','personas','memory','codex',
@@ -28,7 +28,13 @@ begin
     end if;
     if has_table_privilege('anon',format('workspace_data.%I',t),'SELECT') then raise exception 'anon SELECT granted on %',t; end if;
     if not has_table_privilege('authenticated',format('workspace_data.%I',t),'SELECT') then raise exception 'authenticated SELECT missing on %',t; end if;
-    if not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname=format('%s_tenant_guard',t) and not tgisinternal) then raise exception 'tenant immutability trigger missing on %',t; end if;
+    if t = 'change_requests' then
+      if not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname='change_requests_guard_update' and not tgisinternal) then
+        raise exception 'change_requests immutability trigger missing';
+      end if;
+    elsif not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname=format('%s_tenant_guard',t) and not tgisinternal) then
+      raise exception 'tenant immutability trigger missing on %',t;
+    end if;
   end loop;
   if to_regclass('workspace_data.activity_events') is null then raise exception 'activity_events table missing'; end if;
   select count(*) into n from pg_policies where schemaname='workspace_data' and tablename='activity_events';
@@ -36,8 +42,8 @@ begin
   if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name='activity_events' and column_name='workspace_id') <> 'NO' then
     raise exception 'activity_events.workspace_id must be required';
   end if;
-  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 38 then
-    raise exception 'workspace_data table count differs from 37 collections + activity_events';
+  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 39 then
+    raise exception 'workspace_data table count differs from 38 collections + activity_events';
   end if;
   if not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='currency')
      or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='client_id')
@@ -98,4 +104,8 @@ begin
   ) then
     raise exception 'Activity events are missing workspace-member read isolation';
   end if;
-end $$;
+  if position('NEW.workspace_id := OLD.workspace_id' in pg_get_functiondef('workspace_data.guard_change_request_update()'::regprocedure)) = 0
+     or position('NEW.created_by_user_id := OLD.created_by_user_id' in pg_get_functiondef('workspace_data.guard_change_request_update()'::regprocedure)) = 0 then
+    raise exception 'Change request guard does not preserve tenant and creator attribution';
+  end if;
+end $;

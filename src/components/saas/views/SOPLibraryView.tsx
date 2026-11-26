@@ -152,7 +152,7 @@ export const SOPLibraryView: React.FC = () => {
     if (!executeTarget) return;
     const target = executeTarget;
     setExecuteTarget(null);
-    showToast(`Execution started for "${target.title}".`, 'success');
+    showToast(`No runbook execution engine is connected. "${target.title}" was not run.`, 'error');
   };
 
   if (loading) {
@@ -402,7 +402,7 @@ export const SOPLibraryView: React.FC = () => {
       <Modal
         open={executeTarget !== null}
         onClose={() => setExecuteTarget(null)}
-        title={`Execute "${executeTarget?.title ?? ''}"?`}
+        title="Execution engine unavailable"
         size="sm"
         footer={
           <>
@@ -424,7 +424,7 @@ export const SOPLibraryView: React.FC = () => {
         }
       >
         <p className="text-sm text-slate-600 leading-relaxed">
-          This will create a workflow run and notify assigned agents.
+          No runbook execution engine or agent runtime is connected. This procedure is stored, but it cannot be executed from this workspace yet.
         </p>
       </Modal>
     </div>

@@ -1470,3 +1470,17 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Explicitly separated Supabase Google Sign-In credentials from the tenant-scoped Google Drive adapter OAuth credentials. They are different OAuth clients and trust boundaries.
 - Added the rule that user-editable user_metadata must never authorize roles, tenant access or delegated permissions.
 - This is documentation and governance progress only. It does not enable SMTP or OAuth providers and does not unblock the real-user E2E gate until a real email confirmation/sign-in succeeds.
+
+
+### 13.10 Day 2 Finance & Capital foundation — 2026-11-26
+
+- Added the private `finance` schema to the existing Marketplace Supabase project through three additive migrations: `20261126061930 finance_double_entry_foundation`, `20261126062124 finance_integrity_guards`, and `20261126062317 finance_payment_fact_immutability`.
+- Added nine tables: ledger_accounts, journal_entries, journal_lines, payment_intents, payment_webhook_receipts, refunds, payout_batches, payout_items and disputes.
+- Applied RLS to all nine tables; revoked schema USAGE and table privileges from PUBLIC/anon/authenticated; granted service_role only.
+- Added deferred posted-journal balance checks, immutable posted journal lines and entries, same-organization/same-currency account and line foreign keys, order-snapshot matching for payment intents, immutable payment identity/amount/currency/idempotency facts, constrained payment state transitions, webhook signature gate, cumulative refund cap and payout batch currency guard.
+- Added `supabase/tests/marketplace_finance_ledger.sql`; executed it against the live project and it returned without assertion exceptions. The test verifies nine-table inventory, RLS and effective browser/service-role privileges, SECURITY DEFINER search_path/EXECUTE restrictions, and all expected integrity triggers.
+- Added [docs/FINANCE_LEDGER_CONTRACT.md](../FINANCE_LEDGER_CONTRACT.md) with accounting semantics, sample journal shape, provider boundary and remaining E2E requirements.
+- Updated Supabase README and Product Architecture to record the three applied migrations and 9 finance tables (45 application tables total).
+- No organization, order, payment, webhook, refund, payout or journal fixture was created. No provider credentials were added. No provider is represented as connected.
+- Day 2 Finance foundation is structurally implemented, but Day 2 remains OPEN: fee policy, posting API, payment adapter, signed webhook implementation, settlement/payout execution, reconciliation, tax handling, disputes and finance UI remain.
+- Next: add a database-level ledger posting API with strict service-role boundary and idempotent balanced journal posting; then wire a provider-neutral payment API and test the lifecycle using controlled test-mode provider credentials only after a provider is explicitly configured.

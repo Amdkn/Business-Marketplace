@@ -1,5 +1,5 @@
 // src/components/views/TasksView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.sops schema (sops = procedures).
+// Zero Bug Sprint — rewritten for the Marketplace procedure library.
 //
 // Schema (no `steps`/`time`/`uses`/`rating` columns).
 // Bug fixes (D6 #98, D6 #100b, D6 #102, D6 #103):

@@ -20,7 +20,7 @@ export const agentsRepo = {
       id: String(row.id),
       delegationId: String(row.delegation_id ?? ''),
       name: String(row.display_name ?? row.agent_key ?? 'Unnamed agent'),
-      role: 'operator',
+      role: 'operator' as const,
       email: null,
       status: row.principal_status === 'ACTIVE' ? 'active' : row.principal_status === 'PAUSED' ? 'paused' : 'archived',
       createdAt: String(row.created_at ?? ''),
@@ -29,7 +29,8 @@ export const agentsRepo = {
       agentClass: String(row.agent_class ?? ''),
       runtime: String(row.runtime ?? ''),
       permissionCodes: Array.isArray(row.permission_codes) ? row.permission_codes.map(String) : [],
-    }));
+      delegationId: row.delegation_id ? String(row.delegation_id) : undefined,
+    } as Agent));
   },
   async register(input: { agentKey: string; displayName: string; agentClass: string; runtime: string; permissionCodes: string[] }): Promise<void> {
     if (!SUPABASE_READY) throw new Error('Marketplace API is not configured.');

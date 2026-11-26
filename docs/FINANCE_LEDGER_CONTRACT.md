@@ -152,3 +152,22 @@ It delegates to the existing balanced, immutable, idempotent journal-posting API
 Authenticated Edge action: `post_captured_order_finance_entry`. Live `marketplace-api` v22 is ACTIVE with `verify_jwt=true`.
 
 This is the accounting boundary for a trusted provider-confirmed capture, not a provider integration. No live payment intent, capture or journal was created in the empty tenant project.
+
+## Successful Refund → Ledger Reversal
+
+The private table `finance.refund_fee_allocations` freezes the allocation of each successful refund between platform-fee reversal and seller-payable reversal. One immutable allocation is allowed per refund.
+
+`api.post_succeeded_refund_finance_entry(actor, owner_organization, refund_id)` requires a Finance role, a provider-confirmed successful refund (including provider refund ID), a captured payment with provider payment ID, the original capture journal, and a matching immutable order fee snapshot. It serializes postings per payment intent.
+
+For cumulative successful refunds, the target platform-fee reversal is `round(original_platform_fee × cumulative_refunds / original_gross, rounding_scale)`. The current refund receives the difference between that cumulative target and fee reversals already allocated to prior posted refunds. This cumulative method prevents cent-level drift across partial refunds.
+
+The journal allocation is:
+- Debit seller payable for the seller portion reversed.
+- Debit platform fee revenue for the platform commission portion reversed.
+- Credit PSP clearing for the gross refund.
+
+Zero-value debit lines are omitted. The entry delegates to the immutable journal API with `refund-settlement:<refund_id>`; retries reuse the existing journal. Refunds never rewrite the original capture entry.
+
+Authenticated Edge action: `post_succeeded_refund_finance_entry`. Live `marketplace-api` v23 is ACTIVE with `verify_jwt=true`.
+
+No provider refund, refund allocation or journal has been fabricated. This is the ledger posting boundary for a trusted provider-confirmed refund; the provider adapter and signed webhook integration remain separate work.

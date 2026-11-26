@@ -1494,3 +1494,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Supabase Health advisor returned no findings. Security advisor now reports 38 INFO RLS-enabled/no-policy notices (nine are the new private Finance tables); these remain intentional because the finance schema has no browser USAGE and no anon/authenticated table grants. Finance privilege assertions pass.
 - Performance advisor now reports 71 unindexed-FK and 56 unused-index INFO notices across the whole project. Finance FKs are all indexed; the remaining findings concern other schemas and should be triaged by workload, not mass-indexed. Newly added indexes are naturally unused before traffic.
 - Finance foundation is structural only. No provider, payment, refund, payout, dispute or ledger transaction was simulated. Payment posting API, fee policy, provider webhook verification implementation, settlement and payout E2E, tax handling, financial read models and UI remain open.
+
+
+### 13.12 Idempotent journal posting API — 2026-11-26
+
+- Applied cloud migration `20261126062749 finance_journal_posting_api` and tracked its exact SQL source.
+- Added `api.post_finance_journal_entry`: requires active organization membership plus S0/B1/B2 finance-capable role; validates at least two balanced debit/credit lines; validates every account is ACTIVE and belongs to the same organization and currency; posts atomically; enforces organization-scoped idempotency and rejects key reuse with a different payload.
+- Granted EXECUTE only to service_role; SECURITY DEFINER function uses pinned search_path. Browser roles cannot execute it.
+- Added authenticated `post_finance_journal_entry` action to `marketplace-api` and deployed the updated function to Supabase. Live deployment reports ACTIVE, version 17, verify_jwt=true.
+- Extended and re-ran the Finance regression suite; it now checks the posting function's existence, SECURITY DEFINER/search_path and exact role grants. It completed without assertion exceptions.
+- No production journal, account, payment or tenant fixture was created. This is an available guarded posting API, not a claim that production accounting has started.
+- Current Finance source contract and README record the new migration and API.

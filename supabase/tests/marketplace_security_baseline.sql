@@ -99,14 +99,19 @@ BEGIN
     RAISE EXCEPTION 'RLS event-trigger function is executable by browser/public roles';
   END IF;
 
-  SELECT string_agg(format('%I.%I', table_schema, table_name), ', ')
+  SELECT string_agg(format('%I.%I', n.nspname, c.relname), ', ')
     INTO v_bad
-  FROM information_schema.role_table_grants
-  WHERE grantee IN ('anon','authenticated')
-    AND table_schema IN ('identity','areas','enterprise','catalog','commerce','integration')
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE c.relkind='r'
+    AND n.nspname IN ('identity','areas','enterprise','catalog','commerce','integration')
     AND NOT EXISTS (
       SELECT 1 FROM pg_policies pol
-      WHERE pol.schemaname=table_schema AND pol.tablename=table_name
+      WHERE pol.schemaname=n.nspname AND pol.tablename=c.relname
+    )
+    AND (
+      has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      OR has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     );
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION 'RLS tables without policies have browser-role grants: %', v_bad;

@@ -53,7 +53,8 @@ function makeWorkspaceMapper<T extends { id: string }>(collection: string): Mapp
       for (const [dbKey,uiKey] of Object.entries(reverse)) if (row[dbKey] !== undefined && row[dbKey] !== null) result[uiKey] = row[dbKey];
       // Compatibility aliases expected by the existing Garden components.
       if (collection === 'agents' && result.currentTask === undefined && result.task !== undefined) result.currentTask = result.task;
-      if (collection === 'invoices' && result.currency === undefined) result.currency = 'USD';
+      // An unset currency stays visibly unset; never fabricate USD for a tenant record.
+      if (collection === 'invoices' && result.currency === undefined) result.currency = '';
       if (collection === 'documents' && result.uploadedBy === undefined) result.uploadedBy = null;
       return result as T;
     },

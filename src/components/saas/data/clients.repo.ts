@@ -1,5 +1,5 @@
 // src/data/clients.repo.ts
-// ADR-OMK-001 D4 — repository for the `clients` table.
+// ADR-DASHBOARD-001 D4 — repository for the `clients` table.
 // Seeded with the canonical mock CLIENTS from @/lib/constants so the localStorage
 // fallback matches the pre-Phase-D UX exactly. When Supabase is configured, the
 // repository routes to the Supabase table.

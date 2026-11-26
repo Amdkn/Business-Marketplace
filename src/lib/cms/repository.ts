@@ -28,8 +28,8 @@ let _lastError: string | null = null;
 /** Returns the last observed state of the Supabase backend.
  *  - 'unconfigured' : no VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in env
  *  - 'unreachable'  : client exists but every call so far has failed
- *  - 'no-org'       : client works, but the user has no membership row
- *  - 'connected'    : client works and org_id is resolved
+ *  - 'no-org'       : client works, but the user has no active organization membership
+ *  - 'connected'    : client works and organization_id is resolved
  */
 export function supabaseMode(): SupabaseMode {
   return _mode;
@@ -64,14 +64,7 @@ function setMode(next: SupabaseMode, err?: unknown): void {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * Collection → table mapping — Brief-B §1
- * Le nouveau schéma a une table par collection. Le repository historique
- * utilise `cms_items` (générique) pour rester compatible avec ce qui
- * tourne en prod aujourd'hui. `tableFor()` est l'aiguillage : si la
- * collection a une table typée, on l'utilise ; sinon, on retombe sur
- * `cms_items` (events append-only).
- * ──────────────────────────────────────────────────────────────────── */
+/* Collection definitions are source-controlled; tenant records are stored in dedicated tables. */
 
 // Each persistent CMS collection has a dedicated typed table in workspace_data.
 const COLLECTION_FIELDS: Record<string, { title: string; fields: string[] }> = {

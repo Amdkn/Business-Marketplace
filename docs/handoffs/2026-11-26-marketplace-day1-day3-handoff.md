@@ -1740,3 +1740,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - No local TypeScript/Vitest/build execution was available through the connected GitHub/Supabase actions in this session. CI/Vercel status must be refreshed on the latest branch head; previous Vercel rate-limit failure was on an older code head.
 - The Garden table map is now explicit but should receive UI-by-UI contract tests for every field. Check special cases: invoice currency fallback currently defaults to USD if no currency metadata exists; upload/storage lifecycle is still not implemented; mission task status and SOP content use the existing tasks/runbooks storage contracts.
 - Next: refresh PR checks, run typecheck + test + build in CI, perform browser CRUD on the real tenant, then complete remaining Sidebar app modules and Control Tower integrations. Keep PR #1 DRAFT until the full Day 1–3 acceptance gates pass.
+
+
+### 13.29 Final checkpoint — 2026-11-26
+
+- The new Garden repository mapping and two new tenant tables are committed on the working branch. The Web Desktop CMS and Garden now point to the same workspace_data tenant data plane.
+- Verified database shape for the eight Garden collection targets: clients, people_agents, documents, invoices, legal_documents, tasks, deals and runbooks each have RLS enabled and four policies; authenticated table SELECT/INSERT grants exist. The actual policy predicates still require a browser-authenticated CRUD test.
+- The live organization has one active B1_CEO organization role binding. No tenant content rows were created during this implementation.
+- Repository CI workflow exists at .github/workflows/ci.yml and defines npm ci, app and API typechecks, Vitest, build and four runtime benches. No Actions workflow run/check-run was returned for the latest PR head in this session; do not treat the workflow definition as a passing run.
+- PR #1 remains OPEN / DRAFT. Latest known branch head before this handoff update: 788d42d404106f34e9f416b675253b63f857404f. Vercel still reports the rate-limit failure on the immediately preceding verified head; refresh checks after the handoff commit.
+- Explicit open issues: authenticated browser CRUD and cross-tenant denial; confirm JWT org_id hydration for the real account; validate Garden view field contracts and form flows; file upload/storage; invoice currency is currently defaulted to USD if no currency extra_data is present; mission/task and SOP/runbook mappings need UI-level acceptance; the legacy dashboard schema tables have not yet been dropped and remain compatibility artifacts.
+- Continue implementation in this same branch and repository. Do not create another project, do not move Garden back to dashboard, do not add fake tenant records, and do not mark Day 1–3 accepted until their end-to-end gates pass.

@@ -925,7 +925,7 @@ export function ApprovalsView() {
       />
       <SectionHead
         title="Approvals"
-        subtitle="L'agent propose, vous tranchez. Ship or kill, en 10 minutes."
+        subtitle="Les scénarios et propositions restent locaux à ce navigateur; les décisions approuvées/rejetées sont journalisées dans le workspace."
         action={
           <div className="flex items-center gap-2">
             {pendingCount > 0 && (

@@ -134,15 +134,16 @@ Rules:
 - [x] Eight Marketplace operating departments and eight Areas OS portfolios persisted in Supabase and served through a read-only API; LD01 B1/B2/B3 holarchy is shown separately from the V5 source specification.
 - [x] Public published-listing read path connected; current catalogue correctly returns zero published offers.
 - [x] Four platform-core foundations represented in the Control Plane.
-- [ ] Tenant-owned domain/department installation, ownership and dependency graph.
+- [ ] Tenant-owned domain/department installation, ownership and dependency graph. Installation tables, idempotent API actions and a first Control Plane flow are now committed in the draft tranche; ownership assignment and explicit dependency edges remain pending.
 - [x] Global registry of 20 adapter families persisted in Supabase and served through a public read-only API; every family remains explicitly PLANNED.
 - [x] 73 provider-level blueprint records persisted from the 20 adapter families; all remain PLANNED with auth contracts UNSPECIFIED and no operations falsely declared.
 - [x] LD01 B1 OwnerBook, 8 B2 tactical DC Managers and 8 B3 Marvel squads persisted as a separate holon blueprint hierarchy and loaded by the Control Plane from the read-only API.
 - [ ] Executable provider manifests, reviewed auth/scope contracts, tenant connections, secret references and health checks.
-- [ ] Organization/workspace provisioning and authorization verified end-to-end.
+- [ ] Organization/workspace provisioning and authorization verified end-to-end. Authenticated create/list flows and workspace-scoped structure reads are implemented in draft; hosted migration, runtime authorization tests and E2E verification remain pending.
 - [ ] Marketplace capability installation and order lifecycle connected to the frontend.
 - [ ] Production signup/email delivery and browser authentication verified.
 - [ ] E2E tests for tenant isolation, adapter permissions and install lifecycle.
+- [x] Draft tenant installation contract: workspace registry, domain/department/LD01 holon installation records, idempotency ledger and append-only installation events; frontend provisioning and install UI added, not yet deployed against the hosted backend.
 
 ## Engineering principles
 

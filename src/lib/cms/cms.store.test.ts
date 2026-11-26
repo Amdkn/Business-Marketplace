@@ -8,9 +8,10 @@
  *  - addItem refuse une collection inconnue sans toucher au store ;
  *  - un cycle add → remove laisse le store dans son état d'origine.
  *
- * Note : la persistance Supabase est volontairement absente — c'est un
- * effet de bord best-effort et le store local reste la source de vérité
- * tant que le fournisseur n'a pas confirmé (cf. cms.store.ts).
+ * Les méthodes Persisted sont strictes pour les tenants Marketplace.
+ * L'unique exception est TENANT_DEMO_COACH, explicitement memory-only :
+ * les composants génériques conservent leur contrat async sans envoyer
+ * de lignes de démonstration vers le workspace réel.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCmsStore } from './cms.store';
@@ -39,6 +40,7 @@ const tasksDef: CmsCollectionDef = {
  *  assertions in the tests below. */
 function reset(): void {
   useCmsStore.setState({
+    activeTenantId: TENANT_DEMO_COACH,
     collections: {},
     items: {},
     collectionsByTenant: {
@@ -122,6 +124,39 @@ describe('cms.store — couche d\'écriture', () => {
     expect(removed.ok).toBe(true);
     const final = useCmsStore.getState().items['tasks'] ?? [];
     expect(final.map((i) => i.id)).toEqual(['t1']);
+  });
+
+  it('addItemPersisted reste local-only pour le tenant de démonstration', async () => {
+    useCmsStore.getState().setTenant(TENANT_DEMO_COACH);
+    useCmsStore.getState().registerCollection(tasksDef, []);
+    const result = await useCmsStore.getState().addItemPersisted('tasks', {
+      label: 'Demo task',
+      when: 'today',
+      group: 'today',
+      done: false,
+    });
+    expect(result.ok).toBe(true);
+    expect(useCmsStore.getState().items['tasks']).toHaveLength(1);
+  });
+
+  it('updateItemPersisted conserve le contrat async local-only en démo', async () => {
+    useCmsStore.getState().setTenant(TENANT_DEMO_COACH);
+    useCmsStore.getState().registerCollection(tasksDef, [
+      { id: 'demo-task', label: 'Before', when: 'today', group: 'today', done: false },
+    ]);
+    const result = await useCmsStore.getState().updateItemPersisted('tasks', 'demo-task', { done: true });
+    expect(result.ok).toBe(true);
+    expect(useCmsStore.getState().items['tasks']?.[0]?.done).toBe(true);
+  });
+
+  it('removeItemPersisted conserve le contrat async local-only en démo', async () => {
+    useCmsStore.getState().setTenant(TENANT_DEMO_COACH);
+    useCmsStore.getState().registerCollection(tasksDef, [
+      { id: 'demo-task', label: 'Delete me', when: 'today', group: 'today', done: false },
+    ]);
+    const result = await useCmsStore.getState().removeItemPersisted('tasks', 'demo-task');
+    expect(result.ok).toBe(true);
+    expect(useCmsStore.getState().items['tasks']).toHaveLength(0);
   });
 
   it('updateItem reste intact (régression — la nouvelle voie ne casse pas l\'ancienne)', () => {

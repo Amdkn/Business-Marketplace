@@ -1977,3 +1977,53 @@ All six SQL suites were executed against the connected hosted project after the 
 - GitHub combined status on this head still reports the Vercel context as failure with target `build-rate-limit`; this is a platform quota signal, not a verified application build failure. No GitHub Actions workflow run was returned for this commit.
 - Do not retry the deployment API until the 24-hour quota window resets or the team resolves its Vercel deployment allowance. No plan, billing or team security settings were changed.
 - PR #1 remains OPEN / DRAFT and mergeable. Do not mark frontend deployment or Day 1–3 E2E acceptance complete.
+
+
+### 13.38 Canonical agent provisioning, active-delegation integrity and People UI closure — 2026-11-26
+
+This checkpoint supersedes the earlier v28/read-only descriptions in sections 13.35–13.37.
+
+**Canonical identity and provisioning**
+- identity.agent_principals remains the single canonical AI-agent identity registry. A stable (organization_id, agent_key) identifies one principal across workspaces.
+- register_agent is now idempotent for an existing ACTIVE principal: it upserts principal metadata, expires stale scope delegations, and updates an existing active delegation or creates one for the requested organization/workspace scope. It no longer attempts to create a second principal when the same agent key is assigned to another workspace.
+- Added unique partial index identity.agent_delegations_one_active_scope_uidx to enforce at most one ACTIVE, non-revoked delegation per principal and scope. It includes organization/workspace/area/etc. scope identity and handles organization scope with a null-safe key.
+- revoke_agent_delegation remains scoped to the exact workspace delegation; revocation does not delete the canonical principal.
+
+**Hosted migration and mission integrity**
+- Added source migration supabase/migrations/20261126103000_agent_assignment_integrity.sql and applied hosted migration 20261126103000_agent_assignment_integrity successfully.
+- The migration adds the unique active-scope delegation index and strengthens workspace_data.validate_mission_agent_delegation(): a mission assignment now requires both an ACTIVE canonical principal and an ACTIVE, in-window, non-revoked WORKSPACE delegation matching the mission's organization and workspace.
+- The trigger function remains SECURITY DEFINER with a pinned search_path; direct EXECUTE is revoked from PUBLIC, anon and authenticated. The browser continues to use RLS-protected workspace_data.missions, not direct identity-table access.
+- workspace_data.missions RLS remains: active workspace membership for read; identity.can_manage_workspace for writes; INSERT also binds created_by_user_id=auth.uid(). The assignment trigger adds the agent-authority check that the row policy alone does not express.
+
+**Marketplace API deployment**
+- Updated supabase/functions/marketplace-api/index.ts with idempotent canonical principal/delegation registration.
+- Deployed marketplace-api as ACTIVE v29, verify_jwt=true. The deployed function inventory reports v29 after deployment.
+- API action contracts present in source: list_workspace_members, list_workspace_agents, register_agent and revoke_agent_delegation. The list endpoints are workspace-scoped; identity tables remain private and are not granted broad browser access.
+
+**Garden and Web Desktop People**
+- Garden agents.repo.ts now fails closed when Supabase is unconfigured instead of returning an empty array that could be mistaken for a genuinely empty directory.
+- Garden AgentRootView provides canonical workspace agent listing, registration/upsert, and delegation revocation. Registration/revocation buttons serialize submissions. Runtime metrics remain explicitly unavailable; no load, latency, success rate, token count or task count is fabricated.
+- Web Desktop people.repo.ts reads human workspace memberships and canonical workspace-agent projections from the Marketplace API and performs workspace-scoped list/create/delete against workspace_data.missions.
+- Web Desktop PeopleApp.tsx Team is sourced from active human workspace memberships; Agents/Squads use canonical workspace delegations; Cadence reads persisted missions and supports creation/deletion. The agent filter and assignment selector use principal IDs, and only ACTIVE principals can be newly assigned.
+- Overview labels now describe workspace governance and planned missions, not live standup or runtime telemetry. The schedule grid represents persisted planned mission density only.
+- ApprovalsView.tsx now populates agent options from ACTIVE canonical workspace delegations rather than the old hardcoded fleet/CMS people_agents fixtures. Its scenario/proposal drafts remain browser-local (Zustand/localStorage); approved/rejected decision records are written to the workspace approval_decisions collection. This is explicitly disclosed in the UI and is not yet a durable server-side proposal queue.
+
+**Verification performed against the hosted project**
+- Applied migration 20261126103000_agent_assignment_integrity successfully; the migration appears in the hosted migration ledger.
+- Re-executed supabase/tests/marketplace_interface_persistence.sql after the migration; the assertion block returned no exception.
+- Ran a rollback-only authenticated SQL integration transaction using the real tenant's B1_CEO user: inserted a temporary ACTIVE principal + WORKSPACE delegation, switched to PostgreSQL role authenticated with the real JWT subject, inserted an assigned mission through workspace_data.missions, and observed it in the authenticated SELECT (1 row). Transaction rolled back.
+- Ran a rollback-only negative test: a SUSPENDED principal with an otherwise active workspace delegation was rejected by the mission trigger.
+- Ran a rollback-only uniqueness test: a second ACTIVE delegation for the same principal/scope was rejected by the unique index.
+- Follow-up hosted counts remain 0 agent principals / 0 agent delegations / 0 missions. No tenant sample data was left behind.
+- The deployed Edge Function inventory reports marketplace-api ACTIVE v29, JWT verification enabled.
+
+**Acceptance boundary / unresolved**
+- No authenticated browser session/JWT was available to invoke the Edge actions from Garden/Web Desktop. The SQL transaction validates the mission RLS/trigger path under the authenticated database role, but it is not a browser E2E.
+- The Edge Function log query returned no matching invocation rows in the checked window; do not claim the new register/list/revoke HTTP flows were live-tested.
+- TypeScript typecheck, Vitest, Vite production build, Playwright/browser smoke test and frontend deployment were not run in this session. The remote Desktop Commander device was offline, so there was no local checkout available for npm run verify.
+- Latest checked commit: e33a8cea17b216aee2fda7e60f5bb020d63d3102 — https://github.com/Amdkn/Business-Marketplace/commit/e33a8cea17b216aee2fda7e60f5bb020d63d3102.
+- GitHub combined status still reports Vercel failure with target build-rate-limit; this is the known deployment quota gate, not evidence of a source compilation error. No GitHub Actions workflow run was returned for this commit.
+- PR #1 remains OPEN / DRAFT. Day 1–3 remain OPEN until frontend typecheck/build and authenticated browser CRUD plus cross-workspace denial are verified.
+- The current SQL security advisor also reports RLS-enabled/no-policy INFO findings across private schemas and leaked-password protection disabled (WARN). Review those as a separate platform-hardening task; do not add broad authenticated grants merely to silence the private-schema INFO findings.
+
+**Continuation rule:** stay in Amdkn/Business-Marketplace, branch foundation/marketplace-product-identity, Supabase project swegnrvaxxgfrnshdpxx. Next work is (1) complete browser-authenticated API and cross-workspace tests when a browser JWT is available, (2) execute frontend typecheck/Vitest/build when a local checkout or CI runner is available, (3) continue the same source-backed CRUD audit across the remaining Business departments. Do not seed fake agents or claim live runtime telemetry.

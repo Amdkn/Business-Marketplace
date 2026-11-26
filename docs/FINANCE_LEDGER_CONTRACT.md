@@ -134,3 +134,6 @@ The SQL boundary rechecks active membership and Finance roles (S0, B1, B2, B2.2)
 ### Fee policy activation concurrency hardening
 
 A follow-up migration serializes activations on the logical policy identity (owner organization + policy key + scope + scope organization + currency), rather than locking only by policy row ID. This closes the race where two different draft versions could otherwise be activated concurrently with overlapping effective windows. The active-window overlap check runs inside that shared advisory lock.
+
+
+Fee-policy FK indexes and concurrency: migration `finance_fee_policy_fk_indexes` adds covering indexes for the policy creator and optional seller-scope foreign keys. Migration `fee_policy_activation_serialization` locks on owner organization + policy key + scope + seller scope + currency before checking effective-window overlap. Finance now has zero unindexed foreign keys.

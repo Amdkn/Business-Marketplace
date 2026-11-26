@@ -69,7 +69,7 @@ export function ClientsApp() {
   /** Create a workspace client with an explicit ticket amount and currency. */
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerName, setComposerName] = useState('');
-  const [composerSegment, setComposerSegment] = useState('Citadelle — high ticket');
+  const [composerSegment, setComposerSegment] = useState('');
   const [composerTicket, setComposerTicket] = useState('');
   const [composerCurrency, setComposerCurrency] = useState('');
   const [savingClient, setSavingClient] = useState(false);
@@ -95,19 +95,19 @@ export function ClientsApp() {
     try {
       const result = await addItem('clients', {
         name,
-        segment: composerSegment.trim() || 'Citadelle — high ticket',
+        segment: composerSegment.trim() || 'Unassigned',
         ticket,
         currency,
         openThreads: 0,
         nextSession: 'Not scheduled',
-        health: 100,
+        health: null,
         onboardingStep: '1 / 7',
         status: 'Onboarding',
       });
       if (result.ok) {
         addToast({ source: 'Clients', type: 'success', message: `Client enregistré : ${name}` });
         setComposerName('');
-        setComposerSegment('Citadelle — high ticket');
+        setComposerSegment('');
         setComposerTicket('');
         setComposerCurrency('');
         setComposerOpen(false);
@@ -121,7 +121,7 @@ export function ClientsApp() {
 
   const cancelComposer = (): void => {
     setComposerName('');
-    setComposerSegment('Citadelle — high ticket');
+    setComposerSegment('');
     setComposerTicket('');
     setComposerCurrency('');
     setComposerOpen(false);
@@ -332,7 +332,7 @@ export function ClientsApp() {
                     if (e.key === 'Enter') submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
-                  placeholder="Citadelle — high ticket"
+                  placeholder="Unassigned segment"
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
                   style={{
                     background: 'var(--theme-bg)',

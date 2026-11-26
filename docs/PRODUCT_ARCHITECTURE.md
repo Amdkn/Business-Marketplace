@@ -261,3 +261,39 @@ A feature is not complete because it renders. For every vertical slice:
 - automated tests cover the critical path;
 - production deployment is checked against the actual route and backend;
 - demo fixtures are visibly labeled and cannot be mistaken for live data.
+
+
+## 13. Tenant installation tranche — draft implementation status
+
+The next vertical slice separates global blueprints from organization-owned instances.
+
+### Implemented in the current draft branches
+
+- `enterprise.workspaces`: organization-owned workspace records with stable keys and lifecycle state.
+- `areas.domain_installations`: workspace-scoped instances of Areas OS domain blueprints.
+- `enterprise.department_installations`: workspace-scoped instances of Marketplace operating department blueprints.
+- `areas.holon_installations`: optional LD01 B1/B2/B3 structural instances, attached to an installed LD01 domain. B2 and B3 preserve the canonical direct-to-B1 parent relation.
+- `enterprise.structure_installation_requests`: workspace-scoped idempotency ledger and immutable result snapshot.
+- `enterprise.structure_installation_events`: append-only event trail for workspace creation and structure installation.
+- Authenticated API actions: `list_workspaces`, `create_workspace`, `list_workspace_structure`, and `install_structure`.
+- Control Plane Workspaces view: organization selection/creation, workspace creation, separate Areas OS and department selection, optional LD01 holarchy installation, and tenant-installed inventory.
+
+### Invariants
+
+1. A workspace belongs to one organization.
+2. A domain, department or holon installation belongs to one workspace and one organization.
+3. A holon installation requires an installed LD01 domain; all 17 canonical holons are installed as one optional structural pack.
+4. Replaying an idempotency key with the same payload returns the original result; reusing it with a different payload is rejected.
+5. Installation events are append-only.
+6. All tenant operations require a verified Supabase Auth user and active organization membership; write operations additionally require an active organization role.
+7. Global blueprints are not auto-installed into any tenant.
+
+### Not yet verified / intentionally deferred
+
+- Hosted migration application and migration-history verification.
+- Live browser execution against the connected Marketplace Supabase project.
+- Automated tests for cross-tenant access denial, duplicate/concurrent installation and idempotency replay.
+- Per-installation owner assignment and explicit dependency-edge management.
+- Capability linking and executable agent/runtime provisioning.
+
+The schema/API/UI changes are committed to the open draft PRs only. They have not been applied to the hosted database, and no production deployment has been promoted.

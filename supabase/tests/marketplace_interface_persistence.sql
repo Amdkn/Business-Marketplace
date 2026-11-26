@@ -7,7 +7,10 @@ declare
     'marketplace_listings','product_items','product_releases','growth_channels','growth_experiments','deals','invoices',
     'contracts','policies','session_notes','legal_ai_act_checks','legal_frameworks','legal_controls',
     'legal_compliance_policies','legal_evidence','legal_risks','legal_vendors','legal_gaps','personas','memory','codex',
-    'approval_decisions','squads','content','documents','legal_documents','missions','growth_acquisition','growth_partenariats','product_mvps','growth_strategie','growth_aeo','product_rankings','product_launches','product_ideas'
+    'approval_decisions','squads','content','documents','legal_documents','missions','growth_acquisition','growth_partenariats','product_mvps','growth_strategie','growth_aeo','product_rankings','product_launches','product_ideas',
+    'plancher_marges','courbe_demande','budget_tokens','formes_prix','dods','comparators','exposed_actions','processes','benchmarks',
+    'audit_arbitrage','audit_contexte','audit_donnees','audit_automatabilite','audit_arbitrage_roi',
+    'it_journal','it_loops','it_drift','it_evals','settings_integrations'
   ];
   t text;
   n integer;
@@ -42,8 +45,8 @@ begin
   if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name='activity_events' and column_name='workspace_id') <> 'NO' then
     raise exception 'activity_events.workspace_id must be required';
   end if;
-  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 47 then
-    raise exception 'workspace_data table count differs from 46 collections + activity_events';
+  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 66 then
+    raise exception 'workspace_data table count differs from 65 collections + activity_events';
   end if;
   if not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='currency')
      or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='client_id')

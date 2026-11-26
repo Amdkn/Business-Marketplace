@@ -1,7 +1,7 @@
 // src/components/views/mission-control/MissionScheduleView.tsx
 // Hermes — Schedule sub-page (route /agent-root/schedule)
 // Week schedule: 7-day grid showing mission density per agent. Lightweight
-// server-free version — computes from existing omk_saas.missions + agents.
+// server-free version — computes from current tenant mission and agent views.
 
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Hexagon } from 'lucide-react';

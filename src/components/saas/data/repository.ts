@@ -153,7 +153,7 @@ export function makeRepository<T extends { id: string }>(collection: string, see
   return {
     async list() { const orgId=getActiveOrgId(); return IS_SAAS && orgId ? read().filter(x => (x as unknown as {orgId?:string}).orgId===orgId) : read(); },
     async findById(id) { return read().find(x=>x.id===id) ?? null; },
-    async create(item) { const orgId=getActiveOrgId(); assertOrgIdForWrite(orgId,collection); const created={...item,id:item.id??crypto.randomUUID(),orgId} as T; write([...read(),created]); return created; },
+    async create(item) { const orgId=getActiveOrgId(); assertOrgIdForWrite(orgId,collection); const created={...item,id:item.id??crypto.randomUUID(),orgId} as unknown as T; write([...read(),created]); return created; },
     async update(id,patch) { const items=read(),i=items.findIndex(x=>x.id===id); if(i<0) throw new Error(`[${collection}] not found: ${id}`); const next=[...items]; next[i]={...next[i],...patch}; write(next); return next[i]; },
     async remove(id) { write(read().filter(x=>x.id!==id)); },
   };

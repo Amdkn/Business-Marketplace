@@ -101,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <h2 className="font-bold text-slate-900 tracking-tight leading-tight truncate">OMK Services</h2>
+              <h2 className="font-bold text-slate-900 tracking-tight leading-tight truncate">A'Space Marketplace</h2>
               <span className="text-xs text-slate-500 font-medium tracking-wide">BUSINESS OS</span>
             </div>
           )}

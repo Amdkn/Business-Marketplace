@@ -1539,3 +1539,17 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - The five SQL regression suites were executed after the chart provisioning and test assertions were added; all completed without assertion exceptions. The role-helper-only Edge Function correction was then deployed; SQL schema and grants were unchanged.
 - Health advisor: no findings. Security advisor: 39 INFO RLS-enabled/no-policy notices; private engine schemas intentionally have no browser grants. Performance advisor findings are informational (61 unindexed FKs elsewhere and 66 unused indexes); Finance foreign keys remain covered by indexes. No blind changes were made.
 - Live Auth users and organizations remain zero. No chart instances, payments or financial transactions were fabricated. Real authenticated provisioning remains blocked until an authorized tenant exists.
+
+### 13.16 Versioned Fee Policy Engine — 2026-11-26
+
+- Added live migration `finance_fee_policy_engine`, source tracked at `supabase/migrations/20261126073000_finance_fee_policy_engine.sql`.
+- Added private `finance.fee_policies` and `finance.order_fee_snapshots`; both have RLS enabled and no browser-role privileges.
+- Fee policies support versioned policy keys, platform-wide or seller-specific scope, optional currency, basis-point percentage, fixed fee, optional floor/cap, explicit rounding scale and effective windows.
+- Policy lifecycle is Draft → Active → Retired. Activated policy terms are immutable; activation rejects overlapping windows for the same owner/key/scope/currency.
+- Added immutable one-per-order fee snapshots recording gross, policy/version, rate, fixed fee, platform fee, seller net, currency and calculation details. Reapplying the same policy is idempotent; a different policy cannot overwrite an existing snapshot.
+- Calculation: round(gross × rate_bps / 10,000 + fixed, scale), apply floor/cap, cap fee at gross, seller net = gross − fee. Taxes and payment processing are explicitly excluded.
+- No default commission percentage is seeded. No fee policy, order or snapshot is fabricated.
+- Added authenticated Edge actions `create_fee_policy`, `activate_fee_policy`, `apply_order_fee_policy`; deployed `marketplace-api` ACTIVE v21 with `verify_jwt=true`.
+- Structural and arithmetic SQL assertions passed: private grants, RLS, immutability triggers, fee cap, seller net and double-count conservation.
+- Tenant E2E remains blocked: hosted project has zero organizations and zero Auth users. The new actions cannot be exercised with real tenant membership until identity onboarding is connected.
+- Next: connect the fee snapshot to payment capture facts and journal posting; define the seller-payable/platform-revenue accounting event and then provider adapter/webhook settlement.

@@ -42,6 +42,9 @@ function dealDetail(deal: Record<string, unknown>): DetailItem {
   return {
     id: String(deal.id),
     kind: 'deal',
+    clientId: String(deal.clientId ?? ''),
+    currency: String(deal.currency ?? ''),
+    amount: Number(deal.value ?? 0),
     title,
     subtitle: String(deal.offer ?? ''),
     status: String(deal.stage ?? 'open'),

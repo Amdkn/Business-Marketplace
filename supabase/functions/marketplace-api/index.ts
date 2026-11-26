@@ -222,7 +222,7 @@ async function listWorkspaceAgents(user: User, body: Record<string, unknown>) {
     return await tx`
       SELECT ap.id, ap.agent_key, ap.display_name, ap.agent_class, ap.runtime,
         ap.principal_status, ap.created_at,
-        d.id AS delegation_id, d.id AS delegation_id, d.permission_codes, d.starts_at, d.expires_at
+        d.id AS delegation_id, d.permission_codes, d.starts_at, d.expires_at
       FROM identity.agent_principals ap
       JOIN LATERAL (
         SELECT d.id, d.permission_codes, d.starts_at, d.expires_at

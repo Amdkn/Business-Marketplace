@@ -2534,3 +2534,29 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Vercel has a documentation-only deployment queued for an intermediate docs commit `d17070b`. Do not confuse that queue with the already READY application Preview on `b7c2b29`; no application code changed after the verified app commit.
 - The latest docs reconcile the earlier stale build-rate-limit/QUEUED statements and correct the Day 1 migration-source count (69 ledger entries vs 68 exact sources plus one catalog-derived reconstruction).
 - Remaining gates are unchanged: authenticated browser acceptance; real OAuth and PSP lifecycle; tenant installations and agent runtime; backup/restore (none on current Free project); plan-gated leaked-password protection; load/failure and release/rollback drills.
+
+## 13.57 — OAuth scope parsing defect fixed in deployed Edge Functions — 2026-11-26 21:08 UTC
+
+### Defect found
+- Audited the live Edge Function sources, not just repository copies.
+- Both `adapter-oauth-callback` and `adapter-worker.refreshOAuthSecret` used an over-escaped regex `split(/\\\\s+/)`. It matches literal backslash-s, not normal whitespace. Standard provider response `scope=openid email profile` could therefore be parsed as a single token and rejected as `OAUTH_SCOPE_ESCALATION_REJECTED`.
+- This was a genuine OAuth round-trip blocker that the prior 548-test suite did not cover.
+
+### Fix and live deployment
+- Repository callback corrected to `split(/\\s+/)`; deployed as **adapter-oauth-callback v2**, ACTIVE.
+- Repository worker corrected identically; deployed as **adapter-worker v8**, ACTIVE.
+- Both functions keep their prior `verify_jwt=false` settings intentionally: callback uses one-time SHA-256 state/expiry/consumption plus PKCE and provider host allowlist; worker checks the exact service-role bearer secret before claiming jobs.
+- Retrieved both deployed functions after deployment. Complete deployed `index.ts` content matches the corresponding repository file exactly.
+- Added two Vitest regression checks in `src/lib/adapters/oauth-encoding.test.ts`: source-level assertion against the broken regex in both functions, plus parsing of scopes separated by spaces, tabs and newlines.
+
+### Verification limitation
+- Latest code commit containing the new tests: `33e20d9e5bcc1eb84a6f30cda517278575d2d669`.
+- Vercel's latest available Preview build was commit `d17070b`, before these OAuth changes; it passed 548/548 tests, typechecks, Vite build and 102/102 runtime benchmarks.
+- GitHub Actions returned no workflow run for `33e20d9`.
+- A manual Vercel deployment request for `33e20d9` returned HTTP 402 `api-deployments-free-per-day` with a 24-hour retry window. No further retries; do not claim the new two tests passed.
+- The deployed Edge Function code itself is live and source-parity verified. No actual provider round-trip can be completed until real OAuth credentials and an ACTIVE reviewed manifest exist. Current manifest remains DRAFT; zero tenant connections/OAuth transactions/executions.
+
+### Next
+1. Run full hosted `bun run verify` on latest application code when Vercel deployment quota resets or a Git-triggered Preview is available; expect 550 Vitest tests if no other changes.
+2. Keep Google Drive manifest DRAFT until real OAuth client credentials, callback configuration and authorization round-trip succeed.
+3. Continue with authenticated browser acceptance and the remaining provider/PSP/recovery gates.

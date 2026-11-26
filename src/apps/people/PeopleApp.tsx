@@ -38,8 +38,8 @@ import { PeopleDetailPage, type PeopleDetailItem } from './PeopleDetailPage';
 import { DAYS, HOURS } from './fleet';
 import { seedPeopleCms } from './seed';
 import {
-  listWorkspaceAgents, listScheduledMissions, createScheduledMission, deleteScheduledMission,
-  type WorkspaceAgent, type ScheduledMission, type ScheduleKind,
+  listWorkspaceAgents, listWorkspaceMembers, listScheduledMissions, createScheduledMission, deleteScheduledMission,
+  type WorkspaceAgent, type WorkspaceMember, type ScheduledMission, type ScheduleKind,
 } from './people.repo';
 
 seedPeopleCms();
@@ -660,8 +660,6 @@ function Schedule() {
 }
 
 export function PeopleApp() {
-  const teamDrill = useCollectionDrill('team', 'Team');
-  const agentsDrill = useCollectionDrill('people_agents', 'Agents');
   const personasDrill = useCollectionDrill('personas', 'Personas');
   const memoryDrill = useCollectionDrill('memory', 'Mémoire');
   const codexDrill = useCollectionDrill('codex', 'Codex');
@@ -669,13 +667,9 @@ export function PeopleApp() {
   // Brief FIX-7 — silence bruyant. Six collections consommées ici, chacune
   // avec son discriminant (`status: 'registered' | 'unknown'`) pour qu'un
   // défaut de registre ne se déguise pas en section vide.
-  const teamRead = useCmsCollectionStatus('team');
-  const agentsRead = useCmsCollectionStatus('people_agents');
   const personasRead = useCmsCollectionStatus('personas');
   const memoryRead = useCmsCollectionStatus('memory');
   const codexRead = useCmsCollectionStatus('codex');
-  const teamCount = teamRead.items.length;
-  const agentsCount = agentsRead.items.length;
   const personasCount = personasRead.items.length;
   const memoryCount = memoryRead.items.length;
   const codexCount = codexRead.items.length;
@@ -719,24 +713,39 @@ export function PeopleApp() {
   }, [detail]);
 
   const Team = () => {
+    const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+      let cancelled = false;
+      listWorkspaceMembers()
+        .then((rows) => { if (!cancelled) setMembers(rows); })
+        .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load workspace members'); });
+      return () => { cancelled = true; };
+    }, []);
     return (
-      <div className="p-7 flex flex-col gap-3">
-        <UnknownCollectionBanner collectionId="team" status={teamRead.status} appName="People" testFilePath="src/apps/people/seed-collections.test.ts" />
-        <SectionHead title="Team" subtitle="Your human squad (X-Men doctrine)" action={<Badge tone="accent">{teamCount} members</Badge>} />
-        <CollectionRepeater collectionId="team" onOpen={teamDrill.open} />
+      <div className="p-7 flex flex-col gap-4">
+        <SectionHead title="Team" subtitle="Human identities from identity.profiles and active workspace memberships." action={<Badge tone="accent">{members?.length ?? '—'} members</Badge>} />
+        {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+        {members === null && !error && <div role="status" className="rounded-xl bg-[var(--theme-surface-hover)] p-6 text-sm text-[var(--theme-text-muted)]">Loading workspace membership…</div>}
+        {members && members.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--panel-border)] p-8 text-center text-sm text-[var(--theme-text-muted)]">No active human membership is assigned to this workspace.</div>}
+        {members && members.length > 0 && <div className="overflow-x-auto rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-solid)]">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-[var(--panel-border)] text-[10px] uppercase tracking-wider text-[var(--theme-text-dim)]">
+              <tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Organization role</th><th className="px-4 py-3">Workspace role</th><th className="px-4 py-3">Membership</th></tr>
+            </thead>
+            <tbody>{members.map((member) => <tr key={member.id} className="border-b border-[var(--panel-border-subtle)] last:border-0">
+              <td className="px-4 py-3"><div className="font-semibold text-[var(--theme-text)]">{member.name}</div><div className="mt-0.5 font-mono text-[10px] text-[var(--theme-text-dim)]">{member.id}</div></td>
+              <td className="px-4 py-3 text-[var(--theme-text-muted)]">{member.roleCode ?? 'Not assigned'}</td>
+              <td className="px-4 py-3 text-[var(--theme-text-muted)]">{member.workspaceRole}</td>
+              <td className="px-4 py-3"><Badge tone={member.membershipStatus === 'ACTIVE' ? 'ok' : 'warn'}>{member.membershipStatus}</Badge></td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
       </div>
     );
   };
 
-  const Agents = () => {
-    return (
-      <div className="p-7 flex flex-col gap-3">
-        <UnknownCollectionBanner collectionId="people_agents" status={agentsRead.status} appName="People" testFilePath="src/apps/people/seed-collections.test.ts" />
-        <SectionHead title="Agents" subtitle="AI workers on the People domain" action={<Badge tone="accent">{agentsCount} configured</Badge>} />
-        <CollectionRepeater collectionId="people_agents" onOpen={agentsDrill.open} />
-      </div>
-    );
-  };
+  const Agents = () => <Fleet onAgentClick={openAgentDetail} />;
 
   const Personas = () => {
     return (
@@ -816,8 +825,6 @@ export function PeopleApp() {
     drill: { openId: string | null; open: (id: string) => void; close: () => void };
     collectionId: string;
   }> = [
-    { drill: teamDrill,     collectionId: 'team' },
-    { drill: agentsDrill,   collectionId: 'people_agents' },
     { drill: personasDrill, collectionId: 'personas' },
     { drill: memoryDrill,   collectionId: 'memory' },
     { drill: codexDrill,    collectionId: 'codex' },

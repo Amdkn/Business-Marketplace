@@ -3,7 +3,7 @@
 // data plane used by the Web Desktop CMS. No legacy dashboard schema fallback.
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 import { IS_SAAS } from '../config/mode';
-import { getActiveOrgId, assertOrgIdForWrite } from '../lib/tenant';
+import { getActiveOrgId, getActiveWorkspaceId, assertOrgIdForWrite } from '../lib/tenant';
 
 export interface Repository<T extends { id: string }> {
   list(): Promise<T[]>;
@@ -72,30 +72,40 @@ export function makeRepository<T extends { id: string }>(collection: string, see
     const table = () => supabase.schema('workspace_data').from(shape.table);
     const tenant = () => {
       const orgId = getActiveOrgId();
+      const workspaceId = getActiveWorkspaceId();
       assertOrgIdForWrite(orgId, collection);
-      return orgId;
+      if (!workspaceId) {
+        throw new Error(`[${collection}] Cannot access tenant data without one active workspace membership.`);
+      }
+      return { orgId, workspaceId };
     };
     return {
       async list() {
-        const orgId = getActiveOrgId();
-        if (!orgId) return [];
-        const { data,error } = await table().select('*').eq('organization_id',orgId).order('created_at',{ascending:false});
+        const { orgId, workspaceId } = tenant();
+        const { data,error } = await table().select('*')
+          .eq('organization_id',orgId)
+          .eq('workspace_id',workspaceId)
+          .order('created_at',{ascending:false});
         if (error) throw new Error(`[${collection}] ${error.message}`);
         return (data ?? []).map(row => mapper.fromDb(row as Record<string,unknown>));
       },
       async findById(id) {
-        const orgId = getActiveOrgId();
-        if (!orgId) return null;
-        const { data,error } = await table().select('*').eq('organization_id',orgId).eq('id',id).maybeSingle();
+        const { orgId, workspaceId } = tenant();
+        const { data,error } = await table().select('*')
+          .eq('organization_id',orgId)
+          .eq('workspace_id',workspaceId)
+          .eq('id',id)
+          .maybeSingle();
         if (error) throw new Error(`[${collection}] ${error.message}`);
         return data ? mapper.fromDb(data as Record<string,unknown>) : null;
       },
       async create(item) {
-        const orgId = tenant();
+        const { orgId, workspaceId } = tenant();
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) throw new Error(`[${collection}] authenticated user unavailable`);
         const row = mapper.toDb(item);
         row.organization_id = orgId;
+        row.workspace_id = workspaceId;
         row.created_by_user_id = user.id;
         if (!item.id) delete row.id;
         const { data,error } = await table().insert(row).select().single();
@@ -103,20 +113,32 @@ export function makeRepository<T extends { id: string }>(collection: string, see
         return mapper.fromDb(data as Record<string,unknown>);
       },
       async update(id,patch) {
-        const orgId = tenant();
-        const { data: current,error: readError } = await table().select('*').eq('organization_id',orgId).eq('id',id).maybeSingle();
+        const { orgId, workspaceId } = tenant();
+        const { data: current,error: readError } = await table().select('*')
+          .eq('organization_id',orgId)
+          .eq('workspace_id',workspaceId)
+          .eq('id',id)
+          .maybeSingle();
         if (readError) throw new Error(`[${collection}] ${readError.message}`);
         if (!current) throw new Error(`[${collection}] not found: ${id}`);
         const merged = { ...mapper.fromDb(current as Record<string,unknown>), ...patch } as Partial<T>;
         const row = mapper.toDb(merged);
         delete row.id; delete row.organization_id; delete row.created_by_user_id;
-        const { data,error } = await table().update({ ...row, updated_at:new Date().toISOString() }).eq('organization_id',orgId).eq('id',id).select().single();
+        const { data,error } = await table().update({ ...row, updated_at:new Date().toISOString() })
+          .eq('organization_id',orgId)
+          .eq('workspace_id',workspaceId)
+          .eq('id',id)
+          .select()
+          .single();
         if (error) throw new Error(`[${collection}] ${error.message}`);
         return mapper.fromDb(data as Record<string,unknown>);
       },
       async remove(id) {
-        const orgId = tenant();
-        const { error } = await table().delete().eq('organization_id',orgId).eq('id',id);
+        const { orgId, workspaceId } = tenant();
+        const { error } = await table().delete()
+          .eq('organization_id',orgId)
+          .eq('workspace_id',workspaceId)
+          .eq('id',id);
         if (error) throw new Error(`[${collection}] ${error.message}`);
       },
     };

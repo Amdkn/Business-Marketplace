@@ -904,6 +904,73 @@ async function provisionFinanceChartOfAccounts(user: User, body: Record<string, 
   });
 }
 
+
+function financeDecimal(value: unknown, field: string, nullable = false): string | null {
+  if (nullable && (value === undefined || value === null || value === '')) return null;
+  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value)) throw new Error(\`Invalid \${field}\`);
+  return value;
+}
+function financeInteger(value: unknown, field: string, fallback: number, min: number, max: number): number {
+  const n = value === undefined ? fallback : value;
+  if (!Number.isInteger(n) || (n as number) < min || (n as number) > max) throw new Error(\`Invalid \${field}\`);
+  return n as number;
+}
+async function createFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const policyKey = requiredString(body.policy_key, 'policy_key', 80);
+  const version = financeInteger(body.version, 'version', 1, 1, 1000000);
+  const policyName = requiredString(body.policy_name, 'policy_name', 160);
+  const scopeType = requiredString(body.scope_type, 'scope_type', 32);
+  if (!['PLATFORM','SELLER_ORGANIZATION'].includes(scopeType)) throw new Error('Invalid scope_type');
+  const scopeOrgId = body.scope_organization_id === undefined || body.scope_organization_id === null
+    ? null : requiredString(body.scope_organization_id, 'scope_organization_id');
+  if ((scopeType === 'PLATFORM' && scopeOrgId !== null) || (scopeType === 'SELLER_ORGANIZATION' && scopeOrgId === null)) throw new Error('Invalid scope_organization_id for scope_type');
+  const currency = body.currency === undefined || body.currency === null || body.currency === ''
+    ? null : requiredString(body.currency, 'currency', 3).toUpperCase();
+  if (currency !== null && !/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  const rateBps = financeInteger(body.fee_rate_bps, 'fee_rate_bps', 0, 0, 10000);
+  const fixed = financeDecimal(body.fixed_fee_amount ?? '0', 'fixed_fee_amount')!;
+  const minimum = financeDecimal(body.minimum_fee_amount, 'minimum_fee_amount', true);
+  const maximum = financeDecimal(body.maximum_fee_amount, 'maximum_fee_amount', true);
+  const roundingScale = financeInteger(body.rounding_scale, 'rounding_scale', 2, 0, 6);
+  const effectiveFrom = body.effective_from === undefined ? new Date().toISOString() : requiredString(body.effective_from, 'effective_from', 64);
+  const effectiveTo = body.effective_to === undefined || body.effective_to === null
+    ? null : requiredString(body.effective_to, 'effective_to', 64);
+  if (Number(maximum ?? 'Infinity') < Number(minimum ?? '0')) throw new Error('maximum_fee_amount must be greater than or equal to minimum_fee_amount');
+  if (Number(fixed) < 0) throw new Error('Invalid fixed_fee_amount');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx\`SELECT api.create_fee_policy(
+      \${user.id}::uuid,\${ownerId}::uuid,\${policyKey},\${version}::integer,\${policyName},
+      \${scopeType},\${scopeOrgId}::uuid,\${currency}::char(3),\${rateBps}::integer,
+      \${fixed}::numeric,\${minimum}::numeric,\${maximum}::numeric,\${roundingScale}::smallint,
+      \${effectiveFrom}::timestamptz,\${effectiveTo}::timestamptz
+    ) AS policy_id\`;
+    return rows[0];
+  });
+}
+async function activateFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const policyId = requiredString(body.policy_id, 'policy_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx\`SELECT api.activate_fee_policy(\${user.id}::uuid,\${ownerId}::uuid,\${policyId}::uuid) AS policy_id\`;
+    return rows[0];
+  });
+}
+async function applyOrderFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const orderId = requiredString(body.order_id, 'order_id');
+  const policyId = requiredString(body.policy_id, 'policy_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx\`SELECT api.apply_order_fee_policy(
+      \${user.id}::uuid,\${ownerId}::uuid,\${orderId}::uuid,\${policyId}::uuid
+    ) AS fee_snapshot\`;
+    return rows[0]?.fee_snapshot;
+  });
+}
+
 async function postFinanceJournalEntry(user: User, body: Record<string, unknown>) {
   const organizationId = requiredString(body.organization_id, 'organization_id');
   const entryNumber = requiredString(body.entry_number, 'entry_number', 100);
@@ -984,6 +1051,9 @@ Deno.serve(async (req: Request) => {
       case 'create_order': data = await createOrder(user, body); break;
       case 'transition_order': data = await transitionOrder(user, body); break;
       case 'provision_finance_chart_of_accounts': data = await provisionFinanceChartOfAccounts(user, body); break;
+      case 'create_fee_policy': data = await createFeePolicy(user, body); break;
+      case 'activate_fee_policy': data = await activateFeePolicy(user, body); break;
+      case 'apply_order_fee_policy': data = await applyOrderFeePolicy(user, body); break;
       case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
       default: return response({ error: 'Unknown action', action }, 404);
     }

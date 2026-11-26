@@ -185,7 +185,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                           <div className="flex items-center gap-2 mt-1">
                             <Briefcase className="w-3 h-3 text-slate-400" />
                             <span className="text-xs text-slate-500">
-                              {safeStr(client.segment, '—')}
+                              {safeStr(client.service, '—')}
                             </span>
                           </div>
                         </div>

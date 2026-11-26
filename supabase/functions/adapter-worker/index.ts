@@ -214,7 +214,7 @@ async function refreshOAuthSecret(job: Job, config: any): Promise<Record<string,
     const expiresIn=Number(tokens.expires_in ?? 3600);
     if (!Number.isFinite(expiresIn) || expiresIn<1 || expiresIn>31536000) throw new Error('OAUTH_EXPIRY_INVALID');
     const nextScopes = typeof tokens.scope==='string' && tokens.scope.trim()
-      ? tokens.scope.trim().split(/\\s+/) : (Array.isArray(current.scopes)?current.scopes:[]);
+      ? tokens.scope.trim().split(/\s+/) : (Array.isArray(current.scopes)?current.scopes:[]);
     const allowedScopes = Array.isArray(current.scopes)?current.scopes:[];
     if (nextScopes.some((scope: string)=>!allowedScopes.includes(scope))) throw new Error('OAUTH_SCOPE_ESCALATION_REJECTED');
     const next = {

@@ -2390,3 +2390,15 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 4. Complete the PSP sandbox lifecycle with real credentials: checkout/authorization/capture/webhook/refund/payout and double-entry reconciliation.
 5. Build and exercise the real tenant installation journey, ownership/dependency/capability installs, B1/B2/B3 agent runtime, Compute/Inference/Memory/CEL services, workflows and integrated Control Tower.
 6. Run backup/restore, load/failure/recovery, security and release/rollback drills; only then evaluate Day 1, Day 2 and Day 3 acceptance gates.
+
+
+
+## 13.48 — Full GitHub Actions verification passed — 2026-11-26
+
+- Manually dispatched the repository's existing `ci.yml` workflow on branch `foundation/marketplace-product-identity` after correcting the Swarm Radar CSS tokens and the orphan CSS-variable audit.
+- First run `45854165285` on commit `31e8ce1` failed in Vitest: 11 custom properties used by `.bm-shell` and `SwarmRadar` were not recognized as declarations by the audit, and SwarmRadar lacked scoped token/animation definitions.
+- Corrected the audit to collect CSS declarations from local selector scopes, added `.swarm-radar` color/animation tokens and three keyframes, and attached the class to the radar SVG. Commit `155d0109b9f1416338778b55d17d232989cb6150`.
+- Second run `45854802714` completed SUCCESS on `155d010`. Exact steps all passed: frozen Bun install; TypeScript app+Node; TypeScript API; Vitest (53 files / 548 tests); Vite build; kernel benchmark 27/27; bridge 20/20; adapters 39/39; RBAC 16/16. Total benchmark tests 102/102.
+- This supersedes the earlier 13.47 note that Vitest was unrun. OAuth Base64URL vectors are now included in the passing Vitest suite.
+- CI success does not replace authenticated browser acceptance, provider OAuth, PSP sandbox, backup/restore or real tenant lifecycle acceptance. Vercel Preview is still older than current branch because Vercel deployment creation returned HTTP 402 `api-deployments-free-per-day` (24-hour retry).
+- PR #1 remains OPEN / DRAFT. No production alias was moved; the existing production domain still points at the old `main` deployment and is not being promoted from this unaccepted branch.

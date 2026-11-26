@@ -325,3 +325,6 @@ The Finance schema now has a versioned global template catalogue (finance.chart_
 The guarded SQL function api.provision_finance_chart_of_accounts checks active organization, membership and Finance-capable role, serializes concurrent provisioning with an advisory transaction lock, rejects code/system-key collisions and is idempotent for the same organization/currency/version. It is callable only by service_role and has a pinned SECURITY DEFINER search_path. The authenticated marketplace-api action is provision_finance_chart_of_accounts; live deployment v19 has verify_jwt=true.
 
 No organization exists in the current hosted project, so no chart instance was seeded. This is a structural capability only. The baseline is not a substitute for jurisdiction-specific statutory or tax configuration. See docs/FINANCE_LEDGER_CONTRACT.md.
+
+
+Finance action authorization is separated from the general organization-role helper. The dedicated Finance gate accepts S0 Sovereign, B1 CEO, B2 Manager and B2.2 Treasury roles, and the SQL functions repeat the membership/role check. The active Marketplace API deployment is v20.

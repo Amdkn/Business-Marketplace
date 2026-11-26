@@ -85,6 +85,7 @@ export function SalesItemDetail(props: ItemDetailProps) {
 
     const existingClient = clientsItems.find((client) =>
       String(client.name ?? '').trim().toLowerCase() === clientName.toLowerCase());
+    let clientId = existingClient ? String(existingClient.id) : '';
     if (!existingClient) {
       const clientResult = await addItem('clients', {
         name: clientName,
@@ -100,11 +101,17 @@ export function SalesItemDetail(props: ItemDetailProps) {
         addToast({ source: 'Sales', type: 'warning', message: `Client non créé : ${clientResult.error ?? 'erreur inconnue'}.` });
         return;
       }
+      if (!clientResult.item?.id) {
+        addToast({ source: 'Sales', type: 'warning', message: 'Client creation returned no persisted record; invoice was not created.' });
+        return;
+      }
+      clientId = String(clientResult.item.id);
       addToast({ source: 'Sales', type: 'success', message: `Client « ${clientName} » créé et enregistré.` });
     }
 
     const invoiceResult = await addItem('invoices', {
       client: clientName,
+      clientId,
       number: `INV-${isoMonth}-${dealId.slice(-4)}`,
       amount,
       status: 'Sent',

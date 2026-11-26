@@ -68,14 +68,14 @@ export function SalesItemDetail(props: ItemDetailProps) {
   const offerBlurb = OFFER_BLURBS[offer] ?? `Coaching engagement for ${title}. Stage: ${stage ?? 'open'}.`;
   const addToast = useShellStore((s) => s.addToast);
   const clientsItems = useCmsStore((s) => s.items['clients']) ?? [];
-  const addItem = useCmsStore((s) => s.addItem);
+  const addItem = useCmsStore((s) => s.addItemPersisted);
   /** Mark Paid · Send onboarding — wire the deal to a real invoice + client.
    *  Before, this button only pushed a toast. Now it derives an invoice number
    *  from the current ISO month, ensures the client exists (matches by
    *  case-insensitive name), and confirms each side via its own toast. */
-  const onWonOnboard = (dealId: string): void => {
+  const onWonOnboard = async (dealId: string): Promise<void> => {
     if (amount === undefined || amount <= 0) {
-      addToast({ source: 'Sales', type: 'warning', message: `Deal value is missing — cannot invoice.` });
+      addToast({ source: 'Sales', type: 'warning', message: 'Deal value is missing — cannot invoice.' });
       return;
     }
     const now = new Date();
@@ -83,10 +83,10 @@ export function SalesItemDetail(props: ItemDetailProps) {
     const isoMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const clientName = String(item['client'] ?? title).trim() || title;
 
-    // Client — ensure one exists, match case-insensitive on the name.
-    const existingClient = clientsItems.find((c) => String(c.name ?? '').trim().toLowerCase() === clientName.toLowerCase());
+    const existingClient = clientsItems.find((client) =>
+      String(client.name ?? '').trim().toLowerCase() === clientName.toLowerCase());
     if (!existingClient) {
-      const clientResult = addItem('clients', {
+      const clientResult = await addItem('clients', {
         name: clientName,
         segment: `${offer || 'Coaching'} — ${offer ? 'Citadelle high ticket' : 'coaching'}`,
         ticket: amount,
@@ -96,14 +96,14 @@ export function SalesItemDetail(props: ItemDetailProps) {
         onboardingStep: '1 / 7',
         status: 'Onboarding',
       });
-      if (clientResult.ok) {
-        addToast({ source: 'Sales', type: 'success', message: `Client « ${clientName} » créé.` });
-      } else {
+      if (!clientResult.ok) {
         addToast({ source: 'Sales', type: 'warning', message: `Client non créé : ${clientResult.error ?? 'erreur inconnue'}.` });
+        return;
       }
+      addToast({ source: 'Sales', type: 'success', message: `Client « ${clientName} » créé et enregistré.` });
     }
 
-    const invoiceResult = addItem('invoices', {
+    const invoiceResult = await addItem('invoices', {
       client: clientName,
       number: `INV-${isoMonth}-${dealId.slice(-4)}`,
       amount,
@@ -116,17 +116,29 @@ export function SalesItemDetail(props: ItemDetailProps) {
       addToast({
         source: 'Sales',
         type: 'success',
-        message: `Facture créée pour ${clientName} ($${amount.toLocaleString('en-US')}).`,
+        message: `Facture créée et enregistrée pour ${clientName} ($${amount.toLocaleString('en-US')}).`,
       });
     } else {
       addToast({ source: 'Sales', type: 'warning', message: `Facture non créée : ${invoiceResult.error ?? 'erreur inconnue'}.` });
     }
   };
-  const fireAction = (actionLabel: string, message: string, onClick?: () => void): void => {
-    if (onClick) onClick();
-    addToast({ source: 'Sales', type: 'success', message });
-    void actionLabel;
+
+  const fireAction = async (actionLabel: string, message: string, onClick?: () => void | Promise<void>): Promise<void> => {
+    if (onClick) {
+      await onClick();
+      return;
+    }
+    if (actionLabel === 'Open in Sales pipeline') {
+      addToast({ source: 'Sales', type: 'success', message });
+      return;
+    }
+    addToast({
+      source: 'Sales',
+      type: 'warning',
+      message: `${actionLabel} is not connected to a persistent Calendar/Tasks workflow yet. No record was created.`,
+    });
   };
+
   const isWon = stage?.toLowerCase().includes('won') ?? false;
 
   return (

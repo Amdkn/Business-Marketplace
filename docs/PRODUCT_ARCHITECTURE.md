@@ -51,7 +51,7 @@ Canonical tenant hierarchy:
 
 The Marketplace UI must preserve two separate taxonomic axes:
 
-### 3.1 Business Departments — B2.1 to B2.8
+### 4.1 Business Departments — B2.1 to B2.8
 
 1. B2.1 Product & IP
 2. B2.2 Growth & Distribution
@@ -64,7 +64,7 @@ The Marketplace UI must preserve two separate taxonomic axes:
 
 These eight departments describe the Marketplace business operating model and its value-producing functions.
 
-### 3.2 Areas OS mission portfolios — LD01 to LD08
+### 4.2 Areas OS mission portfolios — LD01 to LD08
 
 1. LD01 Business
 2. LD02 Finances
@@ -91,7 +91,15 @@ A domain record should eventually expose:
 - governance: policies, data classification and audit references;
 - measurement: outcomes, KPIs and health signals.
 
-## 5. Adapter contract
+## 5. Relationship to the V5 Day 1 Marketplace core
+
+The V5 [PR #56](https://github.com/Amdkn/Aspace_OS_V5/pull/56) contributes an in-memory domain engine for versioned capabilities, listings, order snapshots, guarded state transitions and idempotent order creation. Its own README explicitly marks it as non-production: no persistence, authentication, production authorization, durable audit, concurrency control, payments, escrow, payouts, refunds, tax/accounting, disputes or agent dispatch.
+
+Treat that package as a behavioral/domain reference, not as a second persistence layer. The connected Marketplace database already has the authoritative persisted contracts in `catalog.capabilities`, `catalog.capability_versions`, `catalog.listings`, `commerce.orders` and `commerce.order_events`, with server-side API functions. Future integration should reconcile the PR #56 invariants with those contracts rather than create a parallel in-memory or duplicate SQL marketplace.
+
+PR #56 also names **six market surfaces**. This Control Plane does not reinterpret or collapse those surfaces into the B2 department axis or the LD Areas OS axis. Their definitions remain a separate architectural dimension to be incorporated from the V5 source specification.
+
+## 6. Adapter contract
 
 An adapter definition is a reusable platform capability. A connection is a tenant-specific configured instance.
 
@@ -133,7 +141,7 @@ Connection state machine:
 
 Additional terminal/administrative states: `revoked`, `error`. A successful OAuth callback alone does not mean the adapter is healthy; run a scoped health check.
 
-## 6. Agent and workflow governance
+## 7. Agent and workflow governance
 
 An agent is not granted ambient access because it exists in a workspace. Every run resolves:
 
@@ -148,7 +156,7 @@ An agent is not granted ambient access because it exists in a workspace. Every r
 
 Workflow steps must support human approval, retries, idempotency keys, cancellation and compensation where a provider supports it.
 
-## 7. Tenancy and security
+## 8. Tenancy and security
 
 - Supabase Auth identifies the principal; organization membership and role bindings determine tenant access.
 - RLS protects tenant-owned records in exposed schemas.
@@ -159,7 +167,7 @@ Workflow steps must support human approval, retries, idempotency keys, cancellat
 - All cross-tenant operations require an explicit privileged policy path and audit record.
 - Demo mode is an explicit environment/product mode, never an implicit fallback that resembles a live customer workspace.
 
-## 8. Existing implementation caveats
+## 9. Existing implementation caveats
 
 The inherited frontend currently includes Coach OS concepts such as `demo-coach`, `coach-os:*` local-storage keys, Coach onboarding copy and Coach-oriented seed collections. Those are legacy implementation details, not canonical Marketplace entities.
 
@@ -172,7 +180,7 @@ Before routing real users into the inherited Desktop:
 
 Existing Marketplace UI is an integration catalog with local install toggles. It is not yet the provider adapter control plane described here.
 
-## 9. Implementation sequence
+## 10. Implementation sequence
 
 ### Wave 0 — identity and safety
 - Product naming, metadata, README and deployment identity.
@@ -204,7 +212,7 @@ Existing Marketplace UI is an integration catalog with local install toggles. It
 - Digital Garden: executive portfolio and outcomes.
 - Mobile Edge: approvals, field actions and alerts.
 
-## 10. Acceptance gates
+## 11. Acceptance gates
 
 A feature is not complete because it renders. For every vertical slice:
 

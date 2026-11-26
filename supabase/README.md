@@ -19,7 +19,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 
 ## Live cloud migration registry
 
-The connected Marketplace project reports **68 applied migration entries**, each with one canonical source file in `supabase/migrations/`. The cloud version is the database runner's application timestamp; the source filename is the authored migration identity.
+The connected Marketplace project reports **69 applied migration entries**, each with one canonical source file in `supabase/migrations/`. The cloud version is the database runner's application timestamp; the source filename is the authored migration identity.
 
 | Applied version | Cloud migration name | Canonical source file |
 |---|---|---|
@@ -91,10 +91,11 @@ The connected Marketplace project reports **68 applied migration entries**, each
 | 20261126124742 | client_activity_event_triggers | migrations/20261126120000_client_activity_event_triggers.sql |
 | 20261126124853 | client_activity_event_id | migrations/20261126120100_client_activity_event_id.sql |
 | 20261126130516 | workspace_document_storage | migrations/20261126130000_workspace_document_storage.sql |
+| 20261126131444 | revoke_finance_trigger_function_execute | migrations/20261126140000_revoke_finance_trigger_function_execute.sql |
 
 The source `20261126041718_revoke_public_execution_rls_auto_enable.sql` is a catalog-derived reconstruction of the live ACL, not a byte-identical recovery of the original SQL. It is already applied in cloud and must not be replayed.
 
-Twenty older/unapplied SQL files are preserved under `supabase/archive/legacy-unapplied-migrations/` (19 Coach OS-era files plus one duplicate Finance foundation file). They are provenance/archive material, not pending Marketplace migrations. The executable migration directory contains exactly the 68 applied Marketplace sources.
+Twenty older/unapplied SQL files are preserved under `supabase/archive/legacy-unapplied-migrations/` (19 Coach OS-era files plus one duplicate Finance foundation file). They are archive material, not pending Marketplace migrations. The executable migration directory contains exactly the 69 applied Marketplace sources.
 
 ## Current live database inventory
 
@@ -139,9 +140,18 @@ All four deployed `index.ts` files were compared with their corresponding reposi
 ## Client activity and Settings
 
 - Client create/update/delete operations now append atomic events to `workspace_data.activity_events` through a SECURITY DEFINER trigger with a pinned search path. The trigger records client ID, title and operation; the client detail timeline reads those events.
-- The authenticated rollback integration test exercised create → update → delete and verified all three event types. The transaction left no test client or activity event.
-- Settings profile display name and organization name now use authenticated `marketplace-api` actions. Profile updates are self-scoped; organization renames require `requireOrgRole`. Email remains Supabase Auth-managed and read-only.
-- `supabase/tests/marketplace_settings_write.sql` passed a rollback-only profile upsert + organization rename round-trip; the post-rollback profile and organization values were unchanged. Authenticated browser acceptance for these UI flows has not yet been run.
+- `supabase/tests/marketplace_client_activity.sql` passed under the authenticated tenant role. It exercised create → update → delete and asserted the three event types. The test transaction rolled back; no client fixture or activity event remains.
+- Settings profile display name and organization name now use authenticated `marketplace-api` actions. Profile updates are self-scoped; organization renames require `requireOrgRole`; email remains Supabase Auth-managed and read-only.
+- `supabase/tests/marketplace_settings_write.sql` passed a rollback-only profile upsert + organization rename round-trip; post-rollback values remained unchanged. Authenticated browser acceptance remains pending.
+
+## Security ACL reconciliation
+
+- All 117 application tables have RLS enabled.
+- Forty-two RLS-enabled blueprint/engine tables have no direct RLS policy. They also have no anon/authenticated table grants; they remain deny-by-default and are accessed through server-side Edge Function contracts. No blanket policies were added.
+- No anon table grants exist in the inspected application schemas. Authenticated CRUD grants are limited to workspace data, CMS content, legacy dashboard compatibility and scoped identity profile/read access; the private `areas`, `enterprise`, `catalog`, `commerce`, `integration` and `finance` tables have no browser-role table grants.
+- All inspected SECURITY DEFINER functions have a pinned `search_path`. The three Finance trigger-only functions (`guard_fee_policy_mutation`, `reject_order_fee_snapshot_mutation`, `reject_refund_fee_allocation_mutation`) had inherited direct EXECUTE grants despite being attached triggers; migration `revoke_finance_trigger_function_execute` revoked PUBLIC/anon/authenticated execution. Each remains attached to its trigger.
+- `public.rls_auto_enable()` and the client activity trigger function remain non-executable by browser/public roles.
+- The expanded `marketplace_security_baseline.sql` and `marketplace_finance_ledger.sql` tests passed after the ACL migration.
 
 ## Current tenant and provider state
 
@@ -165,13 +175,14 @@ Do not silence the RLS advisor with blanket policies. Review each schema's actua
 
 ## Delivery and acceptance boundary
 
-The backend sources, 68 live migrations, tenant-scoped document bucket and four deployed Edge Function sources are reconciled. Garden's formerly inert actions were audited; no enabled button without a handler remains in the audited Garden view set. The Growth showcase is hidden for authenticated workspaces; the Marketplace view reads the live published-listings API; IT infrastructure displays live API/database connectivity rather than fabricated telemetry; simulated agent chat replies were removed.
+The backend sources, 69 live migrations, tenant-scoped document bucket and four deployed Edge Function sources are reconciled. Garden's formerly inert actions were audited; no enabled button without a handler remains in the audited Garden view set. The Growth showcase is hidden for authenticated workspaces; the Marketplace view reads the live published-listings API; IT infrastructure displays live API/database connectivity rather than fabricated telemetry; simulated agent chat replies were removed.
 
 This does **not** certify Day 1–3 acceptance. Authenticated browser CRUD, document upload/download through the UI, cross-workspace browser denial, provider OAuth round-trip, payment-provider lifecycle, live agent inference/execution, tenant installation and the complete Control Tower remain separate end-to-end gates.
 
 The GitHub Actions workflow now installs from canonical `bun.lock` using Bun 1.3.14; `npm ci` was removed because the legacy `package-lock.json` does not describe the current dependencies. No GitHub Actions run is currently visible for the branch. The latest Vercel status is **build-rate-limit failure**; the latest frontend source has not been build-validated. The connected Amd-PC Desktop Commander remains offline, so no local typecheck/build/browser suite could be run.
 
 ## Historical implementation log
+
 
 
 ## Continuation

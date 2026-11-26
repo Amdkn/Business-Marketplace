@@ -2338,3 +2338,15 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Re-ran the enabled-button audit after the private-storage UI changes across all 31 Garden view files. No enabled `<button>` without an `onClick`/submit handler remains in the audited set.
 - Private storage and legal archive actions now have actual handlers; Marketplace purchase, e-signature and agent chat remain intentionally disabled until their external payment/e-sign/inference providers exist.
 - No storage objects or client activity events were created by the SQL tests. The authenticated browser flows remain unverified because the latest Vercel build is still rate-limited and the connected Amd-PC runner is offline.
+
+
+## 13.46 — Day 1 security inventory and Finance trigger ACL hardening
+
+- Targeted RLS/grant/function inventory completed. All 117 application tables have RLS enabled. The 42 RLS-enabled/no-policy tables are confined to private blueprint/engine schemas and have no anon/authenticated table grants; no blanket policies were added.
+- No anon table grants exist in the inspected application schemas. Authenticated CRUD grants are confined to workspace_data, content CMS, legacy dashboard compatibility and scoped identity profile/read access. No browser table grants exist on areas, enterprise, catalog, commerce, integration or finance engine tables.
+- All inspected SECURITY DEFINER functions have pinned search_path. The intended authenticated identity helper RPCs remain the only authenticated-executable SECURITY DEFINER functions in the private engine inventory.
+- Found three Finance trigger-only functions with inherited PUBLIC/anon/authenticated EXECUTE grants. Added and applied migration `20261126131444_revoke_finance_trigger_function_execute`; each function remains attached to its trigger and now reports anon=false/authenticated=false.
+- Expanded `supabase/tests/marketplace_security_baseline.sql` with these ACL assertions. Security baseline and Finance ledger SQL suites passed after migration.
+- Added `docs/evidence/day1-security-inventory.md` and `docs/evidence/day1-closure-matrix.md` to map the nine Day 1 scopes to concrete artifacts, tests and remaining acceptance.
+- Live migration ledger/source parity is now **69/69**; legacy archive remains 20 files. Supabase advisor snapshot remains 42 INFO RLS/no-policy, one WARN leaked-password protection disabled, 63 INFO unindexed foreign keys, 272 INFO unused indexes and no Health findings.
+- Day 1 remains OPEN: backup/restore drill, Auth configuration, full API/browser acceptance, complete observability and Control Tower lifecycle remain unverified. Days 2 and 3 remain OPEN.

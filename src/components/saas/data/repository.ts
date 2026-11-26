@@ -19,9 +19,9 @@ const COLLECTIONS: Record<string, { table: string; title: string; columns?: Reco
   clients: { table: 'clients', title: 'name', columns: { segment:'segment', ticket:'ticket', openThreads:'open_threads', nextSession:'next_session', health:'health', onboardingStep:'onboarding_step', status:'status' } },
   agents: { table: 'people_agents', title: 'name', columns: { codename:'codename', role:'role', status:'status', task:'task', rank:'rank', domain:'domain', squad:'squad', cadence:'cadence' } },
   documents: { table: 'documents', title: 'title', columns: { clientId:'client_id', fileUrl:'file_url', mimeType:'mime_type' } },
-  invoices: { table: 'invoices', title: 'title', columns: { amount:'amount', dueAt:'due', status:'status' } },
+  invoices: { table: 'invoices', title: 'title', columns: { clientId:'client_id', amount:'amount', currency:'currency', issuedAt:'issued_at', dueAt:'due_at', paidAt:'paid_at', status:'status' } },
   legal_docs: { table: 'legal_documents', title: 'title', columns: { clientId:'client_id', type:'document_type', category:'category', status:'document_status', fileUrl:'file_url', notes:'notes' } },
-  missions: { table: 'tasks', title: 'title', columns: { when:'when', group:'group', done:'done' } },
+  missions: { table: 'missions', title: 'title', columns: { agentId:'agent_principal_id', priority:'priority', status:'status', position:'position', notes:'notes' } },
   sales_leads: { table: 'deals', title: 'name', columns: { offer:'offer', value:'value', stage:'stage' } },
   sops: { table: 'runbooks', title: 'title', columns: { category:'category', updated:'updated', content:'steps' } },
 };

@@ -1589,3 +1589,14 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 - Deployed `marketplace-api` ACTIVE v22 with `verify_jwt=true`.
 - Expanded the Finance SQL regression suite to verify capture gates, provider-payment identity requirement, fee snapshot dependency, journal delegation, idempotency marker, API grants/search_path and zero unindexed Finance FKs. The Finance suite passed.
 - No live capture or journal was fabricated. The hosted project still has zero Auth users and organizations, and no payment provider is configured. Real capture-to-ledger E2E remains pending an actual tenant and verified provider webhook.
+
+### 13.20 Successful refund → ledger reversal — 2026-11-26
+
+- Added migration `finance_refund_fee_allocation_posting`, tracked at `supabase/migrations/20261126073500_finance_refund_fee_allocation_posting.sql`.
+- Added private `finance.refund_fee_allocations`, one immutable allocation per refund, with RLS and browser-role access revoked.
+- Added `api.post_succeeded_refund_finance_entry` and authenticated Edge action `post_succeeded_refund_finance_entry`; deployed `marketplace-api` ACTIVE v23 with `verify_jwt=true`.
+- Posting requires a provider-refund ID and SUCCEEDED refund, captured payment with provider payment ID, matching payment/order facts, original capture journal and matching immutable fee snapshot.
+- Cumulative fee reversal uses `round(original fee × cumulative successful refunds / original gross, scale)`; each posted refund receives the residual after prior allocations. This prevents partial-refund cent drift.
+- Journal allocation: debit seller payable (seller share), debit platform fee revenue (fee share), credit PSP clearing (refund gross). Zero lines are omitted. Refund journal is immutable/idempotent; original capture is never rewritten.
+- Finance SQL suite passed with refund table/RLS/grant/immutability checks, API SECURITY DEFINER/search_path/EXECUTE checks, capture dependency/idempotency assertions and cumulative rounding examples.
+- No real provider refund, refund allocation or journal has been created. Tenant/provider E2E remains blocked by zero Auth users, zero organizations and no connected provider.

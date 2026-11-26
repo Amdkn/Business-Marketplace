@@ -15,7 +15,8 @@ const ACCENT = '#db2777';
 
 export function MarketplaceApp() {
   const items = useCmsStore(s => s.items['marketplace_listings']) ?? [];
-  const updateItem = useCmsStore(s => s.updateItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const [mutatingListingId, setMutatingListingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<MarketplaceDetailItem | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
 
@@ -28,25 +29,32 @@ export function MarketplaceApp() {
   }, [detail, setWindowDetail]);
   const addToast = useShellStore(s => s.addToast);
 
-  const install = (id: string) => {
-    const current = items.find(l => l.id === id);
-    if (current && current.installed !== 'Yes') {
-      addToast({ source: 'Marketplace', type: 'success', message: `Installed ${current.name}.` });
+  const install = async (id: string): Promise<void> => {
+    if (mutatingListingId) return;
+    const current = items.find((listing) => listing.id === id);
+    if (!current || current.installed === 'Yes') return;
+    setMutatingListingId(id);
+    try {
+      const result = await updateItem('marketplace_listings', id, { installed: 'Yes' });
+      if (result.ok) addToast({ source: 'Marketplace', type: 'success', message: `Installed ${current.name} and saved to this workspace.` });
+      else addToast({ source: 'Marketplace', type: 'warning', message: result.error ?? 'Installation state was not saved.' });
+    } finally {
+      setMutatingListingId(null);
     }
-    updateItem('marketplace_listings', id, { installed: 'Yes' });
   };
 
-  /* Uninstall — symmetric to install. The audit notes the install path
-   * is canonical; we close the round-trip here so a coach can reverse
-   * a mistaken install without leaving the marketplace. The same
-   * `updateItem` write path is used, with a guard against the no-op
-   * `already uninstalled` toast that `install` already guards against. */
-  const uninstall = (id: string) => {
-    const current = items.find(l => l.id === id);
-    if (current && current.installed === 'Yes') {
-      addToast({ source: 'Marketplace', type: 'success', message: `Uninstalled ${current.name}.` });
+  const uninstall = async (id: string): Promise<void> => {
+    if (mutatingListingId) return;
+    const current = items.find((listing) => listing.id === id);
+    if (!current || current.installed !== 'Yes') return;
+    setMutatingListingId(id);
+    try {
+      const result = await updateItem('marketplace_listings', id, { installed: 'No' });
+      if (result.ok) addToast({ source: 'Marketplace', type: 'info', message: `Uninstalled ${current.name} and saved to this workspace.` });
+      else addToast({ source: 'Marketplace', type: 'warning', message: result.error ?? 'Uninstall state was not saved.' });
+    } finally {
+      setMutatingListingId(null);
     }
-    updateItem('marketplace_listings', id, { installed: 'No' });
   };
 
   /* Ouverture d'une fiche.

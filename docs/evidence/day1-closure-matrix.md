@@ -23,8 +23,8 @@ The 42 RLS-enabled tables without policies are not a reason to add broad policie
 
 ## Next closure order
 
-1. Hosted Vercel Preview `ae81359` is READY with full `bun run verify`: 548/548 Vitest tests, app/API typechecks, Vite build and 102/102 runtime benchmarks. The later IT Software Kernel truth correction is commit `2fe574f`; its latest branch Preview (`97cc906`) is queued and still needs verification.
-2. After that Preview is READY, run authenticated browser acceptance for identity, tenant isolation, Garden CRUD and private storage with the authorized session.
+1. Latest branch head `b7c2b29` is Vercel Preview READY with full `bun run verify`: 548/548 Vitest tests, app/API typechecks, Vite build and 102/102 runtime benchmarks, including the IT Software Kernel correction `2fe574f`.
+2. Run authenticated browser acceptance for identity, tenant isolation, Garden CRUD and private storage with the authorized session; the protected Preview is READY but no authenticated browser E2E has yet been completed.
 3. Complete backup/restore; the project currently reports no backups. Leaked-password protection is disabled and requires a Pro-or-higher plan per Supabase's current Auth documentation.
 4. Complete full API contract/authorization tests and extend audit events/observability.
 5. Only then evaluate the Day 1 acceptance gate. Day 2 and Day 3 remain separate full-scope gates.

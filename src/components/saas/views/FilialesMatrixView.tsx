@@ -161,7 +161,7 @@ export const FilialesMatrixView: React.FC = () => {
                 </div>
                 <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
                   <span className="text-xs text-slate-400">
-                    {f.status === 'live' ? 'Deployed Vercel · hold OMK omk-nexus-coaching-premium (W3 2026-07-03)' : 'Template · roadmap Q3 2026'}
+                    {f.status === 'live' ? 'Deployed Vercel · A’Space product portfolio (W3 2026-07-03)' : 'Template · roadmap Q3 2026'}
                   </span>
                   <ArrowRight className="w-3 h-3 text-slate-300" />
                 </div>

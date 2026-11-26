@@ -1791,3 +1791,12 @@ The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-in
 5. Perform browser-authenticated CRUD and cross-workspace denial with the real tenant JWT; only then accept the shared interface persistence tranche.
 
 **Branch:** `foundation/marketplace-product-identity`. **PR #1:** OPEN / DRAFT. Day 1–3 remain OPEN; no E2E or deployment acceptance is implied by this code tranche.
+
+
+### 13.32 Auth hydration guard and CMS runtime contract cleanup — 2026-11-26
+
+- Garden AuthProvider now catches workspace-membership hydration failures, clears the active workspace cache and releases the loading gate. The authenticated session does not silently gain a workspace; Garden repository access remains closed until exactly one active workspace is resolved.
+- Garden auth cache is cleared on both explicit sign-out and observed session loss.
+- Updated the CMS store header to reflect current Marketplace behavior: demo records belong only to the explicit local demo tenant; real tenants hydrate from workspace_data and remote failures are not demo-seeded.
+- Re-ran `supabase/tests/marketplace_interface_persistence.sql` against the hosted project after the workspace-scoping code changes; the DO assertion suite returned no exceptions. This is structural SQL verification, not browser CRUD.
+- Latest verified code changes are committed before this handoff. TypeScript/Vitest/build, live browser CRUD and deployment remain unverified and are explicitly not accepted.

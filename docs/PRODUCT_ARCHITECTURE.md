@@ -306,3 +306,14 @@ This section supersedes the historical "not yet applied" status in §13. The ten
 This is infrastructure and structural implementation evidence, not end-to-end acceptance. The live project currently has zero Auth users, organizations, memberships, workspaces, tenant installations, tenant connections, active provider manifests, published listings or orders. Google Drive remains DRAFT / PLANNED until a real authorized OAuth and provider operation round-trip passes. Day 1, Day 2 and Day 3 remain OPEN.
 
 See [`supabase/README.md`](../supabase/README.md) and the [Day 1–3 handoff](./handoffs/2026-11-26-marketplace-day1-day3-handoff.md).
+
+
+## 15. Finance & Capital — Day 2 foundation
+
+Finance & Capital is Marketplace Department 07; it is distinct from the LD02 Areas OS portfolio. The provider-neutral private `finance` schema now contains nine tables: ledger accounts, journal entries/lines, payment intents, verified-webhook receipts, refunds, payout batches/items and disputes.
+
+The foundation is applied through cloud migrations `20261126061930`, `20261126062124` and `20261126062317`. All nine tables have RLS enabled, browser schema/table access is revoked, and service_role is the only database gateway. Journal entries must balance before commit and become immutable once posted. Payment intent pricing/party facts are tied to immutable order snapshots; webhook processing requires signature verification; refunds cannot exceed the payment amount; payout items must match batch currency.
+
+This is structural infrastructure, not payment acceptance. No payment processor is configured, no provider event is being treated as a capture, and no payout or journal has been fabricated. The full contract is in [FINANCE_LEDGER_CONTRACT.md](./FINANCE_LEDGER_CONTRACT.md), with regression assertions in `supabase/tests/marketplace_finance_ledger.sql`.
+
+Still open: posting API, fee policies, provider-specific payment adapter, signed webhook verification, settlement reconciliation, payout approval/dispatch, tax policy, dispute workflow, financial read models and UI.

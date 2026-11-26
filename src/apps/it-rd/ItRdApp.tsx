@@ -50,7 +50,7 @@ export function ItRdApp() {
   /* Brief-F — couche d'écriture. Un humain doit pouvoir :
    *   1. acquitter une entrée de drift (severity = alert)
    *   2. poster une nouvelle entrée de journal (manuel + agent)
-   * Les deux passent par `addItem` / `updateItem` du store CMS. Toast
+   * Les deux passent par les mutations CMS persistées du store. Toast
    * global au résultat (succès, warning, info). */
   const addToast = useShellStore(s => s.addToast);
   const addItem = useCmsStore(s => s.addItemPersisted);

@@ -22,7 +22,7 @@ export function ClientsApp() {
   const clients = useCmsStore(s => s.items['clients']) ?? [];
   const drill = useCollectionDrill('clients', ['Active', 'Onboarding', 'Churn Risk', 'Directory']);
   const vaultDrill = useCollectionDrill('session_notes', 'IP Vault');
-  const addItem = useCmsStore(s => s.addItem);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<ClientsDetailItem | null>(null);
   const { activePage, setDetail: setWindowDetail } = useWindowPage();
@@ -66,38 +66,43 @@ export function ClientsApp() {
   const [composerName, setComposerName] = useState('');
   const [composerSegment, setComposerSegment] = useState('Citadelle — high ticket');
   const [composerTicket, setComposerTicket] = useState('1800');
+  const [savingClient, setSavingClient] = useState(false);
 
-  const submitNewClient = (): void => {
+  const submitNewClient = async (): Promise<void> => {
+    if (savingClient) return;
     const name = composerName.trim();
     if (name.length === 0) {
       addToast({ source: 'Clients', type: 'warning', message: 'Client name is required.' });
       return;
     }
-    // Ticket must be a positive number — refuse silently-defaulting values so
-    // a coach can't create a row with an unknown monthly value.
     const ticket = Number(composerTicket);
     if (!Number.isFinite(ticket) || ticket <= 0) {
       addToast({ source: 'Clients', type: 'warning', message: 'Monthly ticket must be a positive number.' });
       return;
     }
-    const result = addItem('clients', {
-      name,
-      segment: composerSegment.trim() || 'Citadelle — high ticket',
-      ticket,
-      openThreads: 0,
-      nextSession: 'Not scheduled',
-      health: 100,
-      onboardingStep: '1 / 7',
-      status: 'Onboarding',
-    });
-    if (result.ok) {
-      addToast({ source: 'Clients', type: 'success', message: `Client added: ${name}` });
-      setComposerName('');
-      setComposerSegment('Citadelle — high ticket');
-      setComposerTicket('1800');
-      setComposerOpen(false);
-    } else {
-      addToast({ source: 'Clients', type: 'warning', message: result.error ?? 'Could not add client.' });
+    setSavingClient(true);
+    try {
+      const result = await addItem('clients', {
+        name,
+        segment: composerSegment.trim() || 'Citadelle — high ticket',
+        ticket,
+        openThreads: 0,
+        nextSession: 'Not scheduled',
+        health: 100,
+        onboardingStep: '1 / 7',
+        status: 'Onboarding',
+      });
+      if (result.ok) {
+        addToast({ source: 'Clients', type: 'success', message: `Client enregistré : ${name}` });
+        setComposerName('');
+        setComposerSegment('Citadelle — high ticket');
+        setComposerTicket('1800');
+        setComposerOpen(false);
+      } else {
+        addToast({ source: 'Clients', type: 'warning', message: result.error ?? 'Could not persist client.' });
+      }
+    } finally {
+      setSavingClient(false);
     }
   };
 
@@ -364,14 +369,15 @@ export function ClientsApp() {
                 Cancel
               </button>
               <button
-                onClick={submitNewClient}
+                onClick={() => void submitNewClient()}
+                  disabled={savingClient}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Add client
+                {savingClient ? 'Saving…' : 'Add client'}
               </button>
             </div>
           </div>

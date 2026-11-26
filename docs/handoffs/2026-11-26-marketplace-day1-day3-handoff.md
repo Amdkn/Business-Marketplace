@@ -1430,3 +1430,12 @@ The migration source files are historical records for the already-applied cloud 
 - GitHub PR-triggered workflow lookup returned no runs for this commit at the last poll; the combined commit status showed Vercel `pending`. Recheck after the deployment completes.
 
 These checks establish deployed-source parity and structural SQL regression status. They do not establish authenticated tenant lifecycle, live OAuth provider operations, payments or Day 1–3 acceptance.
+
+
+### 13.6 Security ACL reconstruction and advisor triage — 2026-11-26
+
+The previously missing migration `20261126041718 / revoke_public_execution_rls_auto_enable` has been reconstructed from the live PostgreSQL catalog. The function `public.rls_auto_enable()` is SECURITY DEFINER, has a fixed `search_path=pg_catalog`, and its live ACL is `postgres=X/postgres,service_role=X/postgres`. PUBLIC, anon and authenticated have no EXECUTE privilege. The event trigger `ensure_rls` remains enabled. A canonical migration source file now reproduces this verified privilege end state; it is explicitly labelled as catalog-derived reconstruction, not byte-identical original SQL. It is already applied in the hosted project and must not be replayed.
+
+Live advisors returned 29 INFO RLS-without-policy findings, 61 INFO unindexed-FK findings, 50 INFO unused-index findings and no health findings. The RLS findings were checked against schema usage and direct grants: private Marketplace schemas are not exposed to browser roles, and policy-less internal tables have no direct anon/authenticated table grants. Existing browser-facing policies inspected on identity/content are tenant- or self-scoped. We intentionally do not add broad RLS policies merely to silence the linter. The security baseline now checks the no-browser-grant invariant for policy-less internal tables and the event-trigger function ACL.
+
+The 61 unindexed-FK notices need workload-aware prioritization; the 50 unused-index notices are expected before representative tenant traffic. Neither category should trigger blind index creation or deletion.

@@ -109,3 +109,21 @@ The platform has deployed schema and runtime foundations. It has not passed auth
 ## Continuation
 
 Use the [Day 1–3 handoff](../docs/handoffs/2026-11-26-marketplace-day1-day3-handoff.md) as the full scope and continuation contract. No Day is accepted complete until its end-to-end acceptance gate has evidence.
+
+
+## Security and performance advisor recheck — 2026-11-26
+
+The live Supabase advisors report:
+
+- 29 INFO findings for RLS-enabled tables without policies.
+- 61 INFO findings for foreign keys without covering indexes.
+- 50 INFO findings for indexes not yet used (expected on an unseeded platform; do not drop solely from this signal).
+- No health advisor findings.
+
+The RLS-without-policy findings were triaged against live schema grants. The affected internal tables are not exposed through `anon` / `authenticated` schema usage and/or have no direct browser-role table grants. The browser-facing `identity` and `content` policies inspected are scoped to the authenticated user's own profile, active organization membership, or the user's own delegation/role binding. Do not add blanket policies to silence the advisor: the internal schema gateway is the intended model. The SQL security baseline now asserts the no-browser-grant rule for policy-less internal tables and verifies that `public.rls_auto_enable()` is not executable by PUBLIC, anon or authenticated.
+
+The 61 unindexed-FK findings are performance INFO findings. Review query paths and existing composite indexes before adding any index; do not create 61 blind indexes. The 50 unused-index findings are not grounds for removal before representative workload exists.
+
+### Historical migration source reconstruction
+
+Cloud migration `20261126041718 / revoke_public_execution_rls_auto_enable` has now been reconstructed from the live function ACL. The function ACL is `postgres=X/postgres,service_role=X/postgres`; PUBLIC, anon and authenticated have no EXECUTE privilege. The event trigger `ensure_rls` remains enabled and invokes `public.rls_auto_enable()`. The canonical source tree includes `migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql` to reproduce the verified end state. This is a **catalog-derived reconstruction**, not a byte-for-byte recovery of the original migration text. It is already applied in cloud; do not replay it.

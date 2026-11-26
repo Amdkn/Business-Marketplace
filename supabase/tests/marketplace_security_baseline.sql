@@ -93,6 +93,25 @@ BEGIN
     RAISE EXCEPTION 'Provider manifest secret-key guard is missing';
   END IF;
 
-  RAISE NOTICE 'PASS: RLS, private-schema grants, SECURITY DEFINER ACL/search_path and identity read policies';
+  IF has_function_privilege('public', 'public.rls_auto_enable()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.rls_auto_enable()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'RLS event-trigger function is executable by browser/public roles';
+  END IF;
+
+  SELECT string_agg(format('%I.%I', table_schema, table_name), ', ')
+    INTO v_bad
+  FROM information_schema.role_table_grants
+  WHERE grantee IN ('anon','authenticated')
+    AND table_schema IN ('identity','areas','enterprise','catalog','commerce','integration')
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_policies pol
+      WHERE pol.schemaname=table_schema AND pol.tablename=table_name
+    );
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'RLS tables without policies have browser-role grants: %', v_bad;
+  END IF;
+
+  RAISE NOTICE 'PASS: RLS, private-schema grants, SECURITY DEFINER ACL/search_path, event-trigger ACL and tenant-scoped policies';
 END
 $test$;

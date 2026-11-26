@@ -104,6 +104,7 @@ export interface Agent {
   agentClass?: string;
   runtime?: string;
   permissionCodes?: string[];
+  delegationId?: string;
 }
 
 /**

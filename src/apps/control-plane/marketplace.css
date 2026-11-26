@@ -29,3 +29,8 @@
 .bm-domain-detail>h3+p{font-size:10px;line-height:1.65;color:#647267;margin:0}
 @media(max-width:980px){.bm-registry-toolbar{align-items:flex-start;flex-direction:column}.bm-registry-tools{width:100%;align-items:stretch}.bm-search input{width:100%}.bm-search{width:100%}}
 @media(max-width:560px){.bm-axis-switch{width:100%}.bm-axis-switch button{flex:1}.bm-domain-cards{grid-template-columns:1fr}}
+
+.bm-source-pill{display:inline-flex;margin-top:8px;padding:4px 7px;border-radius:4px;font:8px 'DM Mono',monospace;letter-spacing:.06em;background:#eef0e8;color:#788276}
+.bm-source-pill.database{background:#e3efdf;color:#4f724d}
+.bm-source-pill.loading{background:#f2eee1;color:#8c7b4f}
+.bm-source-pill.fallback{background:#f3eee7;color:#8a7258}

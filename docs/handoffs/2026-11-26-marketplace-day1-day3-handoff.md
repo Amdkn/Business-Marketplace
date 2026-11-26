@@ -2199,3 +2199,40 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 2. Run the complete frontend verification (npm ci, npm run typecheck, npm test, npm run build) as soon as the local checkout/runner is available. Investigate actual compiler/test failures; do not conflate them with Vercel's build-rate-limit context.
 3. Complete browser-authenticated CRUD against Garden and Web Desktop, including live Edge Function list/register/revoke calls and UI refresh behavior.
 4. Keep PR #1 OPEN / DRAFT and Day 1–3 OPEN until those frontend/browser gates pass.
+
+
+### 13.42 Garden client editing, honest execution boundaries and procedure lifecycle persistence — 2026-11-26
+
+**Garden client detail CRUD**
+- Replaced the inert Client Detail Edit toast with a real workspace-backed edit form for name, email, phone, service and status.
+- Save calls clientsRepo.update and only updates the rendered detail after the repository confirms the write. Validation requires a non-empty name; failures remain visible through the error toast.
+- Phone now displays the stored value rather than a placeholder.
+- Removed the synthetic status-to-progress mapping (80/20/50/100%) and the resulting fake “percent complete” and “status weight” metrics. The detail now shows the actual persisted status and timestamps only.
+
+**Garden procedure lifecycle**
+- The Garden TasksView was actually a runbook/SOP queue, not a real task manager. Its old completion toggle changed React state only and was never persisted.
+- Renamed the view copy to Procedure queue and changed the toggle to a real persisted SOP lifecycle transition: draft → archived and archived → draft, through sopsRepo.update.
+- The procedure list updates only after the workspace write succeeds; errors leave the prior state intact and are reported. No fake task-completion metric is shown.
+- SOPLibraryView still supports persisted SOP creation and editing. Its Execute affordance now explicitly reports that no runbook execution engine or agent runtime is connected; it no longer claims that a workflow run started or that agents were notified.
+
+**Documents / e-sign boundary**
+- DocumentsView previously displayed a success toast claiming a signature request had been sent despite having no e-sign provider integration.
+- The confirmation now explicitly reports that no request was sent, the dialog identifies the unavailable integration, and the action no longer promises delivery. No fake signature request or signing event is recorded.
+
+**Authenticated SQL checks**
+- Ran a rollback-only authenticated transaction against the actual active workspace OWNER identity:
+  - created and updated a client row, including typed title/status plus email, phone and service in extra_data;
+  - created and archived a runbook by updating its extra_data status.
+- Both assertions passed under the authenticated database role. The transaction rolled back; no e2e-client-edit or e2e-runbook row remains.
+- These checks validate the workspace SQL path and mapper storage contract, not a browser interaction test.
+
+**Acceptance boundary**
+- Latest code commit: cf8467d8228e25f703e9f997d0f684d5ef7c1906 — Garden procedure execution action is explicitly non-operational until a runtime exists.
+- PR #1 remains OPEN / DRAFT and mergeable. No new migration or Edge Function deployment was required.
+- The Desktop Commander device remains OFFLINE; TypeScript, Vitest, Vite build and browser E2E remain NOT RUN. GitHub Actions still reports no workflow runs for the branch, and the Vercel status remains the external build-rate-limit failure.
+- Day 1–3 remain OPEN. Do not mark frontend acceptance complete until the app is compiled and browser-authenticated CRUD is exercised.
+
+**Continuation**
+1. Keep auditing Garden detail and secondary entry points for inert buttons or success messages without a durable backend operation.
+2. When the local runner is available, run the complete frontend verification and fix any actual compiler/test failures.
+3. When an authenticated browser session is available, verify the Garden client edit, SOP archive/restore, document integration unavailable state, People cadence and agent API flows end to end.

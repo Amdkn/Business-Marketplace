@@ -56,10 +56,11 @@ The first-class hierarchy is:
 
 Do not collapse the two distinct A’Space taxonomy axes:
 
-- **8 Business Departments (B2.1–B2.8):** Product & IP; Growth & Distribution; People & Talent; Legal & Trust; Tech & Intelligence; Operations & Delivery; Finance & Capital; Sales & Partnerships. These are the Marketplace's value-producing and operating departments.
+- **8 Business Departments:** Product & IP; Growth & Distribution; People & Talent; Legal & Trust; Tech & Intelligence; Operations & Delivery; Finance & Capital; Sales & Partnerships. These are the Marketplace's value-producing and operating departments; their database identifiers are stable slugs, not B2 codes.
 - **8 Areas OS portfolios (LD01–LD08):** Business; Finances; Blue Life; Meta Cognition; Sovereign Triangle; Solarpunk Habitat; MC Sandbox; Civilizer / ABC OS. These are A’Space mission portfolios, not Marketplace departments.
+- **LD01 internal holarchy:** B1 Book (OwnerBook) delegates to 8 tactical DC Managers B2.1–B2.8 (Operations, Tresorerie, Legal, R&D, Alliances, Infra, IT, Gouvernance) and 8 execution Marvel Squads B3.1–B3.8. Each Marvel squad contains 7 specialists plus an operational runbook.
 
-The department and Areas OS registries may be related through explicit ownership, project and capability links, but they are not parent/child versions of one another. LD01 is the Business mission portfolio; the B2.1–B2.8 taxonomy belongs to the Business department structure. The six Marketplace market surfaces identified in the V5 Day 1 core remain a third, independent dimension; this interface does not collapse them into either taxonomy.
+These structures are related but not interchangeable. The B2/B3 hierarchy is internal to LD01; it is not the Marketplace department taxonomy. The six Marketplace market surfaces identified in the V5 Day 1 core remain a separate dimension and are not collapsed into either the department or Areas OS registry.
 
 Cross-cutting entities:
 

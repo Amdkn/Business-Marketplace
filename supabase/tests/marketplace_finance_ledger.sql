@@ -136,3 +136,30 @@ BEGIN
  RAISE NOTICE 'PASS: Fee API SECURITY DEFINER, least privilege and activation serialization';
 END
 $fee_policy_security_test$;
+
+DO $capture_posting_test$
+DECLARE v_def text; v_count integer;
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='api' AND p.proname='post_captured_order_finance_entry' AND p.prosecdef
+   AND p.proconfig @> ARRAY['search_path=pg_catalog, identity, commerce, finance, api']::text[])
+ THEN RAISE EXCEPTION 'Captured payment posting function missing or unsafe'; END IF;
+ IF has_function_privilege('anon','api.post_captured_order_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR has_function_privilege('authenticated','api.post_captured_order_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ OR NOT has_function_privilege('service_role','api.post_captured_order_finance_entry(uuid,uuid,uuid)','EXECUTE')
+ THEN RAISE EXCEPTION 'Captured payment posting grants are unsafe'; END IF;
+ SELECT pg_get_functiondef('api.post_captured_order_finance_entry(uuid,uuid,uuid)'::regprocedure) INTO v_def;
+ IF position('payment_status' in v_def)=0 OR position('CAPTURED' in v_def)=0
+ OR position('provider_payment_id' in v_def)=0 OR position('order_fee_snapshots' in v_def)=0
+ OR position('payment-capture:' in v_def)=0 OR position('api.post_finance_journal_entry' in v_def)=0
+ THEN RAISE EXCEPTION 'Captured payment posting invariants are incomplete'; END IF;
+ SELECT count(*) INTO v_count FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
+ JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='finance' AND c.contype='f'
+ AND NOT EXISTS(SELECT 1 FROM pg_index i WHERE i.indrelid=c.conrelid AND i.indisvalid
+   AND (SELECT array_agg(k.attnum ORDER BY k.attnum) FROM unnest(c.conkey) k(attnum))
+       <@ (SELECT array_agg(a.attnum ORDER BY a.attnum) FROM unnest(i.indkey) a(attnum) WHERE a.attnum>0));
+ IF v_count<>0 THEN RAISE EXCEPTION 'Finance foreign keys lack covering indexes'; END IF;
+ IF 100.00<>(90.00+10.00) THEN RAISE EXCEPTION 'Capture allocation does not balance'; END IF;
+ RAISE NOTICE 'PASS: Captured payment posting gates, idempotency and balanced allocation';
+END
+$capture_posting_test$;

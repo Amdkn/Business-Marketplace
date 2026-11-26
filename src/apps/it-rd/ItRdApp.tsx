@@ -120,27 +120,6 @@ export function ItRdApp() {
     }
   };
 
-  /* Experiments kanban — order declared once so the loop terminates cleanly. */
-  const EXP_STAGE_NEXT: Record<string, string | null> = {
-    idea: 'building',
-    building: 'shipped',
-    shipped: null,
-  };
-  const EXP_STAGE_ACCENT: Record<string, string> = {
-    idea: '#a78bfa',
-    building: '#7c3aed',
-    shipped: '#16a34a',
-  };
-  const moveExpStage = (id: string, fromStage: string): void => {
-    const next = EXP_STAGE_NEXT[fromStage];
-    if (!next) {
-      addToast({ source: 'IT/R&D', type: 'info', message: 'Déjà shipped — fin de la chaîne.' });
-      return;
-    }
-    updateItem('it_experiments', id, { stage: next });
-    addToast({ source: 'IT/R&D', type: 'success', message: `Expérience déplacée vers "${next}"` });
-  };
-
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState('');
   const [composerAction, setComposerAction] = useState<'note' | 'deploy' | 'drift' | 'lock' | 'eval' | 'correction' | 'rollback' | 'wake'>('note');
@@ -685,7 +664,7 @@ export function ItRdApp() {
                 <input
                   value={driftMetric}
                   onChange={(e) => setDriftMetric(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. p95 latency (ms)"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -710,7 +689,7 @@ export function ItRdApp() {
                 <input
                   value={driftReference}
                   onChange={(e) => setDriftReference(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 800"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -721,7 +700,7 @@ export function ItRdApp() {
                 <input
                   value={driftCurrent}
                   onChange={(e) => setDriftCurrent(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 1200"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -732,7 +711,7 @@ export function ItRdApp() {
                 <input
                   value={driftThreshold}
                   onChange={(e) => setDriftThreshold(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 1000"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}

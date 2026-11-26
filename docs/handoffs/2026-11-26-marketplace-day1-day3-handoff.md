@@ -2350,3 +2350,43 @@ This checkpoint supersedes the earlier v28/read-only descriptions in sections 13
 - Added `docs/evidence/day1-security-inventory.md` and `docs/evidence/day1-closure-matrix.md` to map the nine Day 1 scopes to concrete artifacts, tests and remaining acceptance.
 - Live migration ledger/source parity is now **69/69**; legacy archive remains 20 files. Supabase advisor snapshot remains 42 INFO RLS/no-policy, one WARN leaked-password protection disabled, 63 INFO unindexed foreign keys, 272 INFO unused indexes and no Health findings.
 - Day 1 remains OPEN: backup/restore drill, Auth configuration, full API/browser acceptance, complete observability and Control Tower lifecycle remain unverified. Days 2 and 3 remain OPEN.
+
+
+## 13.47 — Day 2/3 engine regression, OAuth correction and frontend build recovery — 2026-11-26
+
+### Day 2 / Day 3 closure evidence
+- Added `docs/evidence/day2-closure-matrix.md` for D2.01–D2.10 and `docs/evidence/day3-closure-matrix.md` for D3.01–D3.14. Both matrices explicitly separate structural implementation from real tenant acceptance.
+- Live blueprints: 8 Areas OS domains, 8 Business departments, 17 LD01 holons, 20 adapter families and 73 provider blueprints.
+- Live operational counts: 0 active provider manifests, 0 tenant connections/OAuth transactions, 0 agent principals/delegations, 0 capabilities/listings, 0 orders/entitlements, 0 payment intents/refunds/payouts/journal entries, and 0 domain/department/holon/capability installations. Google Drive v1.0.0 remains DRAFT. Do not manufacture a fake tenant or provider connection.
+
+### Installation and commerce regression suites
+- Added `supabase/tests/marketplace_installation_engine.sql`: checks domain/department/holon installation idempotency, request replay key uniqueness, append-only request/event ledgers, unique active OWNER, dependency/capability validators, RLS and private browser grants. PASS.
+- Added `supabase/tests/marketplace_commerce_lifecycle.sql`: checks order idempotency, buyer/seller separation, append-only order events, buyer-acceptance entitlement trigger, entitlement suspension propagation and service-role-only order API boundary. PASS.
+- Re-ran 13 structural SQL suites in one batch, including both new suites. PASS. The three rollback-only integration suites (client activity, Settings persistence and Storage security) also passed separately; post-rollback counts remain zero.
+
+### Edge Function and OAuth correction
+- All four Edge Functions are ACTIVE and byte-identical to repository source: `marketplace-api` v30/JWT, `adapter-api` v8/JWT, `adapter-worker` v7/private bearer gate, `adapter-oauth-callback` v1/one-time state + PKCE.
+- Found and fixed the Base64URL replacement regex in `adapter-api`: it now replaces `+` with `-`, `/` with `_` and removes padding. This affects OAuth state and PKCE challenge generation. `adapter-api` v8 is deployed with JWT verification enabled and exact source parity.
+- Added Vitest vectors for special characters, padding, empty input and arbitrary byte sequences. Vitest itself remains unrun; the test is committed but awaits the full verify pipeline.
+
+### Frontend and delivery chain
+- Direct Vercel Preview deployment for commit `75a0bd09cfa76d737bd54c99d7212fd78dc4a92a` reached READY. `tsc -b` and `vite build` passed. It surfaced two additional source errors, fixed in commit `092b972`: LegalView passed `notes: null` where only string/undefined is valid; MissionTasksView dereferenced nullable `missions`.
+- `bun.lock` workspace name now matches `package.json` (`@aspace/business-marketplace`).
+- `vercel.json` now specifies `bun install --frozen-lockfile` and `bun run verify`, covering app/API typecheck, Vitest, Vite build and all four runtime benches.
+- The READY Preview predates the latest branch commit and used the previous default build command; it is not evidence that Vitest/API typecheck/benches pass.
+- New Vercel deployment creation is blocked by HTTP 402 `api-deployments-free-per-day`, retry after 24 hours. Do not retry during the quota window. The latest branch commit has no deployment.
+- Vercel Preview SSO protection remains enabled. No protection weakening was performed. Authenticated browser E2E needs an authorized browser session. GitHub Actions currently shows no run for the branch; Amd-PC remains offline.
+
+### Current acceptance status
+- Day 1 remains OPEN: full browser CRUD, signup/recovery/SMTP, Auth leaked-password protection, backup/restore drill, complete observability and integrated Control Tower remain open.
+- Day 2 remains OPEN: zero real provider connections, agent principals, capabilities/listings, orders, entitlements and payment-provider lifecycle.
+- Day 3 remains OPEN: zero tenant structure installations; Compute, Inference, Memory and CEL are not integrated as operational cores; no live agent/workflow runtime or full Control Tower.
+- PR #1 remains OPEN / DRAFT. Do not merge or accept any Day until the corresponding real tenant E2E and release gates pass.
+
+### Next execution sequence
+1. After Vercel's 24-hour deployment API quota window, deploy the latest branch commit using the new `vercel.json` full verification command; fix every Vitest/API/bench failure it exposes.
+2. Use the protected preview with an authorized browser session to run authenticated identity, workspace, Garden CRUD, private Storage and cross-workspace denial tests.
+3. Complete the Google OAuth callback round-trip once the real OAuth client ID/secret and callback URL are configured; then activate the reviewed Google Drive manifest and run a real provider operation.
+4. Complete the PSP sandbox lifecycle with real credentials: checkout/authorization/capture/webhook/refund/payout and double-entry reconciliation.
+5. Build and exercise the real tenant installation journey, ownership/dependency/capability installs, B1/B2/B3 agent runtime, Compute/Inference/Memory/CEL services, workflows and integrated Control Tower.
+6. Run backup/restore, load/failure/recovery, security and release/rollback drills; only then evaluate Day 1, Day 2 and Day 3 acceptance gates.

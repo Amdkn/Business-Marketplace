@@ -12,7 +12,7 @@ This directory is the canonical source for Marketplace database migrations, Edge
 1. The cloud project above is the existing Marketplace database. Do not create a replacement project.
 2. The migration files in this repository describe migrations already applied to that cloud project. **Do not replay them against the current hosted project.**
 3. Future schema changes must be additive, versioned and authored in this repository. Reconcile the cloud migration registry before applying anything.
-4. The exact original SQL text for historical cloud migration `20261126041718 / revoke_public_execution_rls_auto_enable` was not recovered. A catalog-derived reconstruction is tracked at `migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql`; it reproduces the verified live ACL but is not byte-identical historical source. This closes source-tree coverage of the 25-entry cloud registry, not byte-for-byte provenance. Do not replay it.
+4. The exact original SQL text for historical cloud migration `20261126041718 / revoke_public_execution_rls_auto_enable` was not recovered. A catalog-derived reconstruction is tracked at `migrations/20261126041718_revoke_public_execution_rls_auto_enable.sql`; it reproduces the verified live ACL but is not byte-identical historical source. It is one of the 69 applied entries and must not be replayed.
 5. The older file `20261124024342_coach_schema_adoption.sql` in V5 was not the canonical applied migration. The applied entry is `20261124024550 / coach_schema_adoption_20261124`, represented here by the reconstructed canonical source file `20261124024550_coach_schema_adoption_20261124.sql`. It was reconstructed from the live catalog and is not claimed to be byte-identical to the historical original.
 6. Never put service-role credentials, OAuth client secrets, provider tokens or Vault secret values in this repository. Commit only secret references/contracts and safe configuration.
 7. Supabase CLI v3 is local-first. Any future hosted CLI command must explicitly target the remote project and follow the current confirmation semantics. Prefer the linked native Supabase connection for live verification.
@@ -121,7 +121,7 @@ The `dashboard` tables remain legacy compatibility artifacts; Garden and Web Des
 | Function | Live version | Gateway JWT | Repository source parity |
 |---|---:|---|---|
 | `marketplace-api` | 30 | enabled | byte-identical |
-| `adapter-api` | 7 | enabled | byte-identical |
+| `adapter-api` | 8 | enabled | byte-identical |
 | `adapter-worker` | 7 | disabled | byte-identical; server-only service-role bearer gate |
 | `adapter-oauth-callback` | 1 | disabled | byte-identical; one-time OAuth state + PKCE transaction gate |
 
@@ -175,12 +175,20 @@ Do not silence the RLS advisor with blanket policies. Review each schema's actua
 
 ## Delivery and acceptance boundary
 
-The backend sources, 69 live migrations, tenant-scoped document bucket and four deployed Edge Function sources are reconciled. Garden's formerly inert actions were audited; no enabled button without a handler remains in the audited Garden view set. The Growth showcase is hidden for authenticated workspaces; the Marketplace view reads the live published-listings API; IT infrastructure displays live API/database connectivity rather than fabricated telemetry; simulated agent chat replies were removed.
+The backend sources, 69 live migrations, tenant-scoped document bucket and four deployed Edge Function sources are reconciled. The 13 structural SQL suites and three rollback-only integration suites pass. Garden's formerly inert actions were audited; no enabled button without a handler remains in the audited Garden view set. The Growth showcase is hidden for authenticated workspaces; the Marketplace view reads the live published-listings API; IT infrastructure displays live API/database connectivity rather than fabricated telemetry; simulated agent chat replies were removed.
 
 This does **not** certify Day 1–3 acceptance. Authenticated browser CRUD, document upload/download through the UI, cross-workspace browser denial, provider OAuth round-trip, payment-provider lifecycle, live agent inference/execution, tenant installation and the complete Control Tower remain separate end-to-end gates.
 
-The GitHub Actions workflow now installs from canonical `bun.lock` using Bun 1.3.14; `npm ci` was removed because the legacy `package-lock.json` does not describe the current dependencies. No GitHub Actions run is currently visible for the branch. The latest Vercel status is **build-rate-limit failure**; the latest frontend source has not been build-validated. The connected Amd-PC Desktop Commander remains offline, so no local typecheck/build/browser suite could be run.
+The GitHub Actions workflow installs from canonical `bun.lock` using Bun 1.3.14; `npm ci` was removed because the legacy `package-lock.json` does not describe current dependencies. `bun.lock` workspace identity now matches `package.json`. `vercel.json` now specifies `bun install --frozen-lockfile` and `bun run verify` (app/API typecheck, Vitest, Vite build and four runtime benches). The ready Vercel Preview for commit `75a0bd0` passed `tsc -b` and Vite build, but it predates the latest branch commit and did not run the full verify script. Vercel has returned HTTP 402 `api-deployments-free-per-day` with a 24-hour retry window; the latest branch commit has no deployment yet. Preview SSO protection remains enabled, so authenticated browser acceptance requires an authorized browser session; protection was not disabled. No GitHub Actions run is visible for the branch. Amd-PC Desktop Commander remains offline.
 
+## Day 1–3 implementation and acceptance evidence
+
+- [Day 1 foundation closure matrix](../docs/evidence/day1-closure-matrix.md)
+- [Day 1 security inventory](../docs/evidence/day1-security-inventory.md)
+- [Day 2 Marketplace Engine closure matrix](../docs/evidence/day2-closure-matrix.md)
+- [Day 3 Enterprise Factory & Launch closure matrix](../docs/evidence/day3-closure-matrix.md)
+
+The Day 2/3 matrices distinguish implemented schema/API foundations from live tenant execution. Current counts are 8 Areas OS blueprints, 8 Business departments, 17 LD01 holons, 20 adapter families and 73 provider blueprints; zero active provider manifests, connections, agents, capabilities, listings, orders, payments or installations. The zeroes are the actual cloud tenant state, not missing test fixtures.
 ## Historical implementation log
 
 

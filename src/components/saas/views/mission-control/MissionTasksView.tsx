@@ -2,7 +2,7 @@
 // Hermes — Tasks sub-page (route /agent-root/tasks)
 // Kanban with 3 columns (todo / doing / done), @dnd-kit drag-and-drop,
 // new-mission form, search + priority filter, live data from
-// omk_saas.missions (sql/08_hermes_missions.sql).
+// Marketplace mission persistence (schema connection pending).
 
 import { useEffect, useMemo, useState } from 'react';
 import {

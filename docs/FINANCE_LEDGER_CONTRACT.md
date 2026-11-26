@@ -96,6 +96,9 @@ System keys and account codes are stable within a chart version. The template se
 
 api.provision_finance_chart_of_accounts(actor, organization, currency, chart_version) is the guarded provisioning boundary. It requires an active organization, active membership and an active Finance-capable role; takes an organization/currency/version advisory lock; rejects collisions with existing custom or differently defined accounts; inserts missing accounts and returns the complete chart. Repeated calls for the same tenant/currency/version reuse the same accounts. The SQL function is SECURITY DEFINER with a pinned search_path and EXECUTE is granted only to service_role.
 
-The authenticated marketplace-api action is provision_finance_chart_of_accounts, with organization_id, currency and optional chart_version (default 2026.1). The Edge Function rechecks organization role before invoking SQL. The live deployment is marketplace-api v19 with verify_jwt=true.
+The authenticated marketplace-api action is provision_finance_chart_of_accounts, with organization_id, currency and optional chart_version (default 2026.1). The Edge Function rechecks organization role before invoking SQL. The live deployment is marketplace-api v20 with verify_jwt=true.
 
 The provisioning path is structurally verified only. The live project currently has zero organizations and zero Auth users, so no tenant chart was provisioned and no account fixture was fabricated. Real-tenant idempotency, collision and authorization tests remain blocked until an authorized tenant exists. The chart is a practical Marketplace baseline, not a jurisdiction-specific statutory chart or tax determination.
+
+
+Finance authorization alignment: the live Edge Function uses a dedicated Finance role gate that accepts S0_SOVEREIGN, B1_CEO, B2_MANAGER and B2.2 (Treasury), matching the database function. This avoids relying on the broader non-finance organization role helper.

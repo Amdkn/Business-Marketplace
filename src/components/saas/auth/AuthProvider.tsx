@@ -2,13 +2,13 @@
 // Phase C + F — JWT-aware auth context + Edge Function signUp onboarding.
 // Reads 'org_id' + 'role' claims from Supabase session JWT (Phase A: custom_access_token_hook).
 // In saas mode, missing org_id → RLS will silently return 0 rows (warn per ADR-SUPABASE-001).
-// signUp() invokes the Edge Function `sign-up-organization` (Phase F) to atomically
-// create auth.users + omk_saas.organizations + omk_saas.memberships in one request.
+// signUp() invokes `marketplace-api.create_tenant` to atomically
+// create auth.users + identity.organizations + identity.organization_memberships in one request.
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 import { APP_MODE } from '../config/mode';
-import { setActiveOrgIdCache } from '../lib/tenant';
+import { setActiveOrgIdCache, setActiveWorkspaceIdCache } from '../lib/tenant';
 import type { AuthUser, Organization } from '../lib/types';
 
 export interface AuthContextValue {
@@ -44,7 +44,7 @@ function decodeJwtClaims(token: string): { org_id?: string; role?: string; sub?:
 
 async function fetchUserOrg(orgId: string): Promise<Organization | null> {
   if (!SUPABASE_READY) return null;
-  const { data, error } = await supabase.from('organizations').select('*').eq('id', orgId).maybeSingle();
+  const { data, error } = await supabase.schema('identity').from('organizations').select('*').eq('id', orgId).maybeSingle();
   if (error) {
     if (import.meta.env.DEV) {
       console.warn('[auth] failed to fetch organization', error.message);
@@ -61,6 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hydrate = useCallback(async () => {
     if (!SUPABASE_READY) {
+      setActiveOrgIdCache(null);
+      setActiveWorkspaceIdCache(null);
       setIsLoading(false);
       return;
     }
@@ -68,35 +70,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!session) {
       setUser(null);
       setOrganization(null);
+      setActiveOrgIdCache(null);
+      setActiveWorkspaceIdCache(null);
       setIsLoading(false);
       return;
     }
     const claims = decodeJwtClaims(session.access_token);
+    const userId = claims.sub ?? session.user.id;
+
+    // enterprise remains private. The identity RPC returns only this caller's
+    // unique active org/workspace and role, without exposing private tables.
+    const { data: contexts, error: contextError } = await supabase
+      .schema('identity')
+      .rpc('get_current_workspace_context');
+    if (contextError) throw contextError;
+    const context = Array.isArray(contexts) ? contexts[0] : contexts;
+    const orgId = context?.organization_id as string | undefined;
+    const workspaceId = context?.workspace_id as string | undefined;
+    const role = (context?.role_code as string | undefined)
+      ?? (claims.role && claims.role !== 'authenticated' ? claims.role : 'authenticated');
+
     const authUser: AuthUser = {
-      id: claims.sub ?? session.user.id,
+      id: userId,
       email: claims.email ?? session.user.email ?? '',
-      orgId: claims.org_id ?? null,
-      role: claims.role ?? 'authenticated',
+      orgId: orgId ?? null,
+      role,
       isAuthenticated: true,
     };
     setUser(authUser);
-    setActiveOrgIdCache(authUser.orgId);  // tenant.ts reads this for non-React code paths
+    setActiveOrgIdCache(authUser.orgId);
+    setActiveWorkspaceIdCache(workspaceId ?? null);
+
     if (authUser.orgId) {
       const org = await fetchUserOrg(authUser.orgId);
       setOrganization(org);
+      if (!workspaceId && APP_MODE === 'saas') {
+        throw new Error('No unique active workspace context is available for this organization.');
+      }
     } else {
       setOrganization(null);
+      setActiveWorkspaceIdCache(null);
       if (APP_MODE === 'saas' && import.meta.env.DEV) {
-        console.warn('[omk] saas mode but no org_id in JWT — RLS will return 0 rows');
+        console.warn('[marketplace] no unique active organization/workspace context — tenant repositories remain closed');
       }
     }
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    void hydrate();
+    void hydrate().catch((err: unknown) => {
+      setActiveWorkspaceIdCache(null);
+      setIsLoading(false);
+      if (import.meta.env.DEV) {
+        console.error('[auth] tenant hydration failed; Garden repositories remain closed', err);
+      }
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      void hydrate();
+      void hydrate().catch((err: unknown) => {
+        setActiveWorkspaceIdCache(null);
+        setIsLoading(false);
+        if (import.meta.env.DEV) {
+          console.error('[auth] tenant re-hydration failed; Garden repositories remain closed', err);
+        }
+      });
     });
     return () => subscription.unsubscribe();
   }, [hydrate]);
@@ -113,64 +149,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: 'Supabase not configured (set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY)' };
     }
 
-    // 1. Create the auth.users row via Supabase Auth (email auto-confirmed in MVP).
-    //    The Edge Function will detect the user already exists and skip re-creation.
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { org_name: orgName } },
     });
-    if (signUpErr) {
-      return { error: signUpErr.message };
-    }
-    if (!signUpData.user) {
-      return { error: 'Sign-up succeeded but no user was returned.' };
-    }
+    if (signUpErr) return { error: signUpErr.message };
+    if (!signUpData.user) return { error: 'Sign-up succeeded but no user was returned.' };
 
-    // 2. Immediately sign in to obtain a JWT (needed to call the Edge Function
-    //    when verify_jwt=true). In saas MVP, auto-confirm is enabled so this
-    //    succeeds without email verification.
+    // Obtain the authenticated bearer session before provisioning the tenant.
     const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInErr) {
-      return { error: `User created but sign-in failed: ${signInErr.message}` };
-    }
+    if (signInErr) return { error: `User created but sign-in failed: ${signInErr.message}` };
 
-    // 3. Invoke the Edge Function to provision org + membership.
-    //    The function uses service_role and bypasses RLS.
-    const { data: fnData, error: fnErr } = await supabase.functions.invoke<{
-      userId?: string;
-      orgId?: string;
-      orgSlug?: string;
+    // One server-side transaction creates the organization, B1 owner binding,
+    // default workspace, and workspace OWNER membership. No client-supplied
+    // user ID or service-role credential is trusted.
+    const { data: provisioned, error: provisionError } = await supabase.functions.invoke<{
+      data?: {
+        organization?: { id?: string; name?: string };
+        workspace?: { id?: string; name?: string };
+      };
       error?: string;
-    }>('sign-up-organization', {
-      body: {
-        email,
-        password,
-        orgName,
-        userId: signUpData.user.id,
-      },
+    }>('marketplace-api', {
+      body: { action: 'create_tenant', organization_name: orgName },
     });
-
-    if (fnErr) {
-      return { error: `Organization provisioning failed: ${fnErr.message}` };
+    if (provisionError) {
+      return { error: `Organization/workspace provisioning failed: ${provisionError.message}` };
     }
-    if (!fnData || fnData.error) {
-      return { error: fnData?.error ?? 'Edge Function returned no data.' };
+    if (!provisioned?.data?.organization?.id || !provisioned?.data?.workspace?.id) {
+      return { error: provisioned?.error ?? 'Tenant provisioning returned an incomplete organization/workspace.' };
     }
 
-    // 4. Force a fresh session so the JWT custom_access_token_hook picks up the
-    //    newly-created membership and injects the org_id claim.
-    await supabase.auth.refreshSession();
-    // Hydrate is triggered by onAuthStateChange listener set up in useEffect.
-
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) return { error: `Tenant created but session refresh failed: ${refreshError.message}` };
+    try {
+      await hydrate();
+    } catch (reason) {
+      return { error: reason instanceof Error ? `Tenant created but context hydration failed: ${reason.message}` : 'Tenant created but context hydration failed.' };
+    }
     return { error: null };
-  }, []);
+  }, [hydrate]);
 
   const signOut = useCallback(async () => {
     if (SUPABASE_READY) await supabase.auth.signOut();
     setUser(null);
     setOrganization(null);
     setActiveOrgIdCache(null);
+    setActiveWorkspaceIdCache(null);
   }, []);
 
   return (

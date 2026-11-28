@@ -27,8 +27,8 @@ const RATING_CHIPS = ['G2', 'Capterra', 'App Store', 'Play Store'];
 export const LANDING_PAGES: LandingPage[] = [
   {
     id: 'onboarding-demo',
-    brand: 'OMK Coach Demo',
-    domain: 'demo.omknexus.io',
+    brand: 'A’Space Coach Demo',
+    domain: 'demo.aspace.local',
     tagline: 'A 4-question quiz that shows you the product — before you buy.',
     hero: {
       eyebrow: 'Demo · Free',
@@ -56,13 +56,13 @@ export const LANDING_PAGES: LandingPage[] = [
     faq: [
       { q: 'Is my data used to train the agents?', a: 'No. The demo runs on synthetic data only.' },
     ],
-    closing: { headline: 'Four questions. Four floating windows. Zero PII.', sub: 'The fastest way to know if OMK is for you.', cta: { label: 'Take the 4-question check', href: '#cta' } },
+    closing: { headline: 'Four questions. Four floating windows. Zero PII.', sub: 'The fastest way to know if A’Space is for you.', cta: { label: 'Take the 4-question check', href: '#cta' } },
   },
 
   {
     id: 'domaine-1-rh-meta-gouvernance',
-    brand: 'OMK RH',
-    domain: 'rh.omknexus.io',
+    brand: 'A’Space RH',
+    domain: 'rh.aspace.local',
     tagline: 'Agent Factory, B1 Gatekeeper, sprints, daily standups.',
     hero: {
       eyebrow: 'Domaine 01 · RH & Méta-Gouvernance',
@@ -116,7 +116,7 @@ export const LANDING_PAGES: LandingPage[] = [
     ],
     testimonials: [
       {
-        quote: 'We replaced 3 freelance VAs with 5 OMK agents in a weekend. The mandates alone saved us a quarter of legal review.',
+        quote: 'We replaced 3 freelance VAs with 5 A’Space agents in a weekend. The mandates alone saved us a quarter of legal review.',
         author: 'Tiago Forte',
         role: 'Founder',
         company: 'Forte Labs',
@@ -137,8 +137,8 @@ export const LANDING_PAGES: LandingPage[] = [
       { name: 'Forte', price: '$999', cadence: '/month', pitch: 'For coaching firms with compliance needs.', features: ['Unlimited agents', 'On-prem option', 'Dedicated success engineer', 'AI-Act audit pack'], ctaLabel: 'Talk to sales' },
     ],
     faq: [
-      { q: 'How is an OMK agent different from a ChatGPT wrapper?', a: 'Each agent ships with a mandate, a kill switch, and an audit log, the same primitives you would demand from a human hire. The model is replaceable. The mandate is the asset.' },
-      { q: 'Can I bring my own model?', a: 'Yes. Bring your own LLM endpoint (OpenAI, Anthropic, MiniMax-M3, local Ollama). OMK routes the work, never the weights.' },
+      { q: 'How is an A’Space agent different from a ChatGPT wrapper?', a: 'Each agent ships with a mandate, a kill switch, and an audit log, the same primitives you would demand from a human hire. The model is replaceable. The mandate is the asset.' },
+      { q: 'Can I bring my own model?', a: 'Yes. Bring your own LLM endpoint (OpenAI, Anthropic, MiniMax-M3, local Ollama). A’Space routes the work, never the weights.' },
       { q: 'Is client data used for training?', a: 'Never. Client data stays in your Vault and is excluded from any training pipeline by default. CCPA + Colorado AI Act compliant out of the box.' },
     ],
     closing: { headline: 'Your team of agents is one mandate away.', sub: 'Start a 14-day free trial. No credit card. The kill switch is in the box.', cta: { label: 'Start 14-day free trial', href: '#cta' } },
@@ -146,8 +146,8 @@ export const LANDING_PAGES: LandingPage[] = [
 
   {
     id: 'domaine-2-operations',
-    brand: 'OMK Operations',
-    domain: 'ops.omknexus.io',
+    brand: 'A’Space Operations',
+    domain: 'ops.aspace.local',
     tagline: 'Runbooks, execution engine, incident response.',
     hero: {
       eyebrow: 'Domaine 02 · Operations',
@@ -172,7 +172,7 @@ export const LANDING_PAGES: LandingPage[] = [
         id: 'runbooks',
         eyebrow: 'Runbooks',
         title: 'Runbooks that actually run',
-        body: 'Not 30-page docs nobody reads. OMK runbooks are step-by-step scripts your agents execute, with checkpoints, kill switches, and Slack status updates.',
+        body: 'Not 30-page docs nobody reads. A’Space runbooks are step-by-step scripts your agents execute, with checkpoints, kill switches, and Slack status updates.',
         bullets: ['Step + checkpoint model', 'Kill switch per runbook', 'Slack status per run'],
         visual: 'community',
       },
@@ -180,7 +180,7 @@ export const LANDING_PAGES: LandingPage[] = [
         id: 'knowledge',
         eyebrow: 'Knowledge',
         title: 'Knowledge base, indexed and cited',
-        body: 'Drop your Drive, Notion, Looms in. OMK indexes them, cites them in agent answers, and warns you when a doc goes stale.',
+        body: 'Drop your Drive, Notion, Looms in. A’Space indexes them, cites them in agent answers, and warns you when a doc goes stale.',
         bullets: ['Citations on every answer', 'Stale-doc alerts', 'Per-client knowledge scopes'],
         visual: 'courses',
       },
@@ -201,7 +201,7 @@ export const LANDING_PAGES: LandingPage[] = [
     ],
     testimonials: [
       {
-        quote: 'My runbooks used to live in Notion and die there. OMK agents execute them, and I get a Slack ping every step.',
+        quote: 'My runbooks used to live in Notion and die there. A’Space agents execute them, and I get a Slack ping every step.',
         author: 'Anya P.',
         role: 'COO',
         company: 'Two Chairs',
@@ -230,8 +230,8 @@ export const LANDING_PAGES: LandingPage[] = [
 
   {
     id: 'domaine-3-growth',
-    brand: 'OMK Growth',
-    domain: 'growth.omknexus.io',
+    brand: 'A’Space Growth',
+    domain: 'growth.aspace.local',
     tagline: 'Outbound velocity, Apollo prospecting, 3-step NO-FOLLOW-UP sequences.',
     hero: {
       eyebrow: 'Domaine 03 · Growth',
@@ -242,7 +242,7 @@ export const LANDING_PAGES: LandingPage[] = [
       rating: { stars: 5, count: '12k+', sources: RATING_CHIPS },
     },
     trust: {
-      title: 'Coaching firms running growth on OMK',
+      title: 'Coaching firms running growth on A’Space',
       logos: [
         { name: 'Mindvalley', monogram: 'Mv' },
         { name: 'Modern Counsel', monogram: 'MC' },
@@ -306,7 +306,7 @@ export const LANDING_PAGES: LandingPage[] = [
     ],
     faq: [
       { q: 'Will the SDR agent sound robotic?', a: 'No. Reach is briefed on your voice, your offers, and your ICP. You review the first 20 drafts. Reach never sends unsupervised until you grant the mandate.' },
-      { q: 'Does OMK replace my CRM?', a: 'Most coaches cancel their HubSpot or Pipedrive within 30 days. If you need to keep one, OMK syncs both ways.' },
+      { q: 'Does A’Space replace my CRM?', a: 'Most coaches cancel their HubSpot or Pipedrive within 30 days. If you need to keep one, A’Space syncs both ways.' },
       { q: 'What is the 3-step NO-FOLLOW-UP sequence?', a: 'Three touchpoints over 9 days. Conditional, reply-detection in 90 seconds, auto-stop on engagement. No follow-up pressure, no spam.' },
     ],
     closing: { headline: 'Your pipeline, finally defensible.', sub: 'Book a 20-min walkthrough. We will show you the Monday standup email live.', cta: { label: 'Book a 20-min walkthrough', href: '#cta' } },
@@ -314,8 +314,8 @@ export const LANDING_PAGES: LandingPage[] = [
 
   {
     id: 'domaine-4-cognition-savoir',
-    brand: 'OMK Cognition',
-    domain: 'cognition.omknexus.io',
+    brand: 'A’Space Cognition',
+    domain: 'cognition.aspace.local',
     tagline: 'Sales Second Brain, warehouses, IP extraction from sessions.',
     hero: {
       eyebrow: 'Domaine 04 · Cognition & Savoir',
@@ -348,7 +348,7 @@ export const LANDING_PAGES: LandingPage[] = [
         id: 'warehouse',
         eyebrow: 'Warehouse',
         title: 'A warehouse your team and your agents share',
-        body: 'Drop your Notion, Drive, Looms in. OMK indexes them once, queries them with citation. Both humans and agents read from the same source of truth.',
+        body: 'Drop your Notion, Drive, Looms in. A’Space indexes them once, queries them with citation. Both humans and agents read from the same source of truth.',
         bullets: ['Cross-source indexing', 'Citation on every answer', 'Per-client knowledge scopes'],
         visual: 'revenue',
       },
@@ -399,8 +399,8 @@ export const LANDING_PAGES: LandingPage[] = [
 
   {
     id: 'domaine-5-people-scalabilite',
-    brand: 'OMK People',
-    domain: 'people.omknexus.io',
+    brand: 'A’Space People',
+    domain: 'people.aspace.local',
     tagline: 'Client success (Coach to CEO), cohorts, retention.',
     hero: {
       eyebrow: 'Domaine 05 · People & Scalabilité',
@@ -475,7 +475,7 @@ export const LANDING_PAGES: LandingPage[] = [
       { name: 'Forte', price: '$999', cadence: '/month', pitch: 'For coaching firms.', features: ['Custom cohort playbooks', 'Dedicated success engineer', 'Quarterly business review'], ctaLabel: 'Talk to sales' },
     ],
     faq: [
-      { q: 'Does OMK send messages to my clients without me?', a: 'Only the messages you pre-approve. You approve the cohort cadence templates once. Agents execute the cadence.' },
+      { q: 'Does A’Space send messages to my clients without me?', a: 'Only the messages you pre-approve. You approve the cohort cadence templates once. Agents execute the cadence.' },
       { q: 'Can I keep my own voice in cohort comms?', a: 'Yes. Every template is editable, every send is in your name. The agents draft, you approve, the brand stays yours.' },
       { q: 'What about data privacy across clients?', a: 'Per-client knowledge scopes ship in the Practice tier. Each client only sees their own history. CCPA + Colorado AI Act compliant.' },
     ],
@@ -484,8 +484,8 @@ export const LANDING_PAGES: LandingPage[] = [
 
   {
     id: 'domaine-6-finance',
-    brand: 'OMK Finance',
-    domain: 'finance.omknexus.io',
+    brand: 'A’Space Finance',
+    domain: 'finance.aspace.local',
     tagline: 'Retainers, $1k/mo billing, ROI tracking.',
     hero: {
       eyebrow: 'Domaine 06 · Finance',
@@ -496,7 +496,7 @@ export const LANDING_PAGES: LandingPage[] = [
       rating: { stars: 5, count: '6k+', sources: RATING_CHIPS },
     },
     trust: {
-      title: 'Coaching firms running their ledger on OMK',
+      title: 'Coaching firms running their ledger on A’Space',
       logos: [
         { name: 'Stripe', monogram: 'St' },
         { name: 'Modern Counsel', monogram: 'MC' },
@@ -560,17 +560,17 @@ export const LANDING_PAGES: LandingPage[] = [
       { name: 'Forte', price: '$999', cadence: '/month', pitch: 'For coaching firms.', features: ['Custom billing playbooks', 'Soc 2 evidence pack', 'Dedicated finance CSM'], ctaLabel: 'Talk to sales' },
     ],
     faq: [
-      { q: 'Does OMK replace my bookkeeper?', a: 'No. OMK runs your operational ledger. Your bookkeeper still closes the month, OMK feeds them clean line items.' },
+      { q: 'Does A’Space replace my bookkeeper?', a: 'No. A’Space runs your operational ledger. Your bookkeeper still closes the month, A’Space feeds them clean line items.' },
       { q: 'Can I charge in USD only?', a: 'Yes. USD-only billing, US-hosted ledger. CCPA + Colorado AI Act compliant.' },
-      { q: 'What about taxes?', a: 'OMK does not file taxes. Your bookkeeper + your CPA close the year. OMK exports a clean CSV.' },
+      { q: 'What about taxes?', a: 'A’Space does not file taxes. Your bookkeeper + your CPA close the year. A’Space exports a clean CSV.' },
     ],
     closing: { headline: 'Retainers, on schedule, every month.', sub: 'Book a 20-min walkthrough. We will show you the $1k/mo billing flow and the ROI email live.', cta: { label: 'Book a 20-min walkthrough', href: '#cta' } },
   },
 
   {
     id: 'domaine-7-it-rd',
-    brand: 'OMK IT',
-    domain: 'it.omknexus.io',
+    brand: 'A’Space IT',
+    domain: 'it.aspace.local',
     tagline: 'Sovereign infra, Coolify, MCP, Zero-PII Vault.',
     hero: {
       eyebrow: 'Domaine 07 · IT & R&D',
@@ -624,7 +624,7 @@ export const LANDING_PAGES: LandingPage[] = [
     ],
     testimonials: [
       {
-        quote: 'We migrated off a 3-vendor stack onto OMK + Coolify in a weekend. The Zero-PII Vault alone closed 2 enterprise deals for us.',
+        quote: 'We migrated off a 3-vendor stack onto A’Space + Coolify in a weekend. The Zero-PII Vault alone closed 2 enterprise deals for us.',
         author: 'Tiago Forte',
         role: 'Founder',
         company: 'Forte Labs',
@@ -647,15 +647,15 @@ export const LANDING_PAGES: LandingPage[] = [
     faq: [
       { q: 'Is my data used to train any model?', a: 'Never. Zero-PII Vault excludes every field from any training pipeline by default. The audit pack proves it on demand.' },
       { q: 'Where does the data live?', a: 'US-hosted Supabase on Coolify-managed nodes. AES-256 at rest, TLS 1.3 in transit. CCPA + Colorado AI Act compliant.' },
-      { q: 'Can I bring my own infra?', a: 'Yes. BYO Supabase project, BYO Coolify cluster. OMK routes the work, your infra stays yours.' },
+      { q: 'Can I bring my own infra?', a: 'Yes. BYO Supabase project, BYO Coolify cluster. A’Space routes the work, your infra stays yours.' },
     ],
     closing: { headline: 'Sovereign infra, US-hosted, AI-Act ready.', sub: 'Start a 14-day free trial. The Zero-PII Vault ships on day one, the audit pack is one click.', cta: { label: 'Start 14-day free trial', href: '#cta' } },
   },
 
   {
     id: 'domaine-8-legal-conformite',
-    brand: 'OMK Legal',
-    domain: 'legal.omknexus.io',
+    brand: 'A’Space Legal',
+    domain: 'legal.aspace.local',
     tagline: 'CCPA + Colorado AI Act compliance, NDAs, Zero-PII shield.',
     hero: {
       eyebrow: 'Domaine 08 · Légal & Conformité',

@@ -1,5 +1,5 @@
 // src/components/views/TasksView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.sops schema (sops = procedures).
+// Zero Bug Sprint — rewritten for the Marketplace procedure library.
 //
 // Schema (no `steps`/`time`/`uses`/`rating` columns).
 // Bug fixes (D6 #98, D6 #100b, D6 #102, D6 #103):
@@ -30,6 +30,7 @@ export const TasksView: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState({ title: '', category: 'General' });
   const [saving, setSaving] = useState(false);
+  const [mutatingSopId, setMutatingSopId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const load = (): void => {
@@ -37,7 +38,7 @@ export const TasksView: React.FC = () => {
     setError(null);
     Promise.all([sopsRepo.list(), clientsRepo.list()])
       .then(([s, c]) => {
-        // UI-local "completed" toggle proxy: archived SOPs are "done".
+        // Archive state is persisted on the canonical workspace runbook.
         setTasks(
           safeArray<Sop>(s).map((row) => ({
             ...row,
@@ -87,9 +88,23 @@ export const TasksView: React.FC = () => {
     }
   };
 
-  const toggleTask = (id: string): void => {
-    // UI-local only — not persisted. D2 will add a real tasks table.
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  const toggleTask = async (id: string): Promise<void> => {
+    if (mutatingSopId) return;
+    const current = tasks.find((task) => task.id === id);
+    if (!current) return;
+    const nextStatus: Sop['status'] = current.completed ? 'draft' : 'archived';
+    setMutatingSopId(id);
+    try {
+      const updated = await sopsRepo.update(id, { status: nextStatus });
+      setTasks((previous) => previous.map((task) => task.id === id
+        ? { ...updated, completed: updated.status === 'archived' }
+        : task));
+      showToast(nextStatus === 'archived' ? 'Procedure archived.' : 'Procedure restored to draft.', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Procedure status was not saved.', 'error');
+    } finally {
+      setMutatingSopId(null);
+    }
   };
 
   if (loading) {
@@ -104,7 +119,7 @@ export const TasksView: React.FC = () => {
   if (error) {
     return (
       <div className="p-6 bg-rose-50 border border-rose-200 rounded-lg text-rose-700" role="alert">
-        <p className="font-semibold">Error loading tasks</p>
+        <p className="font-semibold">Error loading procedures</p>
         <p className="text-sm mt-1">{error}</p>
       </div>
     );
@@ -116,11 +131,11 @@ export const TasksView: React.FC = () => {
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">My Day</h1>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Procedure queue</h1>
           <p className="text-slate-500 text-sm mt-1">Focus on execution. No noise.</p>
         </div>
         <div className="text-xs text-slate-500">
-          {tasks.filter((t) => t.completed).length} / {tasks.length} completed
+          {tasks.filter((t) => t.completed).length} / {tasks.length} archived
         </div>
       </div>
 
@@ -135,7 +150,7 @@ export const TasksView: React.FC = () => {
         {tasks.length === 0 ? (
           <EmptyState
             title="No procedures yet"
-            description='Click "Add quick task" below to seed one.'
+            description='Click "Add procedure" below to create the first workspace procedure.'
           />
         ) : (
           <div className="divide-y divide-stone-100">
@@ -148,8 +163,9 @@ export const TasksView: React.FC = () => {
               >
                 <div className="col-span-1 flex justify-center">
                   <button
-                    onClick={() => toggleTask(sop.id)}
-                    aria-label={sop.completed ? 'Mark incomplete' : 'Mark complete'}
+                    onClick={() => void toggleTask(sop.id)}
+                    disabled={mutatingSopId === sop.id || saving}
+                    aria-label={sop.completed ? 'Restore procedure to draft' : 'Archive procedure'}
                     className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
                       sop.completed
                         ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
@@ -163,7 +179,7 @@ export const TasksView: React.FC = () => {
                 <div className="col-span-7">
                   <p
                     className={`text-sm font-medium ${
-                      sop.completed ? 'text-slate-400 line-through decoration-stone-300' : 'text-slate-800'
+                      sop.completed ? 'text-slate-400' : 'text-slate-800'
                     }`}
                   >
                     {sop.title}
@@ -199,7 +215,7 @@ export const TasksView: React.FC = () => {
             onClick={openModal}
             className="text-sm text-slate-500 hover:text-emerald-600 transition-colors py-2 w-full border border-dashed border-stone-200 rounded-xl hover:border-emerald-300 hover:bg-white flex items-center justify-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Add quick task
+            <Plus className="w-4 h-4" /> Add procedure
           </button>
         </div>
       </Card>

@@ -1,18 +1,19 @@
 // src/lib/types.ts
-// Zero Bug Sprint (D6 #98) — TypeScript types for the OMK dashboard, rewritten
-// to match the canonical `omk_saas.*` schema exactly (ADR-OMK-001 ratified).
+// Zero Bug Sprint (D6 #98) — TypeScript types for the A'Space Marketplace Dashboard, rewritten
+// to match the canonical canonical Marketplace tenant schema.
 //
-// Column source-of-truth: query `information_schema.columns WHERE table_schema = 'omk_saas'`
-// on the live Supabase Cloud project. Every field on every interface below
-// exists as a DB column. If the DB schema changes, regenerate this file.
+// These are UI/API contract types, not a promise that every property maps 1:1
+// to a physical column. workspace_data fields are mapped in data/repository.ts;
+// private identity records are projected through authenticated marketplace-api
+// actions. Keep this contract aligned with those mappings and RPC response shapes.
 //
 // What changed vs the old types.ts (D6 #98):
 //   - Client: dropped `progress` (no DB col), `date` (use `createdAt`/`updatedAt`),
 //     status enum tightened to DB-allowed values.
 //   - Document: dropped `name`/`client`/`type`/`status`/`size` (none exist on
 //     documents table — only `title`/`clientId`/`fileUrl`/`mimeType`/`uploadedBy`).
-//   - Agent: dropped `desc`/`tasks`/`totalTasks`/`accuracy`/`time`/`capabilities`
-//     (none exist on agents table — only `name`/`role`/`email`/`status`).
+//   - Agent: canonical identity is `identity.agent_principals`; this UI type
+//     includes the agent/workspace delegation projection returned by marketplace-api.
 //   - Invoice: dropped `client` (use `clientId`), `service` (no DB col),
 //     `due` (use `dueAt`), `amount` is now `string` (PostgREST returns numeric
 //     as string to preserve precision).
@@ -42,7 +43,7 @@ export type TabType =
   | 'settings';
 
 // ─────────────────────────────────────────────────────────────────────────
-// omk_saas schema-accurate types
+// Marketplace schema-aligned types
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface Organization {
@@ -99,6 +100,12 @@ export interface Agent {
   status: 'active' | 'paused' | 'archived';
   createdAt: string;
   updatedAt: string;
+  /** Canonical identity/runtime metadata; present on AI principals only. */
+  agentKey?: string;
+  agentClass?: string;
+  runtime?: string;
+  permissionCodes?: string[];
+  delegationId?: string;
 }
 
 /**

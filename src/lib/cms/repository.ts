@@ -1,14 +1,7 @@
-/** CmsRepository — Supabase-backed persistence for CMS collections, Phase 1.
- *  Mirrors the exact dual-write pattern already proven in the Life OS `DomainDB`
- *  (idb.ts): try Supabase, fall back silently on any failure or missing auth.
- *  There is no sign-in UI yet, so `getCurrentOrgId()` simply returns null when
- *  no session exists — every caller already handles that as "use the seed".
- *
- *  Brief-B (2026-08-11) — extension. Le repli local doit être EXPLICITE :
- *  on ne simule rien. `supabaseMode()` retourne l'état observé, et chaque
- *  fallback loggue un message d'info (pas warn — c'est attendu en démo).
- *  Le mapping `tableFor()` ouvre la voie au nouveau schéma typé (23 tables)
- *  sans casser le chemin générique existant. */
+/** Marketplace CMS repository.
+ *  Collection definitions are source-controlled; tenant records are persisted
+ *  in dedicated workspace_data tables. Real tenants never fall back to demo
+ *  records. Missing tenant context and failed writes are explicit errors. */
 import { supabase, supabaseConfigured } from '../supabase';
 import type { CmsCollectionDef, CmsItem } from './types';
 
@@ -28,8 +21,8 @@ let _lastError: string | null = null;
 /** Returns the last observed state of the Supabase backend.
  *  - 'unconfigured' : no VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in env
  *  - 'unreachable'  : client exists but every call so far has failed
- *  - 'no-org'       : client works, but the user has no membership row
- *  - 'connected'    : client works and org_id is resolved
+ *  - 'no-org'       : client works, but the user has no active organization membership
+ *  - 'connected'    : client works and organization_id is resolved
  */
 export function supabaseMode(): SupabaseMode {
   return _mode;
@@ -40,9 +33,10 @@ export function lastSupabaseError(): string | null {
 }
 
 function setMode(next: SupabaseMode, err?: unknown): void {
-  if (_modeLogged && _mode === next) return;
+  const previous = _mode;
   _mode = next;
   _lastError = err instanceof Error ? err.message : err ? String(err) : null;
+  if (_modeLogged && previous === next) return;
   if (!_modeLogged) {
     _modeLogged = true;
     // L'info-level est volontaire : en mode démo, c'est le comportement
@@ -51,7 +45,7 @@ function setMode(next: SupabaseMode, err?: unknown): void {
     console.info(
       `[cms] supabase mode: ${_mode}` +
         (_lastError ? ` (last error: ${_lastError})` : '') +
-        ` — falling back to bundled seed is the documented contract.`,
+        '',
     );
   } else if (next === 'unreachable' || next === 'no-org') {
     // Mode change after first success — useful when DNS comes back or a
@@ -64,187 +58,967 @@ function setMode(next: SupabaseMode, err?: unknown): void {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * Collection → table mapping — Brief-B §1
- * Le nouveau schéma a une table par collection. Le repository historique
- * utilise `cms_items` (générique) pour rester compatible avec ce qui
- * tourne en prod aujourd'hui. `tableFor()` est l'aiguillage : si la
- * collection a une table typée, on l'utilise ; sinon, on retombe sur
- * `cms_items` (events append-only).
- * ──────────────────────────────────────────────────────────────────── */
+/* Collection definitions are source-controlled; tenant records are stored in dedicated tables. */
 
-const TYPED_TABLES: Record<string, string> = {
-  clients: 'cms_clients',
-  articles: 'cms_articles',
-  team: 'cms_team',
-  people_agents: 'cms_people_agents',
-  runbooks: 'cms_runbooks',
-  incidents: 'cms_incidents',
-  services: 'cms_services',
-  it_experiments: 'cms_it_experiments',
-  deploys: 'cms_deploys',
-  tasks: 'cms_tasks',
-  marketplace_listings: 'cms_marketplace_listings',
-  product_items: 'cms_product_items',
-  product_releases: 'cms_product_releases',
-  growth_channels: 'cms_growth_channels',
-  growth_experiments: 'cms_growth_experiments',
-  deals: 'cms_deals',
-  invoices: 'cms_invoices',
-  contracts: 'cms_contracts',
-  policies: 'cms_policies',
-  session_notes: 'cms_session_notes',
-  demo_coach_apps: 'cms_demo_coach_apps',
-  demo_coach_notes: 'cms_demo_coach_notes',
-  demo_coach_metrics: 'cms_demo_coach_metrics',
+// Each persistent CMS collection has a dedicated typed table in workspace_data.
+const COLLECTION_FIELDS: Record<string, { title: string; fields: string[]; table?: string; extraFields?: string[] }> = {
+  "clients": {
+    "title": "name",
+    "fields": [
+      "segment",
+      "ticket",
+      "currency",
+      "openThreads",
+      "nextSession",
+      "health",
+      "onboardingStep",
+      "status"
+    ]
+  },
+  "articles": {
+    "title": "title",
+    "fields": [
+      "category",
+      "reads",
+      "updated",
+      "body"
+    ]
+  },
+  "runbooks": {
+    "title": "title",
+    "fields": [
+      "category",
+      "updated",
+      "steps"
+    ]
+  },
+  "incidents": {
+    "title": "title",
+    "fields": [
+      "when",
+      "severity",
+      "resolution"
+    ]
+  },
+  "alerts": {
+    "title": "title",
+    "fields": [
+      "when",
+      "severity",
+      "resolution"
+    ],
+    "extraFields": [
+      "enrichment",
+      "source",
+      "riskScore",
+      "hypothesis",
+      "trace",
+      "status"
+    ],
+    "table": "incidents"
+  },
+  "changes": {
+    "title": "title",
+    "fields": [
+      "summary",
+      "why",
+      "risk",
+      "policy",
+      "status",
+      "proposedBy",
+      "decidedByUserId",
+      "decidedAt",
+      "decisionNote"
+    ],
+    "table": "change_requests"
+  },
+  "services": {
+    "title": "name",
+    "fields": [
+      "note",
+      "status",
+      "detail"
+    ]
+  },
+  "it_experiments": {
+    "title": "title",
+    "fields": [
+      "stage",
+      "meta",
+      "notes"
+    ]
+  },
+  "deploys": {
+    "title": "commit",
+    "fields": [
+      "target",
+      "when",
+      "status"
+    ]
+  },
+  "tasks": {
+    "title": "label",
+    "fields": [
+      "when",
+      "group",
+      "done"
+    ]
+  },
+  "marketplace_listings": {
+    "title": "name",
+    "fields": [
+      "tag",
+      "blurb",
+      "installed",
+      "featured"
+    ]
+  },
+  "product_items": {
+    "title": "title",
+    "fields": [
+      "stage",
+      "meta",
+      "priority"
+    ]
+  },
+  "product_releases": {
+    "title": "name",
+    "fields": [
+      "version",
+      "when",
+      "notes"
+    ]
+  },
+  "growth_channels": {
+    "title": "name",
+    "fields": [
+      "leads",
+      "cac",
+      "trend"
+    ]
+  },
+  "growth_experiments": {
+    "title": "title",
+    "fields": [
+      "lift",
+      "notes"
+    ]
+  },
+  "growth_acquisition": {
+    "title": "name",
+    "fields": [
+      "category",
+      "virality",
+      "conversion",
+      "cost",
+      "ease",
+      "global",
+      "verdict",
+      "whatWorks",
+      "whatFailed"
+    ]
+  },
+  "growth_partenariats": {
+    "title": "name",
+    "fields": [
+      "type",
+      "brings",
+      "expects",
+      "state",
+      "contact",
+      "touched"
+    ]
+  },
+  "product_mvps": {
+    "title": "name",
+    "fields": [
+      "feature",
+      "client",
+      "body",
+      "overflow",
+      "weeksToShip",
+      "eta",
+      "owner",
+      "successMetric",
+      "notes"
+    ]
+  },
+  "growth_strategie": {
+    "title": "name",
+    "fields": [
+      "phase",
+      "objective",
+      "duration",
+      "criteria",
+      "state",
+      "focus"
+    ]
+  },
+  "growth_aeo": {
+    "title": "query",
+    "fields": [
+      "intent",
+      "position",
+      "cited",
+      "trackedSince",
+      "history",
+      "competitor"
+    ]
+  },
+  "product_rankings": {
+    "title": "name",
+    "fields": [
+      "tier",
+      "body",
+      "score",
+      "area",
+      "owner",
+      "source",
+      "reviewedOn",
+      "nextStep"
+    ]
+  },
+  "product_launches": {
+    "title": "name",
+    "fields": [
+      "stage",
+      "state",
+      "cohort",
+      "body",
+      "startedAt",
+      "eta",
+      "owner",
+      "metric"
+    ]
+  },
+  "product_ideas": {
+    "title": "name",
+    "fields": [
+      "trend",
+      "opportunity",
+      "demand",
+      "economicSize",
+      "summary",
+      "body",
+      "source",
+      "raisedBy",
+      "raisedOn",
+      "ask"
+    ]
+  },
+  "plancher_marges": {
+    "title": "offer",
+    "fields": [
+      "category",
+      "unit",
+      "realCost",
+      "floor",
+      "price",
+      "gap",
+      "marginPct",
+      "status",
+      "note"
+    ]
+  },
+  "courbe_demande": {
+    "title": "offer",
+    "fields": [
+      "category",
+      "scenarios",
+      "elasticity",
+      "sweetSpot",
+      "sensitivity",
+      "notes"
+    ]
+  },
+  "budget_tokens": {
+    "title": "use",
+    "fields": [
+      "category",
+      "monthlyTokens",
+      "modelCost",
+      "fteRole",
+      "fteSalary",
+      "coverage",
+      "ratio",
+      "monthlySaving",
+      "status",
+      "notes"
+    ]
+  },
+  "formes_prix": {
+    "title": "shape",
+    "fields": [
+      "offer",
+      "pricing",
+      "cashflow",
+      "commitment",
+      "risk",
+      "bestFor"
+    ]
+  },
+  "dods": {
+    "title": "name",
+    "fields": [
+      "context",
+      "owner",
+      "status",
+      "lastEdited",
+      "dod",
+      "signal"
+    ]
+  },
+  "comparators": {
+    "title": "name",
+    "fields": [
+      "compared",
+      "against",
+      "verdict",
+      "delta",
+      "reviewer",
+      "reviewed"
+    ]
+  },
+  "exposed_actions": {
+    "title": "name",
+    "fields": [
+      "audience",
+      "channel",
+      "shippedAt",
+      "owner",
+      "summary",
+      "metric"
+    ]
+  },
+  "processes": {
+    "title": "name",
+    "fields": [
+      "owner",
+      "category",
+      "inputs",
+      "outputs",
+      "dependsOn",
+      "cadence",
+      "edgeCases"
+    ]
+  },
+  "benchmarks": {
+    "title": "title",
+    "fields": [
+      "target",
+      "difficulty",
+      "passRate",
+      "lastRun",
+      "status",
+      "failureMode"
+    ]
+  },
+  "audit_arbitrage": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_contexte": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_donnees": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_automatabilite": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "audit_arbitrage_roi": {
+    "title": "criterion",
+    "fields": [
+      "axis",
+      "frequency",
+      "level0",
+      "level1",
+      "level2"
+    ]
+  },
+  "it_journal": {
+    "title": "title",
+    "fields": [
+      "actor",
+      "action",
+      "entity",
+      "ts",
+      "outcome",
+      "projects",
+      "note"
+    ]
+  },
+  "it_loops": {
+    "title": "name",
+    "fields": [
+      "state",
+      "metric",
+      "capteur",
+      "consigne",
+      "controleur",
+      "actionneur",
+      "target",
+      "tolerance",
+      "lastAction",
+      "lastActionAt",
+      "note"
+    ]
+  },
+  "it_drift": {
+    "title": "name",
+    "fields": [
+      "metric",
+      "severity",
+      "reference",
+      "current",
+      "detected",
+      "threshold",
+      "unit",
+      "method",
+      "note"
+    ]
+  },
+  "it_evals": {
+    "title": "name",
+    "fields": [
+      "rate",
+      "evalType",
+      "trials",
+      "distribution",
+      "failures",
+      "ranAt",
+      "note"
+    ]
+  },
+  "settings_integrations": {
+    "title": "name",
+    "fields": [
+      "description",
+      "status",
+      "scope"
+    ]
+  },
+  "deals": {
+    "title": "client",
+    "fields": [
+      "clientId",
+      "offer",
+      "value",
+      "currency",
+      "stage"
+    ]
+  },
+  "invoices": {
+    "title": "client",
+    "fields": [
+      "amount",
+      "due",
+      "status",
+      "clientId",
+      "currency",
+      "issuedAt",
+      "dueAt",
+      "paidAt",
+      "dealId",
+      "sourceKey"
+    ]
+  },
+  "contracts": {
+    "title": "document",
+    "fields": [
+      "client",
+      "signed",
+      "status"
+    ]
+  },
+  "policies": {
+    "title": "name",
+    "fields": [
+      "updated",
+      "body"
+    ]
+  },
+  "session_notes": {
+    "title": "topic",
+    "fields": [
+      "clientName",
+      "date",
+      "duration",
+      "sentiment",
+      "body"
+    ]
+  },
+  "legal_ai_act_checks": {
+    "title": "label",
+    "fields": [
+      "category",
+      "done",
+      "description",
+      "clearedAt"
+    ]
+  },
+  "legal_frameworks": {
+    "title": "name",
+    "fields": [
+      "family",
+      "short",
+      "scope",
+      "owner",
+      "appliesFrom",
+      "status"
+    ]
+  },
+  "legal_controls": {
+    "title": "code",
+    "fields": [
+      "title",
+      "framework",
+      "severity",
+      "owner",
+      "evidenceCount",
+      "lastTested",
+      "status"
+    ]
+  },
+  "legal_compliance_policies": {
+    "title": "name",
+    "fields": [
+      "version",
+      "owner",
+      "updated",
+      "reviewBy",
+      "body"
+    ]
+  },
+  "legal_evidence": {
+    "title": "title",
+    "fields": [
+      "control",
+      "kind",
+      "location",
+      "collectedAt",
+      "expiresAt"
+    ]
+  },
+  "legal_risks": {
+    "title": "title",
+    "fields": [
+      "area",
+      "likelihood",
+      "impact",
+      "rating",
+      "mitigation",
+      "owner",
+      "status"
+    ]
+  },
+  "legal_vendors": {
+    "title": "name",
+    "fields": [
+      "category",
+      "dataAccess",
+      "dpaSigned",
+      "dpaDate",
+      "lastReview",
+      "risk"
+    ]
+  },
+  "legal_gaps": {
+    "title": "title",
+    "fields": [
+      "control",
+      "framework",
+      "severity",
+      "openedOn",
+      "owner",
+      "status"
+    ]
+  },
+  "personas": {
+    "title": "name",
+    "fields": [
+      "pronouns",
+      "wants",
+      "blockers",
+      "vocabulary",
+      "anchor",
+      "anchorKind",
+      "anchorDate",
+      "domain"
+    ]
+  },
+  "memory": {
+    "title": "fact",
+    "fields": [
+      "fact",
+      "provenance",
+      "retainedOn",
+      "verification",
+      "verifiedBy",
+      "recheckOn",
+      "domain",
+      "notes"
+    ]
+  },
+  "codex": {
+    "title": "situation",
+    "fields": [
+      "situation",
+      "recipe",
+      "why",
+      "appliedCount",
+      "lastApplied",
+      "domain",
+      "owners",
+      "caveats"
+    ]
+  },
+  "approval_decisions": {
+    "title": "scenarioName",
+    "fields": [
+      "scenarioId",
+      "scenarioName",
+      "verdict",
+      "decidedBy",
+      "proposalCount",
+      "rationale",
+      "decidedAt"
+    ]
+  },
+  "squads": {
+    "title": "name",
+    "fields": [
+      "mission",
+      "lead",
+      "members",
+      "rank",
+      "status",
+      "lastSprint"
+    ]
+  },
+  "content": {
+    "title": "title",
+    "fields": [
+      "channel",
+      "audience",
+      "status",
+      "readTime",
+      "hook",
+      "cta"
+    ]
+  }
 };
 
-export function tableFor(collectionId: string): string {
-  return TYPED_TABLES[collectionId] ?? 'cms_items';
+export function tableFor(collectionId: string): string | null {
+  const shape = COLLECTION_FIELDS[collectionId];
+  return shape ? (shape.table ?? collectionId) : null;
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * Original repository — rétro-compat Brief-F (Phase 1) + Brief-B (Phase 4)
- * ──────────────────────────────────────────────────────────────────── */
+function toSnake(key: string): string {
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
 
-let cachedOrgId: string | null | undefined;
+function fromWorkspaceRow(collectionId: string, row: Record<string, unknown>): CmsItem {
+  const shape = COLLECTION_FIELDS[collectionId];
+  const extra = row.extra_data && typeof row.extra_data === 'object'
+    ? { ...(row.extra_data as Record<string, unknown>) }
+    : {};
+  // Ownership and audit metadata are database-managed, never CMS fields.
+  for (const reserved of [
+    'tenant_id', 'orgId', 'organizationId', 'workspaceId',
+    'organization_id', 'workspace_id', 'created_by_user_id',
+    'createdAt', 'updatedAt', 'created_at', 'updated_at',
+  ]) delete extra[reserved];
+  const item: Record<string, unknown> = { ...extra, id: row.id };
+  if (shape && row.title != null) item[shape.title] = row.title;
+  for (const field of shape?.fields ?? []) {
+    const value = row[toSnake(field)];
+    if (value !== null && value !== undefined) {
+      item[field] = collectionId === 'tasks' && field === 'done'
+        ? ['true', 'yes', '1', 'done'].includes(String(value).toLowerCase())
+        : value;
+    }
+  }
+  // Invoice typed columns are shared with Garden's invoice repository. Keep
+  // their browser-facing camelCase projection aligned across both interfaces.
+  if (collectionId === 'invoices') {
+    const typedColumns: Record<string, string> = {
+      clientId: 'client_id',
+      currency: 'currency',
+      issuedAt: 'issued_at',
+      dueAt: 'due_at',
+      paidAt: 'paid_at',
+    };
+    for (const [uiKey, dbKey] of Object.entries(typedColumns)) {
+      if (row[dbKey] !== null && row[dbKey] !== undefined) item[uiKey] = row[dbKey];
+    }
+  }
+  return item as CmsItem;
+}
 
-/** Resolves the signed-in coach's org_id, or null if there is no session yet
- *  (no auth UI exists in Coach OS today — this is the hook Phase 2 wires into). */
-export async function getCurrentOrgId(): Promise<string | null> {
+export interface CurrentWorkspaceContext {
+  organizationId: string;
+  workspaceId: string;
+  userId: string;
+  workspaceName: string;
+}
+
+let cachedWorkspaceContext: Promise<CurrentWorkspaceContext | null> | null = null;
+
+// Auth transitions invalidate the resolved tenant context. Never retain one
+// user's organization/workspace after logout or account switching.
+supabase.auth.onAuthStateChange(() => {
+  cachedWorkspaceContext = null;
+});
+
+function toWorkspaceRow(
+  collectionId: string,
+  item: CmsItem,
+  context: CurrentWorkspaceContext,
+): Record<string, unknown> {
+  const shape = COLLECTION_FIELDS[collectionId];
+  if (!shape) throw new Error(`[cms] no dedicated table for collection: ${collectionId}`);
+  const row: Record<string, unknown> = {
+    id: item.id,
+    organization_id: context.organizationId,
+    workspace_id: context.workspaceId,
+    created_by_user_id: context.userId,
+    title: item[shape.title] ?? null,
+    extra_data: Object.fromEntries(Object.entries(item).filter(([key]) =>
+      !['id', 'tenant_id', 'orgId', 'organizationId', 'workspaceId', 'organization_id', 'workspace_id', 'created_by_user_id', 'createdAt', 'updatedAt', 'created_at', 'updated_at'].includes(key) &&
+      !(collectionId === 'invoices' && ['clientId', 'currency', 'issuedAt', 'dueAt', 'paidAt'].includes(key))
+    )),
+    updated_at: new Date().toISOString(),
+  };
+  for (const field of shape.fields) {
+    const value = item[field];
+    row[toSnake(field)] = collectionId === 'tasks' && field === 'done' && typeof value === 'boolean'
+      ? String(value)
+      : value ?? null;
+  }
+  if (collectionId === 'invoices') {
+    const typedColumns: Record<string, string> = {
+      clientId: 'client_id',
+      currency: 'currency',
+      issuedAt: 'issued_at',
+      dueAt: 'due_at',
+      paidAt: 'paid_at',
+    };
+    for (const [uiKey, dbKey] of Object.entries(typedColumns)) {
+      if (item[uiKey] !== undefined) row[dbKey] = item[uiKey];
+    }
+  }
+  return row;
+}
+
+/**
+ * Resolve the signed-in user's unique active workspace. The current UI has no
+ * workspace switcher yet, so multiple active memberships fail closed instead
+ * of silently mixing records from different workspaces.
+ */
+export async function getCurrentWorkspaceContext(): Promise<CurrentWorkspaceContext | null> {
   if (!supabaseConfigured) {
     setMode('unconfigured');
     return null;
   }
-  if (cachedOrgId !== undefined) return cachedOrgId;
+  if (cachedWorkspaceContext) return cachedWorkspaceContext;
 
+  cachedWorkspaceContext = (async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session?.user) {
+        setMode('no-org');
+        return null;
+      }
+
+      // enterprise is a private schema. Resolve only the caller's unique
+      // active organization/workspace through the authenticated identity RPC.
+      const { data: contexts, error: contextError } = await supabase
+        .schema('identity')
+        .rpc('get_current_workspace_context');
+      if (contextError) throw contextError;
+      const context = Array.isArray(contexts) ? contexts[0] : contexts;
+      if (!context) {
+        setMode('no-org', 'No unique active organization/workspace context');
+        return null;
+      }
+
+      setMode('connected');
+      return {
+        organizationId: context.organization_id as string,
+        workspaceId: context.workspace_id as string,
+        userId: session.user.id,
+        workspaceName: context.workspace_name as string,
+      };
+    } catch (err) {
+      setMode('unreachable', err);
+      return null;
+    }
+  })();
+
+  const resolved = await cachedWorkspaceContext;
+  if (!resolved) cachedWorkspaceContext = null;
+  return resolved;
+}
+
+/** Compatibility helper for callers that only need the organization key. */
+export async function getCurrentOrgId(): Promise<string | null> {
+  const context = await getCurrentWorkspaceContext();
+  return context?.organizationId ?? null;
+}
+
+/** Hydrate one dedicated tenant table. null means local-only or no auth session;
+ *  database/API failures reject so callers cannot mistake an outage for an empty list. */
+export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
+  const tableName = tableFor(collectionId);
+  if (!tableName) return null;
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return null;
+  }
+  const context = await getCurrentWorkspaceContext();
+  if (!context) return null;
+  const { data, error } = await supabase.schema('workspace_data').from(tableName)
+    .select('*')
+    .eq('organization_id', context.organizationId)
+    .eq('workspace_id', context.workspaceId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    setMode('unreachable', error);
+    throw error;
+  }
+  setMode('connected');
+  return (data ?? []).map((row) => fromWorkspaceRow(collectionId, row as Record<string, unknown>));
+}
+
+/** Collection metadata lives in source-controlled definitions, not tenant rows. */
+export async function upsertCollectionDef(_def: CmsCollectionDef): Promise<void> { /* definitions are versioned with the app */ }
+
+/** Persist one item. A configured production client must never silently drop a write. */
+/** Strict write path for UI actions that must not report success without cloud persistence. */
+export async function upsertItemRequired(collectionId: string, item: CmsItem): Promise<void> {
+  if (!supabaseConfigured) throw new Error('[cms] Supabase is not configured; persistent write refused.');
+  await upsertItem(collectionId, item);
+}
+
+export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return; // local-only development/demo mode
+  }
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
+    const error = new Error('[cms] write refused: authenticated workspace context is unavailable');
+    setMode('no-org', error);
+    throw error;
+  }
+  if (!tableFor(collectionId)) {
+    const error = new Error(`[cms] write refused: collection "${collectionId}" has no persistent Marketplace table`);
+    setMode('unreachable', error);
+    throw error;
+  }
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      setMode('no-org');
-      cachedOrgId = null;
-      return null;
-    }
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('org_id')
-      .eq('user_id', session.user.id)
-      .limit(1)
+    const tableName = tableFor(collectionId);
+    if (!tableName) throw new Error(`[cms] no persistent Marketplace table for collection: ${collectionId}`);
+    const table = supabase.schema('workspace_data').from(tableName);
+    const row = toWorkspaceRow(collectionId, item, context);
+    const { data: existing, error: lookupError } = await table.select('id')
+      .eq('id', item.id)
+      .eq('organization_id', context.organizationId)
+      .eq('workspace_id', context.workspaceId)
       .maybeSingle();
-    if (error || !data) {
-      setMode('no-org', error ?? 'no membership row');
-      cachedOrgId = null;
-      return null;
+    if (lookupError) throw lookupError;
+
+    if (existing) {
+      // Creator and tenant ownership are immutable audit fields. Never let an
+      // ordinary CMS edit rewrite created_by_user_id or move a row between tenants.
+      const update = { ...row };
+      delete update.id;
+      delete update.organization_id;
+      delete update.workspace_id;
+      delete update.created_by_user_id;
+      const { data, error } = await table.update(update)
+        .eq('id', item.id)
+        .eq('organization_id', context.organizationId)
+        .eq('workspace_id', context.workspaceId)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error(`[cms] update refused or row disappeared: ${collectionId}/${item.id}`);
+    } else {
+      // A primary-key collision in another workspace is intentionally not
+      // converted into an UPDATE: the INSERT will fail under the PK/RLS guard.
+      const { error } = await table.insert(row);
+      if (error) throw error;
     }
-    cachedOrgId = data.org_id as string;
     setMode('connected');
-    return cachedOrgId;
   } catch (err) {
     setMode('unreachable', err);
-    cachedOrgId = null;
-    return null;
+    throw err;
   }
 }
 
-/** Hydrates a collection's live items from Supabase for the given org.
- *  Returns null (not []) when there is no session/org yet, so callers can
- *  distinguish "no data" from "not authenticated — use the bundled seed". */
-export async function hydrateCollection(collectionId: string): Promise<CmsItem[] | null> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('cms_items')
-      .select('id, data')
-      .eq('org_id', orgId)
-      .eq('collection_id', collectionId);
-    if (error || !data) return null;
-    return data.map((row) => ({ id: row.id as string, ...(row.data as Record<string, unknown>) }));
-  } catch {
-    return null;
-  }
+/** Delete only the matching row within the resolved tenant; never report a silent success. */
+/** Strict delete path for UI actions that must not report success without cloud persistence. */
+export async function removeItemRequired(collectionId: string, id: string): Promise<void> {
+  if (!supabaseConfigured) throw new Error('[cms] Supabase is not configured; persistent delete refused.');
+  await removeItem(collectionId, id);
 }
 
-/** Ensures the collection definition itself exists remotely (idempotent upsert). */
-export async function upsertCollectionDef(def: CmsCollectionDef): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return;
-
-  try {
-    await supabase.from('cms_collections').upsert({
-      id: def.id,
-      org_id: orgId,
-      name: def.name,
-      singular: def.singular,
-      accent: def.accent,
-      title_field: def.titleField,
-      subtitle_field: def.subtitleField ?? null,
-      badge_field: def.badgeField ?? null,
-      fields: def.fields,
-    });
-  } catch {
-    // best-effort — the in-memory store already has the definition either way
-  }
-}
-
-/** Upserts one item. Fire-and-forget from the caller's perspective — the
- *  Zustand store already updated optimistically before this resolves. */
-export async function upsertItem(collectionId: string, item: CmsItem): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return;
-
-  try {
-    const { id, ...data } = item;
-    await supabase.from('cms_items').upsert({
-      id, collection_id: collectionId, org_id: orgId, data, updated_at: new Date().toISOString(),
-    });
-  } catch {
-    // best-effort — local state is the source of truth until Supabase confirms
-  }
-}
-
-/** Removes one item. Fire-and-forget from the caller's perspective — the
- *  Zustand store already updated optimistically before this resolves.
- *  Brief-F (2026-08-07) — la couche d'écriture appelle ce chemin en miroir
- *  de `upsertItem`. Sans lui, `removeItem` du store laissait la ligne dans
- *  Supabase après un rechargement. */
 export async function removeItem(collectionId: string, id: string): Promise<void> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return;
-
-  try {
-    await supabase
-      .from('cms_items')
-      .delete()
-      .eq('id', id)
-      .eq('collection_id', collectionId)
-      .eq('org_id', orgId);
-  } catch {
-    // best-effort — local state is the source of truth until Supabase confirms
+  if (!supabaseConfigured) {
+    setMode('unconfigured');
+    return;
   }
-}
-
-/** Append-only event sink used by domain surfaces to record state-changing
- *  decisions without mutating existing rows. D4 append-only compliance, no
- *  UPSERT semantics, no PATCH semantics. */
-export async function appendCmsEvent(args: {
-  collectionId: string;
-  data: Record<string, unknown>;
-}): Promise<string | null> {
-  const orgId = await getCurrentOrgId();
-  if (!orgId) return null;
-  const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  try {
-    await supabase.from('cms_items').insert({
-      id,
-      collection_id: args.collectionId,
-      org_id: orgId,
-      data: args.data,
-      updated_at: new Date().toISOString(),
-    });
-    return id;
-  } catch {
-    return null;
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
+    const error = new Error('[cms] delete refused: authenticated workspace context is unavailable');
+    setMode('no-org', error);
+    throw error;
   }
+  if (!tableFor(collectionId)) {
+    const error = new Error(`[cms] delete refused: collection "${collectionId}" has no persistent Marketplace table`);
+    setMode('unreachable', error);
+    throw error;
+  }
+  const tableName = tableFor(collectionId);
+  if (!tableName) throw new Error(`[cms] no persistent Marketplace table for collection: ${collectionId}`);
+  const { error } = await supabase.schema('workspace_data').from(tableName)
+    .delete()
+    .eq('id', id)
+    .eq('organization_id', context.organizationId)
+    .eq('workspace_id', context.workspaceId);
+  if (error) {
+    setMode('unreachable', error);
+    throw error;
+  }
+  setMode('connected');
 }

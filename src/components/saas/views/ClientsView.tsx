@@ -1,5 +1,5 @@
 // src/components/views/ClientsView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.clients schema.
+// Zero Bug Sprint — rewritten for the Marketplace tenant client directory.
 //
 // Bug fixes (D6 #95e, D6 #98, D6 #102, D6 #103):
 //   - (c.email ?? '').toLowerCase() prevents the null-email TypeError crash

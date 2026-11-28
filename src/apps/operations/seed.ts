@@ -325,7 +325,7 @@ const alertsItems: CmsItem[] = [
     when: '05:30',
     severity: 'warn',
     enrichment: 'enriched',
-    source: 'Supabase · omk_saas',
+    source: 'Supabase · Marketplace',
     riskScore: '0.55',
     hypothesis: 'Memory crept past 90% after a vault-import batch. The auto-archiver should bring it back under 80% within the next 2h. If not, escalate to ops lead.',
     trace: '05:30:00 vault.ingest batch=42 size=812MB\n05:32:00 supabase.memory 91.4% (warn)\n05:34:00 archive.daemon triggered',

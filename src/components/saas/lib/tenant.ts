@@ -1,14 +1,14 @@
 // src/lib/tenant.ts
-// ADR-OMK-005 (Phase C) — tenant isolation guard at the application layer.
+// ADR-TENANT-005 (Phase C) — tenant isolation guard at the application layer.
 //
 // PURPOSE
-//   The RLS policies in `omk_saas.*` filter rows server-side based on the
-//   `org_id` claim injected by `public.custom_access_token_hook`. This module
+//   The RLS policies in `workspace_data.*` enforce organization + workspace
+//   membership. This module
 //   adds a CLIENT-SIDE guard so that:
 //     1. Every repository call receives the active org_id (defense-in-depth).
 //     2. UI components can display tenant context (org name, user role).
 //     3. A clear runtime error fires if org_id is missing in saas mode
-//        (catches the silent-failure mode flagged in omk/AGENTS.md gotcha #4).
+//        (catches the silent-failure mode flagged in Marketplace engineering notes gotcha #4).
 //
 // USAGE
 //   import { useOrg } from './tenant';
@@ -74,7 +74,7 @@ export function useOrg(): TenantContext {
     console.warn(
       '[tenant] saas mode but orgId is NULL. RLS will return 0 rows. ' +
         'Check that auth hook `public.custom_access_token_hook` is wired in ' +
-        'Supabase Auth dashboard and that the user has a row in omk_saas.memberships.',
+        'Supabase Auth dashboard and that the user has a row in identity.organization_memberships.',
     );
   }
 
@@ -93,8 +93,18 @@ export function getActiveOrgId(): string | null {
 }
 
 let _activeOrgIdCache: string | null = null;
+let _activeWorkspaceIdCache: string | null = null;
+
 export function setActiveOrgIdCache(orgId: string | null): void {
   _activeOrgIdCache = orgId;
+}
+
+export function getActiveWorkspaceId(): string | null {
+  return _activeWorkspaceIdCache;
+}
+
+export function setActiveWorkspaceIdCache(workspaceId: string | null): void {
+  _activeWorkspaceIdCache = workspaceId;
 }
 
 /**
@@ -106,7 +116,7 @@ export function assertOrgIdForWrite(orgId: string | null, table: string): assert
   if (IS_SAAS && !orgId) {
     throw new Error(
       `[${table}] Cannot write in saas mode without an active orgId. ` +
-        'Check that the user is signed in AND has a row in omk_saas.memberships.',
+        'Check that the user is signed in AND has a row in identity.organization_memberships.',
     );
   }
 }

@@ -1,4 +1,4 @@
-/** OMK Growth canvas — pipeline kanban + reply inbox preview.
+/** A’Space Growth canvas — pipeline kanban + reply inbox preview.
  *
  *  Why this layout, not the landing template:
  *  Growth is about volume and velocity. The proof isn't a single testimonial —
@@ -269,7 +269,7 @@ export function GrowthCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

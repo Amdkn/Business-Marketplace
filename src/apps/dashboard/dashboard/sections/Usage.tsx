@@ -6,8 +6,9 @@ import { AlertTriangle, Coins, Gauge, Timer, TrendingUp } from 'lucide-react';
 import { COST_BUCKETS, MONTH_SUMMARY, USAGE_TODAY } from '../seed';
 import { useDashboardAgents } from '../cmsAgents';
 import { ACCENT, IconChip, KpiTile, Panel, ProgressBar, SectionTitle, Sparkline } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 
-export function Usage() {
+function DemoUsage() {
   // Agent list comes from CMS so the "tous comptés" footer reflects the
   // current count (seed + user-created). The cost buckets stay on the seed
   // — they're aggregates, not per-agent rows.
@@ -155,3 +156,11 @@ function Small({ label, value }: { label: string; value: string }) {
 
 // Suppress unused import warnings for icons kept for future use.
 void Coins; void Timer; void TrendingUp;
+
+
+export function Usage() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoUsage />
+    : <RuntimeUnavailable title="Usage" description="Token counts, daily caps and projections require authenticated runtime usage events; no such feed is connected to this workspace." />;
+}

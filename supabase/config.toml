@@ -1,0 +1,13 @@
+project_id = "swegnrvaxxgfrnshdpxx"
+
+[functions.marketplace-api]
+verify_jwt = true
+
+[functions.adapter-api]
+verify_jwt = true
+
+[functions.adapter-worker]
+verify_jwt = false
+
+[functions.adapter-oauth-callback]
+verify_jwt = false

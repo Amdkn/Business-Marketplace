@@ -32,6 +32,7 @@ import {
   type TenantActions,
 } from '../lib/tenant/contract';
 import { createScopedStorage } from '../lib/auth/storage-scope';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 /** The default tenant for the single-tenant demo seed. Picked deliberately
  *  to match the `demo_coach_*` collections in `cms/seed.ts` and the existing
@@ -51,8 +52,8 @@ export const TENANT_DEMO_COACH: TenantId = 'demo-coach' as TenantId;
 // elle (legacy) ou avec une version antérieure, on retombe sur le
 // tenant par défaut. La clé `STORAGE_KEY` reste inchangée pour le
 // bridge.
-const STORAGE_KEY = 'coach-os:activeTenantId';
-const VERSION_KEY = 'coach-os:activeTenantId.version';
+const STORAGE_KEY = 'aspace-marketplace:activeTenantId';
+const VERSION_KEY = 'aspace-marketplace:activeTenantId.version';
 const SCHEMA_VERSION = 1;
 
 function readPersistedTenant(): TenantId {
@@ -98,16 +99,56 @@ export const useTenantStore = create<TenantState & TenantActions>((set, get) => 
   bootstrap: async (): Promise<void> => {
     set({ isLoading: true, error: null });
     try {
-      // Phase 3 hook: read memberships from Supabase and populate knownTenants.
-      // Today there is no auth UI, so this is a no-op beyond confirming the
-      // persisted tenant is still valid.
-      const persisted = readPersistedTenant();
+      if (!supabaseConfigured) {
+        const persisted = readPersistedTenant();
+        set({ activeTenantId: persisted, isLoading: false });
+        return;
+      }
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session?.user) {
+        set({
+          activeTenantId: TENANT_DEFAULT as TenantId,
+          displayName: 'No active tenant',
+          knownTenants: [],
+          isLoading: false,
+        });
+        return;
+      }
+
+      // enterprise is intentionally private; resolve the caller's unique active
+      // organization/workspace through the authenticated identity RPC.
+      const { data: contexts, error: contextError } = await supabase
+        .schema('identity')
+        .rpc('get_current_workspace_context');
+      if (contextError) throw contextError;
+      const context = Array.isArray(contexts) ? contexts[0] : contexts;
+      if (!context) {
+        set({
+          activeTenantId: TENANT_DEFAULT as TenantId,
+          displayName: 'Workspace context unavailable',
+          knownTenants: [],
+          isLoading: false,
+          error: 'An active organization and exactly one active workspace membership are required.',
+        });
+        return;
+      }
+
+      const tenantId = context.organization_id as TenantId;
+      const displayName = context.organization_name as string;
+      persistTenant(tenantId);
       set({
-        activeTenantId: persisted,
+        activeTenantId: tenantId,
+        displayName,
+        knownTenants: [{ tenantId, displayName }],
         isLoading: false,
       });
     } catch (err) {
       set({
+        activeTenantId: TENANT_DEFAULT as TenantId,
+        displayName: 'Tenant context unavailable',
+        knownTenants: [],
         isLoading: false,
         error: err instanceof Error ? err.message : String(err),
       });

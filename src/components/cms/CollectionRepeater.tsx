@@ -106,8 +106,8 @@ export function CollectionRepeater({
 }: CollectionRepeaterProps): import('react').ReactNode {
   const def = useCmsStore(s => s.collections[collectionId]);
   const allItems = useCmsStore(s => s.items[collectionId]) ?? [];
-  const addItem = useCmsStore(s => s.addItem);
-  const removeItem = useCmsStore(s => s.removeItem);
+  const addItem = useCmsStore(s => s.addItemPersisted);
+  const removeItem = useCmsStore(s => s.removeItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const items = filter ? allItems.filter(filter) : allItems;
 
@@ -115,6 +115,7 @@ export function CollectionRepeater({
   const [creating, setCreating] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   // HTMLFormElement, pas HTMLDivElement : cette ref est attachee au <form> de
   // creation (plus bas), jamais a un div. Le type mentait sans consequence a
   // l'execution — `contains()` marche sur n'importe quel Node — mais il rendait
@@ -191,12 +192,13 @@ export function CollectionRepeater({
     setSubmitError(null);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>): void {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    if (saving) return;
     setSubmitError(null);
     const titleRaw = String(values[def!.titleField] ?? '').trim();
     if (!titleRaw) {
-      setSubmitError(`Le titre est obligatoire.`);
+      setSubmitError('Le titre est obligatoire.');
       return;
     }
     const titleKey = titleRaw.toLowerCase();
@@ -204,53 +206,59 @@ export function CollectionRepeater({
       setSubmitError(`"${titleRaw}" existe déjà dans ${def!.name}.`);
       return;
     }
-    // `formFieldsFor` et non `def.fields` : sans lui le champ titre était
-    // absent du payload, l'item se créait sans titre et la carte affichait
-    // son sous-titre à la place. Le toast disait pourtant « créé », ce qui
-    // rendait le défaut invisible sans regarder la liste.
     const partial: Record<string, string | number> = {};
-    for (const f of formFieldsFor(def!)) {
-      partial[f.key] = parseSubmitValue(f, values[f.key] ?? '');
+    for (const field of formFieldsFor(def!)) {
+      partial[field.key] = parseSubmitValue(field, values[field.key] ?? '');
     }
-    const result = addItem(collectionId, partial as Omit<CmsItem, 'id'>);
-    if (!result.ok) {
-      const msg = result.error ?? 'Création échouée.';
-      setSubmitError(msg);
-      addToast({ source: def!.name, type: 'error', message: msg });
-      return;
+
+    setSaving(true);
+    try {
+      const result = await addItem(collectionId, partial as Omit<CmsItem, 'id'>);
+      if (!result.ok) {
+        const message = result.error ?? 'Création échouée.';
+        setSubmitError(message);
+        addToast({ source: def!.name, type: 'error', message });
+        return;
+      }
+      addToast({
+        source: def!.name,
+        type: 'success',
+        message: `${def!.singular} « ${titleRaw} » créé et enregistré.`,
+      });
+      setValues({});
+      setCreating(false);
+    } finally {
+      setSaving(false);
     }
-    addToast({
-      source: def!.name,
-      type: 'success',
-      message: `${def!.singular} « ${titleRaw} » créé.`,
-    });
-    // Keep the form open? No — clear and close; if the user wants to add
-    // several, the empty-state / header button is one click away.
-    setValues({});
-    setCreating(false);
   }
 
-  function handleDelete(itemId: string, itemTitle: string): void {
+  async function handleDelete(itemId: string, itemTitle: string): Promise<void> {
+    if (saving) return;
     if (confirmDeleteId !== itemId) {
       setConfirmDeleteId(itemId);
       return;
     }
-    const result = removeItem(collectionId, itemId);
-    if (!result.ok) {
+    setSaving(true);
+    try {
+      const result = await removeItem(collectionId, itemId);
+      if (!result.ok) {
+        addToast({
+          source: def!.name,
+          type: 'error',
+          message: result.error ?? 'Suppression échouée.',
+        });
+        setConfirmDeleteId(null);
+        return;
+      }
       addToast({
         source: def!.name,
-        type: 'error',
-        message: result.error ?? 'Suppression échouée.',
+        type: 'success',
+        message: `${def!.singular} « ${itemTitle} » supprimé du workspace.`,
       });
       setConfirmDeleteId(null);
-      return;
+    } finally {
+      setSaving(false);
     }
-    addToast({
-      source: def!.name,
-      type: 'success',
-      message: `${def!.singular} « ${itemTitle} » supprimé.`,
-    });
-    setConfirmDeleteId(null);
   }
 
   return (
@@ -384,6 +392,7 @@ export function CollectionRepeater({
             <button
               type="button"
               onClick={closeCreate}
+              disabled={saving}
               className="h-7 px-3 rounded-lg text-[11px] font-semibold"
               style={{ color: 'var(--theme-text-muted)' }}
             >
@@ -391,11 +400,12 @@ export function CollectionRepeater({
             </button>
             <button
               type="submit"
+              disabled={saving}
               data-cms-action={`submit-${collectionId}`}
               className="h-7 px-3 rounded-lg text-[11px] font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ background: def.accent }}
             >
-              Créer
+              {saving ? 'Enregistrement…' : 'Créer'}
             </button>
           </div>
         </form>
@@ -445,9 +455,10 @@ export function CollectionRepeater({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDelete(String(item.id), title);
+                    void handleDelete(String(item.id), title);
                   }}
                   aria-label={isConfirming ? `Confirmer la suppression de ${title}` : `Supprimer ${title}`}
+                  disabled={saving}
                   data-cms-action={isConfirming ? `confirm-delete-${collectionId}-${item.id}` : `delete-${collectionId}-${item.id}`}
                   className="absolute top-2 right-2 h-6 px-2 rounded-md text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 transition-all"
                   style={

@@ -18,11 +18,20 @@ registerItemDetail('clients', ClientsItemDetail);
 
 const ACCENT = '#2563eb';
 
+function formatClientTicket(ticket: unknown, currency: string): string {
+  const amount = Number(ticket);
+  if (!Number.isFinite(amount)) return 'Not specified';
+  if (/^[A-Z]{3}$/.test(currency)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount); } catch { /* unknown currency code */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
+}
+
 export function ClientsApp() {
   const clients = useCmsStore(s => s.items['clients']) ?? [];
   const drill = useCollectionDrill('clients', ['Active', 'Onboarding', 'Churn Risk', 'Directory']);
   const vaultDrill = useCollectionDrill('session_notes', 'IP Vault');
-  const addItem = useCmsStore(s => s.addItem);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<ClientsDetailItem | null>(null);
   const { activePage, setDetail: setWindowDetail } = useWindowPage();
@@ -57,54 +66,64 @@ export function ClientsApp() {
   const riskClients = clients.filter(c => c.status === 'At risk');
   const sessionNotes = useCmsStore(s => s.items['session_notes']) ?? [];
 
-  /** Compose a new client. The mini-form takes a name and a monthly ticket;
-   *  everything else is defaulted to canonical Citadelle values so the new
-   *  row slots into the existing lists cleanly (Active section, Directory
-   *  card, etc.). The mutation flows through `addItem` so the new client
-   *  appears in the right tab without any manual refresh. */
+  /** Create a workspace client with an explicit ticket amount and currency. */
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerName, setComposerName] = useState('');
-  const [composerSegment, setComposerSegment] = useState('Citadelle — high ticket');
-  const [composerTicket, setComposerTicket] = useState('1800');
+  const [composerSegment, setComposerSegment] = useState('');
+  const [composerTicket, setComposerTicket] = useState('');
+  const [composerCurrency, setComposerCurrency] = useState('');
+  const [savingClient, setSavingClient] = useState(false);
 
-  const submitNewClient = (): void => {
+  const submitNewClient = async (): Promise<void> => {
+    if (savingClient) return;
     const name = composerName.trim();
     if (name.length === 0) {
       addToast({ source: 'Clients', type: 'warning', message: 'Client name is required.' });
       return;
     }
-    // Ticket must be a positive number — refuse silently-defaulting values so
-    // a coach can't create a row with an unknown monthly value.
     const ticket = Number(composerTicket);
     if (!Number.isFinite(ticket) || ticket <= 0) {
       addToast({ source: 'Clients', type: 'warning', message: 'Monthly ticket must be a positive number.' });
       return;
     }
-    const result = addItem('clients', {
-      name,
-      segment: composerSegment.trim() || 'Citadelle — high ticket',
-      ticket,
-      openThreads: 0,
-      nextSession: 'Not scheduled',
-      health: 100,
-      onboardingStep: '1 / 7',
-      status: 'Onboarding',
-    });
-    if (result.ok) {
-      addToast({ source: 'Clients', type: 'success', message: `Client added: ${name}` });
-      setComposerName('');
-      setComposerSegment('Citadelle — high ticket');
-      setComposerTicket('1800');
-      setComposerOpen(false);
-    } else {
-      addToast({ source: 'Clients', type: 'warning', message: result.error ?? 'Could not add client.' });
+    const currency = composerCurrency.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      addToast({ source: 'Clients', type: 'warning', message: 'Enter a valid ISO 4217 currency code.' });
+      return;
+    }
+    setSavingClient(true);
+    try {
+      const result = await addItem('clients', {
+        name,
+        segment: composerSegment.trim() || 'Unassigned',
+        ticket,
+        currency,
+        openThreads: 0,
+        nextSession: 'Not scheduled',
+        health: null,
+        onboardingStep: '1 / 7',
+        status: 'Onboarding',
+      });
+      if (result.ok) {
+        addToast({ source: 'Clients', type: 'success', message: `Client enregistré : ${name}` });
+        setComposerName('');
+        setComposerSegment('');
+        setComposerTicket('');
+        setComposerCurrency('');
+        setComposerOpen(false);
+      } else {
+        addToast({ source: 'Clients', type: 'warning', message: result.error ?? 'Could not persist client.' });
+      }
+    } finally {
+      setSavingClient(false);
     }
   };
 
   const cancelComposer = (): void => {
     setComposerName('');
-    setComposerSegment('Citadelle — high ticket');
-    setComposerTicket('1800');
+    setComposerSegment('');
+    setComposerTicket('');
+    setComposerCurrency('');
     setComposerOpen(false);
   };
 
@@ -121,7 +140,7 @@ export function ClientsApp() {
       portrait: { initials, gradient: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' },
       pills: [
         { label: 'Health', value: `${health || '—'}%`, tone: health >= 80 ? 'good' : health >= 50 ? 'warn' : health > 0 ? 'bad' : 'neutral' },
-        { label: 'Ticket', value: `$${Number(item.ticket ?? 0).toLocaleString()}`, tone: 'neutral' },
+        { label: 'Ticket', value: formatClientTicket(item.ticket, String(item.currency ?? '')), tone: 'neutral' },
         { label: 'Open threads', value: String(item.openThreads ?? 0), tone: 'neutral' },
         { label: 'Next session', value: String(item.nextSession ?? '—'), tone: 'neutral' },
         { label: 'Onboarding', value: String(item.onboardingStep ?? 'complete'), tone: item.status === 'Onboarding' ? 'warn' : 'good' },
@@ -285,7 +304,7 @@ export function ClientsApp() {
                   value={composerName}
                   onChange={(e) => setComposerName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="Elena Marquez"
@@ -310,10 +329,10 @@ export function ClientsApp() {
                   value={composerSegment}
                   onChange={(e) => setComposerSegment(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
-                  placeholder="Citadelle — high ticket"
+                  placeholder="Unassigned segment"
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
                   style={{
                     background: 'var(--theme-bg)',
@@ -328,20 +347,20 @@ export function ClientsApp() {
                   style={{ color: 'var(--theme-text-dim)' }}
                   htmlFor="clients-composer-ticket"
                 >
-                  Monthly ticket (USD)
+                  Monthly ticket amount
                 </label>
                 <input
                   id="clients-composer-ticket"
                   type="number"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   min="0"
                   value={composerTicket}
                   onChange={(e) => setComposerTicket(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewClient();
+                    if (e.key === 'Enter') void submitNewClient();
                     if (e.key === 'Escape') cancelComposer();
                   }}
-                  placeholder="1800"
+                  placeholder="1200"
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
                   style={{
                     background: 'var(--theme-bg)',
@@ -349,6 +368,12 @@ export function ClientsApp() {
                     color: 'var(--theme-text)',
                   }}
                 />
+              </div>
+              <div>
+                <label className="block text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ color: 'var(--theme-text-dim)' }} htmlFor="clients-composer-currency">Currency (ISO 4217)</label>
+                <input id="clients-composer-currency" required maxLength={3} value={composerCurrency} onChange={(e) => setComposerCurrency(e.target.value.toUpperCase())}
+                  placeholder="USD" className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
+                  style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }} />
               </div>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
@@ -364,14 +389,15 @@ export function ClientsApp() {
                 Cancel
               </button>
               <button
-                onClick={submitNewClient}
+                onClick={() => void submitNewClient()}
+                  disabled={savingClient || !composerCurrency.trim()}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Add client
+                {savingClient ? 'Saving…' : 'Add client'}
               </button>
             </div>
           </div>

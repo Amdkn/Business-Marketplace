@@ -1,318 +1,244 @@
 /**
- * SalesApp — section Today : la carte 'the one thing to act on today',
- * les calls du jour, les top tasks, et le journal 'what changed today'.
- * Extrait de SalesApp.tsx.
+ * Sales Today — tenant-backed tasks, deals and workspace activity.
+ * Calendar and call panels stay explicit empty states until their adapters
+ * write records into this workspace; no prospect or meeting fixtures are shown.
  */
-import { CheckCheck, CircleDashed, Cloud, FileText, Mail, Phone, PhoneCall, Users } from 'lucide-react';
-import { useShellStore } from '../../../stores/shell.store';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, CheckCheck, CircleDashed, PhoneCall, Target } from 'lucide-react';
+import { useCmsStore } from '../../../lib/cms/cms.store';
+import { listWorkspaceActivity, type WorkspaceActivityEvent } from '../sales.repo';
 import type { DetailItem } from '../SalesDetailPage';
-import {
-  ACCENT, Eyebrow, FONT_BODY, FONT_DISPLAY, FONT_MONO, ICP_EDGE, ICP_FIT, ICP_OFF, LOSE,
-  PageHeader, RELANCE, WIN,
-  type CallRecord, type CalendarRecord, type ChangeRecord, type TaskRecord,
-} from './Primitives';
+import { ACCENT, Eyebrow, FONT_DISPLAY, Frame, RELANCE, WIN } from './Primitives';
 
-const CALLS: CallRecord[] = [
-  { id: 'call-anish', name: 'Anish', company: 'Anish Labs', role: 'Co-founder & CEO · funded scale-up', time: '12:20', stage: 'Qualified · rebooked', score: 72, badge: 'on-ICP', brief: "Anish is back in the seat after a one-week slip. The discovery surfaced a clear trigger — paid search spend above a 12k €/mo threshold — and a buying committee with the founder, the head of growth, and a quiet CFO. The call's job is to confirm the budget owner and the implementation window before a proposal is drafted.", links: [{ label: 'Full brief', icon: FileText }, { label: 'LinkedIn', icon: Users }, { label: 'Website', icon: Cloud }, { label: 'Join call', icon: PhoneCall }, { label: 'Email', icon: Mail }, { label: '+33 1 02 03 04 05', icon: Phone }] },
-  { id: 'call-louis', name: 'Louis', company: 'Louis Conseil', role: 'Co-founder · independent AI advisory', time: '16:45', stage: 'Offer fit', score: 54, badge: 'ICP-edge', brief: "Louis runs a Paris agency that builds turnkey AI ops for SMBs. The band matches but the headcount and the build-it-myself reflex push him to the ceiling of the standard package. Open the call by qualifying intent (narrow fit vs. study the method) — do not pitch the $5k offer before that read.", links: [{ label: 'Full brief', icon: FileText }, { label: 'LinkedIn', icon: Users }, { label: 'Website', icon: Cloud }, { label: 'Join call', icon: PhoneCall }, { label: 'Email', icon: Mail }] },
-  { id: 'call-itay', name: 'Itay', company: 'xGrowth, Cyprus', role: 'Founder & CEO · app-growth consultancy', time: '18:00', stage: 'Rebooked', score: 38, badge: 'off-ICP', brief: "This is the rebooked first call. The 06-29 slot was missed on our side while you were flying back from the offsite, and the apology plus fresh intro already went out, so the deal stays clean. The one flag is geography: xGrowth is Cyprus-based, outside the strict US line. Confirm he is buying for xGrowth itself, get the headcount (target 1-25), and note Cyprus without leading with it.", links: [{ label: 'Full brief', icon: FileText }, { label: 'LinkedIn', icon: Users }, { label: 'Website', icon: Cloud }, { label: 'Join call', icon: PhoneCall }, { label: 'Email', icon: Mail }, { label: '+357 97869398', icon: Phone }] },
-];
-
-const TASKS: TaskRecord[] = [
-  { id: 'task-tim', title: "Send Tim's drafted proposal", when: 'Today · time-critical', priority: 'now', tone: 'danger', note: 'The PandaDoc draft is ready. Send before Tim reviews with his partner this week.' },
-  { id: 'task-itay', title: 'Confirm Itay rebook', when: 'Today · owed', priority: 'now', tone: 'warn', note: 'Send a one-line pre-call confirmation. Keep momentum on the rebooked slot.' },
-  { id: 'task-louis', title: 'Prepare Louis offer fit', when: 'Today · 18:00 call', priority: 'next', tone: 'accent', note: 'Bring the outcome, scope boundary, and the narrow-fit question into the call brief.' },
-  { id: 'task-anish', title: 'Verify Anish budget owner', when: 'Today · 12:20 call', priority: 'watch', tone: 'ok', note: 'Confirm whether the CFO is the silent signatory before the proposal draft.' },
-];
-
-const CHANGES: ChangeRecord[] = [
-  { id: 'ch-1', time: '08:00', text: "Morning routine ran on time and cleaned 3 stale deals from last week." },
-  { id: 'ch-2', time: '07:42', text: "Two pipeline calls (Itay 12:20, Anish 12:20) flagged for re-confirmation by the calendar agent." },
-  { id: 'ch-3', time: 'Yesterday', text: "Rep scoreboard closed at 7.5 — closing still the gap, demo stable." },
-  { id: 'ch-4', time: 'Yesterday', text: "Tim's PandaDoc draft updated with the 07-04 partner-review date." },
-];
-
-const CALENDAR: CalendarRecord[] = [
-  { id: 'cal-marko', label: 'Marko · 15:00 IST', detail: 'A YouTube strategist hiring round, not a sales call.' },
-  { id: 'cal-qa', label: 'Q&A with Ben · 17:00 CEST', detail: 'Community event on the accelerator calendar, not pipeline.' },
-  { id: 'cal-booked', label: 'Booked ahead · 07-04', detail: 'Tim De La Salle onboarding follow-up.' },
-];
-
-function callDetail(call: CallRecord): DetailItem {
+function taskDetail(task: Record<string, unknown>): DetailItem {
+  const title = String(task.label ?? task.title ?? 'Untitled task');
+  const isDone = ['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase());
   return {
-    id: call.id, kind: 'call', title: call.name, subtitle: call.company, status: call.stage, summary: call.brief,
+    id: String(task.id),
+    kind: 'task',
+    title,
+    subtitle: String(task.when ?? ''),
+    status: isDone ? 'done' : String(task.group ?? 'open'),
+    summary: String(task.notes ?? task.body ?? 'No task notes recorded.'),
     fields: [
-      { label: 'Time', value: call.time },
-      { label: 'Role', value: call.role },
-      { label: 'Qualification score', value: `${call.score}/100 · ${call.badge}` },
-      { label: 'Stage', value: call.stage },
+      { label: 'When', value: String(task.when ?? 'Not scheduled') },
+      { label: 'Group', value: String(task.group ?? 'Unassigned') },
+      { label: 'Status', value: isDone ? 'Done' : 'Open' },
     ],
   };
 }
 
-function taskDetail(task: TaskRecord): DetailItem {
+function formatDealValue(value: unknown, currency: string): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 'Value unknown';
+  if (/^[A-Z]{3}$/.test(currency)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount); } catch { /* unknown currency code */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
+}
+
+function dealDetail(deal: Record<string, unknown>): DetailItem {
+  const title = String(deal.client ?? deal.title ?? 'Untitled deal');
   return {
-    id: task.id, kind: 'task', title: task.title, subtitle: task.when, status: task.priority, summary: task.note,
+    id: String(deal.id),
+    kind: 'deal',
+    clientId: String(deal.clientId ?? ''),
+    currency: String(deal.currency ?? ''),
+    amount: Number(deal.value ?? 0),
+    title,
+    subtitle: String(deal.offer ?? ''),
+    status: String(deal.stage ?? 'open'),
+    summary: 'Workspace deal record.',
     fields: [
-      { label: 'When', value: task.when },
-      { label: 'Priority', value: task.priority },
-      { label: 'Note', value: task.note },
+      { label: 'Offer', value: String(deal.offer ?? 'Not specified') },
+      { label: 'Value', value: deal.value == null ? 'Not specified' : formatDealValue(deal.value, String(deal.currency ?? '')) },
+      { label: 'Stage', value: String(deal.stage ?? 'Open') },
     ],
   };
 }
 
-// ─── Section: Today ───
+function activitySummary(event: WorkspaceActivityEvent): string {
+  const payload = event.eventPayload;
+  for (const key of ['summary', 'message', 'title', 'description']) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return event.eventType;
+}
+
+function activityTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+}
 
 export function TodayPanel({ onSelect }: { onSelect: (item: DetailItem) => void }) {
-  const addToast = useShellStore(s => s.addToast);
+  const tasks = useCmsStore((state) => state.items.tasks ?? []);
+  const deals = useCmsStore((state) => state.items.deals ?? []);
+  const [events, setEvents] = useState<WorkspaceActivityEvent[] | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listWorkspaceActivity()
+      .then((rows) => { if (!cancelled) setEvents(rows); })
+      .catch((reason: unknown) => {
+        if (!cancelled) setActivityError(reason instanceof Error ? reason.message : 'Unable to load workspace activity.');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const openTasks = useMemo(
+    () => tasks.filter((task) => !['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase())),
+    [tasks],
+  );
+  const activeDeals = useMemo(
+    () => deals.filter((deal) => !['won', 'lost', 'closed'].includes(String(deal.stage ?? '').toLowerCase())),
+    [deals],
+  );
+  const todayFocus = openTasks.filter((task) => String(task.group ?? '').toLowerCase() === 'today' || String(task.when ?? '').toLowerCase().includes('today'));
+  const dateLabel = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-8 py-8" style={{ fontFamily: FONT_BODY }}>
-      <PageHeader
-        eyebrow="Sales OS · live operating layer · Coach OS"
-        title="Sales OS"
-        subtitle="The stateful operating layer behind the coaching offer. It always knows the calls, the pipeline, and the changes — and keeps itself current."
-        meta={{ label: 'Updated', value: new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), sub: 'Regenerated daily after the morning routines' }}
-      />
-
-      {/* The one thing to act on today — black band */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <section
-          className="rounded-2xl p-7"
-          style={{ background: 'var(--theme-text)', color: 'var(--theme-bg)' }}
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: 'var(--theme-bg)' }}
-              aria-hidden
-            />
-            <Eyebrow>the one thing to act on today</Eyebrow>
-          </div>
-          <p
-            className="text-[20px] font-extrabold leading-[1.25] tracking-tight"
-            style={{ fontFamily: FONT_DISPLAY }}
-          >
-            Send Tim De La Salle's proposal, one-pager, and information checklist{' '}
-            <span style={{ background: 'rgba(187,247,208,0.6)', color: 'var(--theme-text)' }}>out the door today</span>
-            . #12 still unsent — he reviews with his partner and decides this week. Then run three live calls,{' '}
-            <span style={{ background: 'rgba(254,243,199,0.85)', color: 'var(--theme-text)' }}>opening with the 12:20 Itay rebook you owe him</span>
-            , followed by Louis at 16:45 and Anish at 18:00.
-          </p>
-        </section>
-
-        <aside
-          className="rounded-2xl p-6"
-          style={{ background: 'var(--theme-surface)', border: '1px solid var(--panel-border)' }}
-        >
-          <Eyebrow>Also on the calendar, not pipeline</Eyebrow>
-          <ul className="mt-3 space-y-3">
-            {CALENDAR.map((c) => (
-              <li key={c.id} className="text-[12.5px]">
-                <button
-                  type="button"
-                  onClick={() => addToast({
-                    source: 'Sales',
-                    type: 'info',
-                    message: `${c.label} — ${c.detail}`,
-                  })}
-                  className="text-left rounded-lg p-1.5 -m-1.5 transition-colors hover:bg-[var(--theme-surface-hover)]"
-                >
-                  <div className="font-bold" style={{ color: 'var(--theme-text)' }}>{c.label}</div>
-                  <div style={{ color: 'var(--theme-text-muted)' }}>{c.detail}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
-
-      {/* Today's calls */}
-      <section className="mt-10">
-        <div className="mb-4 flex items-end justify-between">
-          <div className="flex items-baseline gap-3">
-            <span
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-bold"
-              style={{ background: 'var(--theme-text)', color: 'var(--theme-bg)', fontFamily: FONT_MONO }}
-            >01</span>
-            <h2
-              className="text-[20px] font-extrabold tracking-tight"
-              style={{ fontFamily: FONT_DISPLAY, color: 'var(--theme-text)' }}
-            >
-              Today's calls
-            </h2>
-          </div>
-          <Eyebrow>call-prep, per prospect</Eyebrow>
+    <div className="p-7 flex flex-col gap-8" style={{ color: 'var(--theme-text)', background: 'var(--theme-bg)' }}>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Eyebrow>Sales · Workspace snapshot</Eyebrow>
+          <h1 className="mt-2 text-[36px] font-extrabold tracking-tight" style={{ fontFamily: FONT_DISPLAY }}>Today</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--theme-text-muted)' }}>{dateLabel} · live workspace records, not demo fixtures</p>
         </div>
+        <div className="flex gap-3 text-xs font-mono">
+          <span className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--panel-border)' }}>{openTasks.length} open tasks</span>
+          <span className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--panel-border)' }}>{activeDeals.length} active deals</span>
+        </div>
+      </header>
 
-        <div className="space-y-4">
-          {CALLS.map((call) => {
-            const tone = call.badge === 'on-ICP' ? ICP_FIT : call.badge === 'ICP-edge' ? ICP_EDGE : ICP_OFF;
-            return (
-              <article
-                key={call.id}
-                className="relative overflow-hidden rounded-2xl"
-                style={{ background: 'var(--theme-surface)', border: '1px solid var(--panel-border)' }}
-              >
-                <span
-                  aria-hidden
-                  className="absolute inset-y-0 left-0 w-1"
-                  style={{ background: tone }}
-                />
-                <button
-                  type="button"
-                  onClick={() => onSelect(callDetail(call))}
-                  className="flex w-full flex-col gap-3 p-6 pl-7 text-left"
-                  style={{ color: 'var(--theme-text)' }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-[16px] font-extrabold tracking-tight" style={{ fontFamily: FONT_DISPLAY }}>
-                        {call.name} <span style={{ color: 'var(--theme-text-muted)' }}>· {call.company}, {call.role}</span>
-                      </div>
-                      <div
-                        className="mt-1 text-[10.5px] font-bold uppercase"
-                        style={{ letterSpacing: '0.18em', color: 'var(--theme-text-dim)', fontFamily: FONT_MONO }}
-                      >
-                        Today {call.time} · {call.stage}
-                      </div>
-                    </div>
-                    <span
-                      className="rounded-md px-2.5 py-1 text-[10px] font-bold uppercase"
-                      style={{
-                        background: tone,
-                        color: 'var(--theme-bg)',
-                        letterSpacing: '0.14em',
-                        fontFamily: FONT_MONO,
-                      }}
-                    >
-                      {call.badge} · {call.score}/100
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
+        <Frame accent="accent">
+          <div className="p-6">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4" style={{ color: ACCENT }} />
+              <Eyebrow>Today's focus · tasks table</Eyebrow>
+            </div>
+            {todayFocus.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {todayFocus.slice(0, 5).map((task) => (
+                  <button key={task.id} type="button" onClick={() => onSelect(taskDetail(task))}
+                    className="flex w-full items-start justify-between gap-4 rounded-xl border p-3 text-left transition hover:bg-[var(--theme-surface-hover)]"
+                    style={{ borderColor: 'var(--panel-border-subtle)' }}>
+                    <span>
+                      <span className="block text-sm font-semibold">{String(task.label ?? task.title ?? 'Untitled task')}</span>
+                      <span className="mt-1 block text-xs" style={{ color: 'var(--theme-text-muted)' }}>{String(task.when ?? 'Not scheduled')}</span>
                     </span>
-                  </div>
-                  <p className="text-[13.5px] leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-                    {call.brief}
-                  </p>
-                </button>
-                <div
-                  className="flex flex-wrap items-center gap-2 border-t px-6 py-3 pl-7"
-                  style={{ borderColor: 'var(--panel-border-subtle)' }}
-                >
-                  {call.links.map((l) => (
-                    <button
-                      type="button"
-                      key={l.label}
-                      onClick={() => {
-                        if (l.label === 'Full brief') {
-                          // Reuse the same fiche the card itself opens.
-                          onSelect(callDetail(call));
-                          return;
-                        }
-                        // Every other tag (LinkedIn / Website / Join call /
-                        // Email / phone) reads as a navigation affordance.
-                        // Without a real action it was a dead <span>; now
-                        // it pushes a toast that says where the link would
-                        // take the coach — a stub, but an observable one.
-                        const target =
-                          l.label === 'LinkedIn' ? `Open LinkedIn profile for ${call.name}`
-                          : l.label === 'Website' ? `Open website for ${call.company}`
-                          : l.label === 'Join call' ? `Open calendar invite for the ${call.time} call with ${call.name}`
-                          : l.label === 'Email' ? `Compose email to ${call.name}`
-                          : `Dial ${call.name}`;
-                        addToast({ source: 'Sales', type: 'info', message: target });
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11.5px] font-semibold transition-opacity hover:opacity-80 active:scale-[0.98]"
-                      style={{
-                        background: l.label === 'Full brief' ? 'rgba(21,128,61,0.10)' : 'var(--theme-surface-hover)',
-                        color: l.label === 'Full brief' ? WIN : 'var(--theme-text)',
-                        border: '1px solid var(--panel-border)',
-                      }}
-                      aria-label={`${l.label} for ${call.name}`}
-                    >
-                      <l.icon className="h-3 w-3" />
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                    <span className="rounded-md px-2 py-1 text-[10px] font-bold uppercase" style={{ background: 'rgba(21,128,61,0.10)', color: WIN }}>
+                      {String(task.group ?? 'today')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-dashed p-6 text-sm" style={{ borderColor: 'var(--panel-border)', color: 'var(--theme-text-muted)' }}>
+                No open task is marked for today. Create or schedule one in the Tasks workspace.
+              </div>
+            )}
+          </div>
+        </Frame>
+
+        <Frame>
+          <div className="p-6">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" style={{ color: 'var(--theme-text-muted)' }} />
+              <Eyebrow>Calendar connection</Eyebrow>
+            </div>
+            <p className="mt-4 text-sm font-semibold">No calendar event feed is connected.</p>
+            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
+              This panel will show real workspace calendar events when a calendar adapter is connected. No appointments are inferred from sample data.
+            </p>
+          </div>
+        </Frame>
       </section>
 
-      {/* Top tasks + What changed today */}
-      <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <article
-          className="rounded-2xl p-6"
-          style={{ background: 'var(--theme-surface)', border: '1px solid var(--panel-border)' }}
-        >
-          <div className="mb-4 flex items-center gap-2.5">
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <CheckCheck className="h-4 w-4" style={{ color: 'var(--theme-text)' }} />
-            <h3
-              className="text-[16px] font-extrabold tracking-tight"
-              style={{ fontFamily: FONT_DISPLAY, color: 'var(--theme-text)' }}
-            >
-              Top tasks
-            </h3>
+            <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>Open tasks</h2>
           </div>
-          <ul className="space-y-3">
-            {TASKS.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(taskDetail(t))}
-                  className="block w-full text-left"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[13.5px] font-semibold" style={{ color: 'var(--theme-text)' }}>
-                      {t.title}
-                    </span>
-                    <span
-                      className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
-                      style={{
-                        letterSpacing: '0.16em',
-                        background: t.tone === 'danger' ? LOSE : t.tone === 'warn' ? RELANCE : t.tone === 'ok' ? WIN : ACCENT,
-                        color: 'var(--theme-bg)',
-                        fontFamily: FONT_MONO,
-                      }}
-                    >
-                      {t.priority}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[12px]" style={{ color: 'var(--theme-text-muted)' }}>
-                    {t.when} — {t.note}
-                  </div>
-                </button>
-              </li>
+          <Eyebrow>workspace_data.tasks</Eyebrow>
+        </div>
+        {openTasks.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-6 text-sm" style={{ borderColor: 'var(--panel-border)', color: 'var(--theme-text-muted)' }}>No open tasks in this workspace.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {openTasks.slice(0, 9).map((task) => (
+              <button key={task.id} type="button" onClick={() => onSelect(taskDetail(task))}
+                className="rounded-xl border p-4 text-left transition hover:bg-[var(--theme-surface-hover)]"
+                style={{ borderColor: 'var(--panel-border)', background: 'var(--theme-surface)' }}>
+                <span className="block text-sm font-semibold">{String(task.label ?? task.title ?? 'Untitled task')}</span>
+                <span className="mt-1 block text-xs" style={{ color: 'var(--theme-text-muted)' }}>{String(task.when ?? 'Not scheduled')}</span>
+                <span className="mt-3 block text-[10px] font-mono uppercase" style={{ color: ['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase()) ? WIN : RELANCE }}>{['true', 'yes', 'done', 'completed'].includes(String(task.done ?? '').toLowerCase()) ? 'Done' : String(task.group ?? 'Open')}</span>
+              </button>
             ))}
-          </ul>
-        </article>
+          </div>
+        )}
+      </section>
 
-        <article
-          className="rounded-2xl p-6"
-          style={{ background: 'var(--theme-surface)', border: '1px solid var(--panel-border)' }}
-        >
-          <div className="mb-4 flex items-center gap-2.5">
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <CircleDashed className="h-4 w-4" style={{ color: 'var(--theme-text)' }} />
-            <h3
-              className="text-[16px] font-extrabold tracking-tight"
-              style={{ fontFamily: FONT_DISPLAY, color: 'var(--theme-text)' }}
-            >
-              What changed today
-            </h3>
+            <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>Active pipeline</h2>
           </div>
-          <ul className="space-y-3">
-            {CHANGES.map((c) => (
-              <li key={c.id} className="flex gap-3 text-[12.5px]">
-                <span
-                  className="w-14 shrink-0 text-[10.5px] font-bold uppercase"
-                  style={{ letterSpacing: '0.16em', color: 'var(--theme-text-dim)', fontFamily: FONT_MONO }}
-                >
-                  {c.time}
+          <Eyebrow>workspace_data.deals</Eyebrow>
+        </div>
+        {activeDeals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-6 text-sm" style={{ borderColor: 'var(--panel-border)', color: 'var(--theme-text-muted)' }}>No active deal is registered in this workspace.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {activeDeals.slice(0, 9).map((deal) => (
+              <button key={deal.id} type="button" onClick={() => onSelect(dealDetail(deal))}
+                className="rounded-xl border p-4 text-left transition hover:bg-[var(--theme-surface-hover)]"
+                style={{ borderColor: 'var(--panel-border)', background: 'var(--theme-surface)' }}>
+                <span className="block text-sm font-semibold">{String(deal.client ?? deal.title ?? 'Untitled deal')}</span>
+                <span className="mt-1 block text-xs" style={{ color: 'var(--theme-text-muted)' }}>{String(deal.offer ?? 'Offer not specified')}</span>
+                <span className="mt-3 flex items-center justify-between gap-2 text-[10px] font-mono uppercase">
+                  <span style={{ color: 'var(--theme-text-muted)' }}>{String(deal.stage ?? 'Open')}</span>
+                  <span style={{ color: ACCENT }}>{formatDealValue(deal.value, String(deal.currency ?? ''))}</span>
                 </span>
-                <span style={{ color: 'var(--theme-text-muted)' }}>{c.text}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-center gap-2">
+          <CircleDashed className="h-4 w-4" style={{ color: 'var(--theme-text)' }} />
+          <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>Workspace activity</h2>
+          <Eyebrow>workspace_data.activity_events</Eyebrow>
+        </div>
+        {activityError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{activityError}</div>}
+        {events === null && !activityError && <div role="status" className="rounded-xl border p-4 text-sm" style={{ borderColor: 'var(--panel-border)' }}>Loading workspace activity…</div>}
+        {events && events.length === 0 && <div className="rounded-2xl border border-dashed p-6 text-sm" style={{ borderColor: 'var(--panel-border)', color: 'var(--theme-text-muted)' }}>No activity events have been recorded in this workspace.</div>}
+        {events && events.length > 0 && (
+          <ol className="space-y-2">
+            {events.map((event) => (
+              <li key={event.id} className="flex flex-wrap items-start gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--panel-border)', background: 'var(--theme-surface)' }}>
+                <span className="min-w-[112px] text-[10px] font-mono uppercase" style={{ color: 'var(--theme-text-dim)' }}>{activityTime(event.createdAt)}</span>
+                <span className="min-w-[140px] text-[10px] font-bold uppercase" style={{ color: ACCENT }}>{event.eventType}</span>
+                <span className="flex-1 text-sm" style={{ color: 'var(--theme-text-muted)' }}>{activitySummary(event)}</span>
               </li>
             ))}
-          </ul>
-        </article>
+          </ol>
+        )}
+      </section>
+
+      <section>
+        <div className="rounded-2xl border border-dashed p-6" style={{ borderColor: 'var(--panel-border)' }}>
+          <div className="flex items-center gap-2"><PhoneCall className="h-4 w-4" /><Eyebrow>Call records</Eyebrow></div>
+          <p className="mt-3 text-sm font-semibold">No call registry is connected to this workspace.</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--theme-text-muted)' }}>Call briefs and call outcomes will appear here once a CRM or voice adapter writes them to a persistent call source.</p>
+        </div>
       </section>
     </div>
   );

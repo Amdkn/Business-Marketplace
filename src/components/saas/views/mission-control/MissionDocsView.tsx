@@ -15,49 +15,49 @@ const SECTIONS: ReadonlyArray<DocSection> = [
     id: 'overview',
     title: 'Overview · /agent-root',
     body:
-      'The Mission Control hub. Live fleet stats: total tasks, average success rate, fast-routing percentage. Reads from omk_saas.agents and surfaces Hermes telemetry derived from agent status until the ingest pipeline is live.',
+      'The Mission Control hub. Workspace and agent information is read from canonical tenant-scoped sources. Runtime throughput, success rates and routing telemetry are not reported unless a live ingestion source is connected.',
   },
   {
     id: 'agents',
     title: 'Agents · /agent-root/agents',
     body:
-      'Full Agent configuration surface. One card per specialist with load, tokens, latency, channel, default model. Plus task summary (24h throughput) and model routing panel that lets the operator know which LLM each agent defaults to.',
+      'Canonical agent directory backed by agent principals and explicit workspace delegations. Operators can register a principal with approved permission codes and revoke its workspace assignment. Runtime load, tokens, latency and model telemetry remain unavailable without an ingestion/runtime connection.',
   },
   {
     id: 'tasks',
     title: 'Tasks · /agent-root/tasks',
     body:
-      'Kanban with three columns (To do / In progress / Done). Drag-and-drop powered by @dnd-kit. New-mission form, priority filter (P1/P2/P3), title search. Backed by the omk_saas.missions table (sql/08_hermes_missions.sql) with RLS by org_id.',
+      'Workspace-backed mission Kanban with To do / In progress / Done columns, persisted creation, priority filtering, title search and drag-and-drop ordering. Status and position changes are written to the workspace mission register; this board does not execute missions.',
   },
   {
     id: 'office',
     title: 'Office · /agent-root/office',
     body:
-      'A 3D city built by the agents. The orchestrator runs HQ at the center; four specialists own towers at the corners. Lit windows = live work. Drag to orbit, scroll to zoom, click a building to open its dossier with load, tasks, success rate, channel, and default model.',
+      'A 3D spatial visualization of the agent-office concept. Buildings and visual states are presentation elements, not evidence of live agent activity. Use the Agent Directory for canonical principals and workspace assignments.',
   },
   {
     id: 'content',
     title: 'Content · /agent-root/content',
     body:
-      'Document library. Reads omk_saas.documents. Title-scoped search. Stats strip showing total docs, agents writing, latest published. Each card opens the document via its fileUrl.',
+      'Workspace document register with title search, persisted document metadata and links to non-placeholder file URLs. The New Doc and upload workflows remain unavailable until document authoring and storage are connected; uploader counts are not agent-execution telemetry.',
   },
   {
     id: 'schedule',
     title: 'Schedule · /agent-root/schedule',
     body:
-      'Weekly grid (Mon–Sun × 08:00–18:00 in 2-hour buckets). Mission density per cell, color-coded by priority. Cells aggregate missions by updated_at timestamp.',
+      'Read-only weekly projection of persisted workspace missions. Schedule metadata is shared with People → Cadence; times are displayed in UTC. Creating or editing schedule entries happens through the canonical People cadence workflow.',
   },
   {
     id: 'chat',
     title: 'Chat · /agent-root/chat',
     body:
-      'Single-agent chat interface. Pick a specialist, type, get a reply. Replies are deterministic stubs that route by agent role (owner / manager / operator / viewer). The stub acknowledges wiring to a future Edge Function for live model replies.',
+      'Agent directory-linked chat shell. No inference or execution runtime is connected; the composer is disabled and messages are not sent, simulated or stored.',
   },
   {
     id: 'docs',
     title: 'Docs · /agent-root/docs',
     body:
-      'This page. The Mission Control manual — what each sub-route does, where the data comes from, and how to extend it. Maintained alongside the schema migrations in sql/.',
+      'This page. The Mission Control manual documents route behavior and the boundary between persisted workspace data, visual presentation and connected runtime capabilities.',
   },
 ];
 
@@ -72,8 +72,7 @@ export const MissionDocsView = (): React.ReactElement => {
           Docs<span className="text-ember">.</span>
         </h1>
         <p className="font-sans text-[14px] text-her-muted mt-3 max-w-2xl">
-          Eight surfaces wired to the OMK SaaS Dashboard. Each route reads from a single
-          Supabase table, scoped by org_id through Row-Level Security.
+          Mission Control surfaces combine canonical workspace records and visual tools. Supabase access is scoped through organization and workspace authorization; visualizations do not imply a live agent runtime.
         </p>
       </header>
 
@@ -103,7 +102,7 @@ export const MissionDocsView = (): React.ReactElement => {
         <h3 className="font-display text-[20px]">Schema</h3>
         <ul className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-[12px]">
           <li className="rounded-2xl bg-cream/8 border border-cream/15 p-3">
-            <code className="text-ember">sql/02_omk_saas_schema.sql</code>
+            <code className="text-ember">Marketplace schema migrations</code>
             <p className="text-cream/65 mt-1">agents table — 8 columns, RLS by org_id.</p>
           </li>
           <li className="rounded-2xl bg-cream/8 border border-cream/15 p-3">

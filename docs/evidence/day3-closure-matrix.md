@@ -1,0 +1,44 @@
+# Day 3 closure matrix — Enterprise Factory & Launch
+
+**Snapshot:** 2026-11-26 · Supabase project `swegnrvaxxgfrnshdpxx`  
+**Gate: OPEN — not accepted**
+
+| Scope | Implemented evidence | Live / test evidence | Remaining acceptance | Status |
+|---|---|---|---|---|
+| D3.01 Tenant installation engine | Idempotent `install_structure` API; advisory transaction lock; replay-safe idempotency payload; installation request/event ledgers; domain/department/holon writes. | Installation engine SQL regression passes; 0 requests/events/installations. | Real authenticated tenant provisioning, retry/replay, partial-failure compensation and rollback E2E. | PARTIAL |
+| D3.02 Workspace provisioning & structure | Organization/workspace creation APIs; explicit workspace OWNER membership; workspace structure read model; install engine. | Existing cloud has one real organization/workspace membership; no installed structure. | Signup-to-workspace onboarding and install of domains/departments with real user in browser. | PARTIAL |
+| D3.03 Eight Areas OS | Eight canonical domain blueprints and domain installation schema/API. | 8 blueprints, 0 installations. | Install/configure all eight for a real tenant, owner/dependency/capability mapping and metrics. | BLUEPRINT / PARTIAL |
+| D3.04 Eight Business departments | Eight canonical department blueprints and department installation schema/API. | 8 blueprints, 0 installations. | Deploy all eight departments, owners, mandates, dependencies and workflows in tenant workspace. | BLUEPRINT / PARTIAL |
+| D3.05 Holarchy B1/B2/B3 | 17 LD01 holon blueprints; parent/child install constraints; ownership and agent-delegation models. | 17 blueprints, 0 holon installations and 0 agent principals. | Install LD01 holarchy, assign B1/B2/B3 owners and managers, bind live agents and validate succession. | BLUEPRINT / PARTIAL |
+| D3.06 Compute Core | Platform architecture boundary only. | No integrated tenant-aware compute allocation, sandbox, queue, metering or billing runtime demonstrated. | Build compute catalog/provisioner, scheduling, isolation, quotas, metering and cost attribution. | OPEN |
+| D3.07 Inference Core | AI SDK dependencies and adapter/provider taxonomy are present in the repo; no operational inference service contract is accepted. | No tenant model routing, credentials, request ledger, usage/cost telemetry or runtime evidence. | Implement routing, BYOK/managed credentials, fallback, budget enforcement, streaming, evaluations and audit. | OPEN |
+| D3.08 Memory Core | Private document Storage and workspace document metadata provide a file foundation. | One private bucket, zero objects; no tenant memory namespace/vector retrieval service. | Implement tenant-scoped structured/vector memory, ingestion, provenance, retrieval, retention and deletion. | PARTIAL / OPEN |
+| D3.09 CEL Security Core | RLS, grants, pinned SECURITY DEFINER search paths, JWT boundaries, Vault references, delegation validators and security inventory. | 117/117 application tables RLS-enabled; Finance trigger-only ACLs hardened; 42 private no-policy tables have no browser grants. | Unified policy decision point, cross-core enforcement, revocation propagation, threat detection and incident workflows. | PARTIAL |
+| D3.10 Agent Deployment Runtime | Agent principals, delegations, guarded mission assignment and private adapter worker foundations. | 0 agents/delegations; no live inference/execution environment or agent deployment lifecycle. | Runtime deployment, activation/suspension, task scheduling, tool scopes, logs, budgets and recovery. | OPEN |
+| D3.11 Workflows & orchestration | SOP Library and workspace mission/task persistence; no false execution claims. | No durable cross-agent workflow engine, scheduler, approvals or compensation runtime demonstrated. | Versioned workflow definitions, triggers, durable execution, retries, approvals, handoffs and audit. | OPEN |
+| D3.12 Enterprise Creation Pipeline | Installation APIs and canonical blueprints cover parts of assembly/provisioning. | No complete opportunity → design → blueprint → assembly → deployment → operations → replication lifecycle. | Implement pipeline state machine, blueprint validation, assembly, acceptance, operations and reproducible replication. | OPEN |
+| D3.13 Control Tower | Garden dashboard surfaces and real API/database health; mission, client and installation data foundations. | No integrated topology/control plane over tenant lifecycle, adapters, agents, workflows, compute, finance and security. | Deliver role-aware Control Tower with actionable lifecycle, audit, health, cost and incident controls. | OPEN |
+| D3.14 Observability, tests & launch | 16 SQL test files validated (13 structural + 3 rollback-only integration). Latest branch head [b7c2b29](https://github.com/Amdkn/Business-Marketplace/commit/b7c2b29454b4a47f19705ef68d8053a221de3a83) Preview [dpl_Cxp8KS7ptZBBo7zPxYcrPPzwUox6](https://vercel.com/amd-lab/business-marketplace/Cxp8KS7ptZBBo7zPxYcrPPzwUox6) is READY after full `bun run verify`: 53/53 Vitest files, 548/548 tests, app/API TypeScript, Vite build (2712 modules), kernel 27/27, bridge 20/20, adapters 39/39, RBAC 16/16 (102/102). | Latest code and docs full hosted verify PASS. Authenticated browser E2E, backup/restore (Dashboard reports no backups), load/failure recovery and release/rollback evidence remain absent. | Authenticated browser acceptance; establish backup/restore; load/security/failure drills; release/rollback. | PARTIAL / ACCEPTANCE OPEN |
+
+## Live tenant inventory
+
+One real Auth user, one organization, one active organization membership, one workspace and one active workspace membership exist. There are zero domain, department, holon, capability installations; zero agents/delegations; zero adapter connections; and zero orders. No fake production tenant or identity was created to manufacture acceptance evidence.
+
+## Day 3 acceptance gate
+
+Day 3 remains OPEN until a real tenant can be provisioned from blueprints through all eight Areas OS domains, eight Business departments and its holarchy; operate agents and workflows through Compute/Inference/Memory/CEL; monitor and control that lifecycle from one Control Tower; and replicate the enterprise with tenant isolation, audit, recovery and rollback evidence.
+
+
+## Fresh hosted acceptance blockers — 2026-11-26
+
+- Supabase Dashboard currently identifies the project as Free and reports **No backups**. No scheduled backup or backup/restore drill is evidenced. This remains a hard launch gate.
+- Supabase Security Advisor: 42 INFO RLS-enabled/no-policy findings (the affected server-owned tables have no anon/authenticated table grants), plus one WARN: leaked-password protection disabled. Current project Free plan is below the Pro-and-above requirement for this feature; this is a plan-gated Auth hardening item.
+- Performance Advisor: 63 INFO unindexed foreign keys and 272 INFO unused indexes. Do not blindly add/drop indexes; review with actual query plans and workload.
+- Health Advisor: zero findings.
+- The authenticated PostgREST role explicitly exposes `public, dashboard, identity, workspace_data`; `public` has zero app tables. All 117 application tables have RLS enabled. The browser-accessible workspace_data schema has 66 authenticated-readable tables under RLS.
+- Latest code correction `2fe574f` removes fabricated live infrastructure and sovereignty claims. It is included in latest branch head `97cc906`, whose Vercel Preview is currently QUEUED; full verification for that exact latest head is still pending.
+
+
+## Latest branch Preview — 2026-11-26 21:03 UTC
+
+Latest branch head `b7c2b29` is now READY at [dpl_Cxp8KS7ptZBBo7zPxYcrPPzwUox6](https://vercel.com/amd-lab/business-marketplace/Cxp8KS7ptZBBo7zPxYcrPPzwUox6). Full `bun run verify` passed on that exact head: 53/53 Vitest files, 548/548 tests, app/API TypeScript, Vite build (2712 modules), and 102/102 runtime benchmarks. This verifies the IT Software Kernel correction in `2fe574f`. Authenticated browser E2E, backup/restore (no backups on current Free plan), load/failure recovery and release/rollback remain open.

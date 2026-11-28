@@ -56,7 +56,7 @@ export const MissionControlShell = (): React.ReactElement => {
           </span>
         </div>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em] text-her-muted">
-          omk_saas · agents + missions
+          Marketplace · agents + missions
         </span>
       </header>
 

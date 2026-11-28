@@ -43,19 +43,24 @@ export function SettingsItemDetail(props: ItemDetailProps) {
   // on resynchronise le brouillon avec les valeurs fraiches, mais seulement
   // si l'utilisateur n'a pas deja commence a editer. Sinon on perd son
   // travail.
-  const updateItem = useCmsStore((s) => s.updateItem);
+  const updateItem = useCmsStore((s) => s.updateItemPersisted);
+  const [saving, setSaving] = useState(false);
   const addToast = useShellStore((s) => s.addToast);
 
-  /** Persiste le brouillon dans la collection CMS et confirme par un toast.
-   *  `updateItem` retourne void — le verdict est « la fonction n'a pas
-   *  jete ». La couche CMS est la seule source de verite pour ces fiches. */
-  const handleSave = () => {
-    updateItem(def.id, String(item.id), { ...draft });
-    addToast({
-      source: 'Settings',
-      type: 'success',
-      message: `${title} mis a jour`,
-    });
+  /** Save editable fields only after the active tenant repository confirms them. */
+  const handleSave = async (): Promise<void> => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const result = await updateItem(def.id, String(item.id), { ...draft });
+      if (result.ok) {
+        addToast({ source: 'Settings', type: 'success', message: `${title} mis à jour et enregistré.` });
+      } else {
+        addToast({ source: 'Settings', type: 'warning', message: result.error ?? 'Mise à jour non enregistrée.' });
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   /** Le Reset efface les champs editables du brouillon et le ramene aux
@@ -164,7 +169,8 @@ export function SettingsItemDetail(props: ItemDetailProps) {
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() => { void handleSave(); }}
+              disabled={saving}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold"
               style={{
                 background: accent,

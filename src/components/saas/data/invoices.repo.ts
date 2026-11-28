@@ -1,5 +1,5 @@
 // src/data/invoices.repo.ts
-// ADR-OMK-001 D4 — repository for the `invoices` table.
+// ADR-MARKETPLACE-001 D4 — repository for the `invoices` table.
 
 import { makeRepository } from './repository';
 import { INVOICES } from '../lib/constants';

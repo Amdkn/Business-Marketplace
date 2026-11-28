@@ -1,5 +1,5 @@
 // src/components/Modal.tsx
-// Reusable OMK-styled Modal component. ESC + backdrop close, focus trap, optional footer.
+// Reusable Marketplace-styled Modal component. ESC + backdrop close, focus trap, optional footer.
 // Animation: Tailwind v4 animate-in fade-in zoom-in-95 duration-200.
 
 import React, { useEffect, useRef } from 'react';

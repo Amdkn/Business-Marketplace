@@ -1,0 +1,132 @@
+-- Marketplace interface persistence regression.
+-- Run after migrations; this suite validates schema/RLS shape without creating tenant data.
+do $$
+declare
+  expected text[] := array[
+    'clients','articles','team','people_agents','runbooks','incidents','services','it_experiments','deploys','tasks','change_requests',
+    'marketplace_listings','product_items','product_releases','growth_channels','growth_experiments','deals','invoices',
+    'contracts','policies','session_notes','legal_ai_act_checks','legal_frameworks','legal_controls',
+    'legal_compliance_policies','legal_evidence','legal_risks','legal_vendors','legal_gaps','personas','memory','codex',
+    'approval_decisions','squads','content','documents','legal_documents','missions','growth_acquisition','growth_partenariats','product_mvps','growth_strategie','growth_aeo','product_rankings','product_launches','product_ideas',
+    'plancher_marges','courbe_demande','budget_tokens','formes_prix','dods','comparators','exposed_actions','processes','benchmarks',
+    'audit_arbitrage','audit_contexte','audit_donnees','audit_automatabilite','audit_arbitrage_roi',
+    'it_journal','it_loops','it_drift','it_evals','settings_integrations'
+  ];
+  t text;
+  n integer;
+begin
+  if not has_schema_privilege('authenticated','workspace_data','USAGE') then
+    raise exception 'authenticated role cannot use workspace_data';
+  end if;
+  if has_schema_privilege('anon','workspace_data','USAGE') then
+    raise exception 'anon unexpectedly has workspace_data usage';
+  end if;
+  foreach t in array expected loop
+    if to_regclass(format('workspace_data.%I',t)) is null then raise exception 'missing collection table %',t; end if;
+    if not (select relrowsecurity from pg_class where oid=to_regclass(format('workspace_data.%I',t))) then raise exception 'RLS disabled on %',t; end if;
+    select count(*) into n from pg_policies where schemaname='workspace_data' and tablename=t;
+    if n <> 4 then raise exception 'expected four policies on %, found %',t,n; end if;
+    if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name=t and column_name='workspace_id') <> 'NO' then
+      raise exception 'workspace_id must be required on %',t;
+    end if;
+    if has_table_privilege('anon',format('workspace_data.%I',t),'SELECT') then raise exception 'anon SELECT granted on %',t; end if;
+    if not has_table_privilege('authenticated',format('workspace_data.%I',t),'SELECT') then raise exception 'authenticated SELECT missing on %',t; end if;
+    if t = 'change_requests' then
+      if not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname='change_requests_guard_update' and not tgisinternal) then
+        raise exception 'change_requests immutability trigger missing';
+      end if;
+    elsif not exists(select 1 from pg_trigger where tgrelid=to_regclass(format('workspace_data.%I',t)) and tgname=format('%s_tenant_guard',t) and not tgisinternal) then
+      raise exception 'tenant immutability trigger missing on %',t;
+    end if;
+  end loop;
+  if to_regclass('workspace_data.activity_events') is null then raise exception 'activity_events table missing'; end if;
+  select count(*) into n from pg_policies where schemaname='workspace_data' and tablename='activity_events';
+  if n <> 2 then raise exception 'expected two append-only activity event policies, found %',n; end if;
+  if (select is_nullable from information_schema.columns where table_schema='workspace_data' and table_name='activity_events' and column_name='workspace_id') <> 'NO' then
+    raise exception 'activity_events.workspace_id must be required';
+  end if;
+  if (select count(*) from information_schema.tables where table_schema='workspace_data' and table_type='BASE TABLE' ) <> 66 then
+    raise exception 'workspace_data table count differs from 65 collections + activity_events';
+  end if;
+  if not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='currency')
+     or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='client_id')
+     or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='issued_at')
+     or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='due_at')
+     or not exists(select 1 from information_schema.columns where table_schema='workspace_data' and table_name='invoices' and column_name='paid_at') then
+    raise exception 'Garden invoice typed field contract is incomplete';
+  end if;
+  if not exists(select 1 from pg_trigger where tgrelid='workspace_data.missions'::regclass and tgname='missions_agent_delegation_guard' and not tgisinternal) then
+    raise exception 'Mission agent delegation guard is missing';
+  end if;
+  foreach t in array array['growth_acquisition','growth_partenariats','product_mvps'] loop
+    if not exists (
+      select 1 from pg_constraint
+      where conrelid=to_regclass(format('workspace_data.%I',t))
+        and conname=format('%s_workspace_org_fkey',t)
+        and contype='f'
+    ) then
+      raise exception 'Composite workspace/organization FK missing on %',t;
+    end if;
+    if not exists (
+      select 1 from pg_trigger
+      where tgrelid=to_regclass(format('workspace_data.%I',t))
+        and tgname=format('%s_tenant_guard',t)
+        and not tgisinternal
+    ) then
+      raise exception 'Tenant immutability trigger missing on %',t;
+    end if;
+  end loop;
+  if exists (
+    with fk as (
+      select c.conrelid,c.conkey
+      from pg_constraint c
+      join pg_class t on t.oid=c.conrelid
+      join pg_namespace n on n.oid=t.relnamespace
+      where c.contype='f' and n.nspname='workspace_data'
+    )
+    select 1 from fk
+    where not exists (
+      select 1 from pg_index i
+      where i.indrelid=fk.conrelid and i.indisvalid and i.indisready
+        and i.indpred is null and i.indexprs is null
+        and i.indnkeyatts >= cardinality(fk.conkey)
+        and (
+          select array_agg(k.attnum::smallint order by k.ord)
+          from unnest(i.indkey) with ordinality k(attnum,ord)
+          where k.ord <= cardinality(fk.conkey)
+        ) = fk.conkey
+    )
+  ) then
+    raise exception 'workspace_data contains an unindexed foreign key';
+  end if;
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname='identity'
+      and indexname='agent_delegations_one_active_scope_uidx'
+      and indexdef like '%UNIQUE INDEX%'
+  ) then
+    raise exception 'Canonical active agent delegation uniqueness index is missing';
+  end if;
+  if position('ap.principal_status = ''ACTIVE''' in pg_get_functiondef('workspace_data.validate_mission_agent_delegation()'::regprocedure)) = 0 then
+    raise exception 'Mission agent guard does not reject inactive principals';
+  end if;
+  if exists(select 1 from information_schema.tables where table_schema='workspace_data' and table_name like 'demo_coach_%') then
+    raise exception 'demo-only collections must not have tenant persistence tables';
+  end if;
+  if position('new.created_by_user_id := old.created_by_user_id' in pg_get_functiondef('workspace_data.guard_tenant_row()'::regprocedure)) = 0 then
+    raise exception 'Workspace row guard does not preserve immutable creator attribution';
+  end if;
+  if not exists(
+    select 1 from pg_policies
+    where schemaname='workspace_data'
+      and tablename='activity_events'
+      and cmd='SELECT'
+      and qual like '%is_active_workspace_member%'
+  ) then
+    raise exception 'Activity events are missing workspace-member read isolation';
+  end if;
+  if position('NEW.workspace_id := OLD.workspace_id' in pg_get_functiondef('workspace_data.guard_change_request_update()'::regprocedure)) = 0
+     or position('NEW.created_by_user_id := OLD.created_by_user_id' in pg_get_functiondef('workspace_data.guard_change_request_update()'::regprocedure)) = 0 then
+    raise exception 'Change request guard does not preserve tenant and creator attribution';
+  end if;
+end $$;

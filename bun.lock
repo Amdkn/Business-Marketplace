@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "coach-os",
+      "name": "@aspace/business-marketplace",
       "dependencies": {
         "@ai-sdk/anthropic": "^4.0.34",
         "@ai-sdk/google": "^4.0.37",

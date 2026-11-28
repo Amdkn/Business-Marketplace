@@ -1,0 +1,1486 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
+import postgres from 'npm:postgres@3.4.5';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+const url = Deno.env.get('SUPABASE_URL') ?? '';
+const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const dbUrl = Deno.env.get('SUPABASE_DB_URL') ?? '';
+if (!url || !anonKey || !dbUrl) throw new Error('Required Supabase Edge Function environment is missing');
+
+const authClient = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const db = postgres(dbUrl, { max: 1, prepare: false });
+type User = { id: string; email?: string };
+type Tx = any;
+
+function response(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+function requiredString(value: unknown, field: string, max = 200): string {
+  if (typeof value !== 'string' || !value.trim() || value.trim() !== value || value.length > max) throw new Error(`Invalid ${field}`);
+  return value;
+}
+async function authenticate(req: Request): Promise<User> {
+  const header = req.headers.get('Authorization') ?? '';
+  if (!header.startsWith('Bearer ')) throw new Error('Authentication required');
+  const { data, error } = await authClient.auth.getUser(header.slice(7));
+  if (error || !data.user) throw new Error('Invalid or expired session');
+  return { id: data.user.id, email: data.user.email ?? undefined };
+}
+async function withServiceRole<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
+  return await db.begin(async (tx) => {
+    await tx`SET LOCAL ROLE service_role`;
+    return await work(tx);
+  });
+}
+async function requireOrgRole(tx: Tx, userId: string, orgId: string) {
+  const rows = await tx`
+    SELECT rb.role_code
+    FROM identity.organization_memberships m
+    JOIN identity.role_bindings rb
+      ON rb.organization_id = m.organization_id AND rb.subject_user_id = m.user_id
+    JOIN identity.organizations o ON o.id = m.organization_id
+    WHERE o.status = 'ACTIVE' AND m.organization_id = ${orgId}::uuid AND m.user_id = ${userId}::uuid
+      AND m.membership_status = 'ACTIVE' AND rb.binding_status = 'ACTIVE'
+      AND rb.starts_at <= now() AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND rb.role_code IN ('S0_SOVEREIGN','B1_CEO','A3_PICARD','B2_MANAGER')
+    LIMIT 1
+  `;
+  if (!rows.length) throw new Error('Active organization role required');
+}
+async function requireFinanceRole(tx: Tx, userId: string, orgId: string) {
+  const rows = await tx`
+    SELECT rb.role_code
+    FROM identity.organization_memberships m
+    JOIN identity.role_bindings rb
+      ON rb.organization_id = m.organization_id AND rb.subject_user_id = m.user_id
+    JOIN identity.organizations o ON o.id = m.organization_id
+    WHERE o.status = 'ACTIVE' AND m.organization_id = ${orgId}::uuid AND m.user_id = ${userId}::uuid
+      AND m.membership_status = 'ACTIVE' AND rb.binding_status = 'ACTIVE'
+      AND rb.starts_at <= now() AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND rb.role_code IN ('S0_SOVEREIGN','B1_CEO','B2_MANAGER','B2.2')
+    LIMIT 1
+  `;
+  if (!rows.length) throw new Error('Active Finance organization role required');
+}
+
+async function listOrganizations(user: User) {
+  return await withServiceRole(async (tx) => await tx`
+    SELECT o.id,o.organization_key,o.name,o.organization_type,o.status
+    FROM identity.organizations o
+    JOIN identity.organization_memberships m ON m.organization_id=o.id
+    WHERE o.status='ACTIVE' AND m.user_id=${user.id}::uuid AND m.membership_status='ACTIVE'
+    ORDER BY o.created_at ASC
+  `);
+}
+async function getSettings(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id', 64);
+  const row = await withServiceRole(async (tx) => {
+    const rows = await tx`
+      SELECT p.display_name, o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      LEFT JOIN identity.profiles p ON p.id = ${user.id}::uuid
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!rows.length) throw new Error('Active organization membership required');
+    return rows[0];
+  });
+  return { ...row, email: user.email ?? null };
+}
+
+async function updateSettings(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id', 64);
+  const hasDisplayName = body.display_name !== undefined;
+  const hasOrganizationName = body.organization_name !== undefined;
+  if (!hasDisplayName && !hasOrganizationName) throw new Error('No settings fields supplied');
+
+  const displayName = hasDisplayName ? requiredString(body.display_name, 'display_name', 120) : null;
+  const organizationName = hasOrganizationName ? requiredString(body.organization_name, 'organization_name', 120) : null;
+
+  const row = await withServiceRole(async (tx) => {
+    const membership = await tx`
+      SELECT o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!membership.length) throw new Error('Active organization membership required');
+
+    if (displayName !== null) {
+      await tx`
+        INSERT INTO identity.profiles (id, display_name)
+        VALUES (${user.id}::uuid, ${displayName})
+        ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name
+      `;
+    }
+
+    if (organizationName !== null && organizationName !== membership[0].organization_name) {
+      await requireOrgRole(tx, user.id, organizationId);
+      await tx`
+        UPDATE identity.organizations
+        SET name = ${organizationName}
+        WHERE id = ${organizationId}::uuid
+      `;
+    }
+
+    const updated = await tx`
+      SELECT p.display_name, o.name AS organization_name
+      FROM identity.organization_memberships m
+      JOIN identity.organizations o ON o.id = m.organization_id
+      LEFT JOIN identity.profiles p ON p.id = ${user.id}::uuid
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.user_id = ${user.id}::uuid
+        AND m.membership_status = 'ACTIVE'
+        AND o.status = 'ACTIVE'
+      LIMIT 1
+    `;
+    if (!updated.length) throw new Error('Unable to reload saved settings');
+    return updated[0];
+  });
+  return { ...row, email: user.email ?? null };
+}
+
+async function listAdapterFamilies() {
+  return await withServiceRole(async (tx) => {
+    return await tx`
+      SELECT family_key, family_name, provider_examples, icon_key, sort_order,
+        taxonomy_version, implementation_status
+      FROM integration.adapter_family_blueprints
+      WHERE implementation_status <> 'DEPRECATED'
+      ORDER BY sort_order
+    `;
+  });
+}
+
+async function listProviderAdapterBlueprints(familyKey: string | null) {
+  return await withServiceRole(async (tx) => {
+    if (familyKey) {
+      return await tx`
+        SELECT p.provider_key, p.family_key, f.family_name, p.provider_name,
+          p.manifest_version, p.implementation_status, p.auth_contract_status,
+          p.supported_operations, p.documentation_uri
+        FROM integration.provider_adapter_blueprints p
+        JOIN integration.adapter_family_blueprints f USING (family_key)
+        WHERE p.implementation_status <> 'DEPRECATED' AND p.family_key = ${familyKey}
+        ORDER BY p.provider_name
+      `;
+    }
+    return await tx`
+      SELECT p.provider_key, p.family_key, f.family_name, p.provider_name,
+        p.manifest_version, p.implementation_status, p.auth_contract_status,
+        p.supported_operations, p.documentation_uri
+      FROM integration.provider_adapter_blueprints p
+      JOIN integration.adapter_family_blueprints f USING (family_key)
+      WHERE p.implementation_status <> 'DEPRECATED'
+      ORDER BY f.sort_order, p.provider_name
+    `;
+  });
+}
+
+async function listHolonBlueprints(areaCode: string | null) {
+  return await withServiceRole(async (tx) => {
+    if (areaCode) {
+      return await tx`
+        SELECT h.holon_code, h.area_code, d.domain_name AS area_name,
+          h.holon_level, h.holon_type, h.display_name, h.mandate,
+          h.parent_holon_code, h.specialist_count, h.runbook_required,
+          h.source_path, h.sort_order, h.taxonomy_version, h.status
+        FROM areas.holon_blueprints h
+        JOIN areas.domain_blueprints d ON d.domain_code = h.area_code
+        WHERE h.status = 'ACTIVE' AND h.area_code = ${areaCode}
+        ORDER BY h.sort_order
+      `;
+    }
+    return await tx`
+      SELECT h.holon_code, h.area_code, d.domain_name AS area_name,
+        h.holon_level, h.holon_type, h.display_name, h.mandate,
+        h.parent_holon_code, h.specialist_count, h.runbook_required,
+        h.source_path, h.sort_order, h.taxonomy_version, h.status
+      FROM areas.holon_blueprints h
+      JOIN areas.domain_blueprints d ON d.domain_code = h.area_code
+      WHERE h.status = 'ACTIVE'
+      ORDER BY d.sort_order, h.sort_order
+    `;
+  });
+}
+
+async function listTaxonomyBlueprints() {
+  return await withServiceRole(async (tx) => {
+    const areasDomains = await tx`
+      SELECT domain_code AS code, domain_name AS name, description, mission AS responsibility,
+        sort_order, taxonomy_version
+      FROM areas.domain_blueprints
+      WHERE status = 'ACTIVE'
+      ORDER BY sort_order
+    `;
+    const businessDepartments = await tx`
+      SELECT department_key AS key, department_name AS name, description, mandate AS responsibility,
+        sort_order, taxonomy_version
+      FROM enterprise.department_blueprints
+      WHERE status = 'ACTIVE'
+      ORDER BY sort_order
+    `;
+    return { areas_domains: areasDomains, business_departments: businessDepartments };
+  });
+}
+
+async function requireWorkspaceMember(tx: Tx, userId: string, orgId: string, workspaceId: string) {
+  const rows = await tx`
+    SELECT w.id
+    FROM enterprise.workspaces w
+    JOIN enterprise.workspace_memberships wm ON wm.workspace_id=w.id AND wm.organization_id=w.organization_id
+    JOIN identity.organizations o ON o.id=w.organization_id
+    WHERE o.status='ACTIVE' AND w.id=${workspaceId}::uuid AND w.organization_id=${orgId}::uuid
+      AND w.workspace_status='ACTIVE' AND wm.user_id=${userId}::uuid
+      AND wm.membership_status='ACTIVE'
+  `;
+  if (!rows.length) throw new Error('Active workspace membership required');
+}
+function stringArray(value: unknown, field: string, pattern: RegExp, maxItems = 32): string[] {
+  if (!Array.isArray(value) || value.length > maxItems) throw new Error(`Invalid ${field}`);
+  const values = value.map((item) => requiredString(item, field, 100));
+  if (values.some((item) => !pattern.test(item)) || new Set(values).size !== values.length) throw new Error(`Invalid or duplicate ${field}`);
+  return values;
+}
+async function listWorkspaceMembers(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    return await tx`
+      SELECT wm.user_id AS id,
+        COALESCE(NULLIF(p.display_name,''), 'Workspace member') AS name,
+        rb.role_code,
+        wm.membership_status,
+        wm.workspace_role,
+        wm.created_at,
+        wm.updated_at
+      FROM enterprise.workspace_memberships wm
+      LEFT JOIN identity.profiles p ON p.id=wm.user_id
+      LEFT JOIN LATERAL (
+        SELECT r.role_code
+        FROM identity.role_bindings r
+        WHERE r.organization_id=wm.organization_id
+          AND r.subject_user_id=wm.user_id
+          AND r.binding_status='ACTIVE'
+          AND r.scope_type='ORGANIZATION'
+          AND r.scope_id IS NULL
+          AND r.starts_at <= now()
+          AND (r.expires_at IS NULL OR r.expires_at > now())
+        ORDER BY r.created_at DESC
+        LIMIT 1
+      ) rb ON true
+      WHERE wm.organization_id=${orgId}::uuid
+        AND wm.workspace_id=${workspaceId}::uuid
+        AND wm.membership_status='ACTIVE'
+      ORDER BY p.display_name NULLS LAST, wm.created_at
+    `;
+  });
+}
+
+async function listWorkspaceAgents(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    return await tx`
+      SELECT ap.id, ap.agent_key, ap.display_name, ap.agent_class, ap.runtime,
+        ap.principal_status, ap.created_at,
+        d.id AS delegation_id, d.permission_codes, d.starts_at, d.expires_at
+      FROM identity.agent_principals ap
+      JOIN LATERAL (
+        SELECT d.id, d.permission_codes, d.starts_at, d.expires_at
+        FROM identity.agent_delegations d
+        WHERE d.agent_principal_id=ap.id
+          AND d.organization_id=ap.organization_id
+          AND d.scope_type='WORKSPACE'
+          AND d.scope_id=${workspaceId}::uuid
+          AND d.delegation_status='ACTIVE'
+          AND d.starts_at <= now()
+          AND (d.expires_at IS NULL OR d.expires_at > now())
+          AND d.revoked_at IS NULL
+        ORDER BY d.created_at DESC
+        LIMIT 1
+      ) d ON true
+      WHERE ap.organization_id=${orgId}::uuid
+        AND ap.principal_status <> 'REVOKED'
+      ORDER BY ap.display_name, ap.agent_key
+    `;
+  });
+}
+
+async function listWorkspaces(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  return await withServiceRole(async (tx) => {
+    const rows = await tx`
+      SELECT w.id,w.organization_id,w.workspace_key,w.name,w.description,w.workspace_status,w.created_at
+      FROM enterprise.workspaces w
+      JOIN enterprise.workspace_memberships wm ON wm.workspace_id=w.id AND wm.organization_id=w.organization_id
+      JOIN identity.organizations o ON o.id=w.organization_id
+      WHERE o.status='ACTIVE' AND w.organization_id=${orgId}::uuid AND wm.user_id=${user.id}::uuid
+        AND wm.membership_status='ACTIVE'
+      ORDER BY w.created_at ASC
+    `;
+    return rows;
+  });
+}
+async function listWorkspaceStructure(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    const domains = await tx`
+      SELECT i.id,i.domain_code,b.domain_name,b.description,i.parent_installation_id,
+        i.owner_user_id,i.installation_status,i.installed_at
+      FROM areas.domain_installations i
+      JOIN areas.domain_blueprints b ON b.domain_code=i.domain_code
+      WHERE i.organization_id=${orgId}::uuid AND i.workspace_id=${workspaceId}::uuid
+      ORDER BY b.sort_order
+    `;
+    const departments = await tx`
+      SELECT i.id,i.department_key,b.department_name,b.description,i.owner_user_id,
+        i.installation_status,i.installed_at
+      FROM enterprise.department_installations i
+      JOIN enterprise.department_blueprints b USING (department_key)
+      WHERE i.organization_id=${orgId}::uuid AND i.workspace_id=${workspaceId}::uuid
+      ORDER BY b.sort_order
+    `;
+    const holons = await tx`
+      SELECT i.id,i.holon_code,b.display_name,b.holon_level,b.holon_type,
+        b.parent_holon_code,i.parent_installation_id,i.owner_user_id,
+        i.installation_status,i.installed_at
+      FROM areas.holon_installations i
+      JOIN areas.holon_blueprints b USING (holon_code)
+      WHERE i.organization_id=${orgId}::uuid AND i.workspace_id=${workspaceId}::uuid
+      ORDER BY b.sort_order
+    `;
+    const engines = await listInstallationEngines(tx,orgId,workspaceId);
+    return { organization_id: orgId, workspace_id: workspaceId, domains, departments, holons, ...engines };
+  });
+}
+async function createWorkspace(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const key = requiredString(body.workspace_key, 'workspace_key', 96).toLowerCase();
+  const name = requiredString(body.name, 'name', 160);
+  const description = body.description === undefined ? '' : requiredString(body.description, 'description', 2000);
+  if (!/^[a-z0-9][a-z0-9._-]{1,95}$/.test(key)) throw new Error('Invalid workspace_key format');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    const rows = await tx`
+      INSERT INTO enterprise.workspaces (organization_id,workspace_key,name,description,created_by_user_id)
+      VALUES (${orgId}::uuid,${key},${name},${description},${user.id}::uuid)
+      ON CONFLICT (organization_id,workspace_key) DO NOTHING
+      RETURNING id,organization_id,workspace_key,name,description,workspace_status,created_at,created_by_user_id
+    `;
+    let workspace = rows[0];
+    if (!workspace) {
+      const existing = await tx`
+        SELECT id,organization_id,workspace_key,name,description,workspace_status,created_at,created_by_user_id
+        FROM enterprise.workspaces
+        WHERE organization_id=${orgId}::uuid AND workspace_key=${key}
+        LIMIT 1
+      `;
+      if (!existing.length || existing[0].created_by_user_id !== user.id ||
+          existing[0].name !== name || existing[0].description !== description) {
+        throw new Error('workspace_key already exists with a different owner or payload');
+      }
+      workspace = existing[0];
+    } else {
+      await tx`
+        INSERT INTO enterprise.workspace_memberships
+          (organization_id,workspace_id,user_id,membership_status,workspace_role,granted_by_user_id)
+        VALUES (${orgId}::uuid,${workspace.id}::uuid,${user.id}::uuid,'ACTIVE','OWNER',${user.id}::uuid)
+      `;
+      await tx`
+        INSERT INTO enterprise.structure_installation_events
+          (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+        VALUES (${orgId}::uuid,${workspace.id}::uuid,'WORKSPACE_CREATED','WORKSPACE',${workspace.id}::uuid,${user.id}::uuid,
+          ${JSON.stringify({ workspace_key: key })}::jsonb)
+      `;
+    }
+    return workspace;
+  });
+}
+async function installStructure(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  const idempotencyKey = requiredString(body.idempotency_key, 'idempotency_key', 200);
+  if (idempotencyKey.length < 8) throw new Error('idempotency_key must contain at least 8 characters');
+  const domainCodes = stringArray(body.domain_codes, 'domain_codes', /^LD0[1-8]$/, 8);
+  const departmentKeys = stringArray(body.department_keys, 'department_keys', /^[a-z0-9]+(-[a-z0-9]+)*$/, 8);
+  const includeLd01Holarchy = body.include_ld01_holarchy === true;
+  if (!domainCodes.length && !departmentKeys.length) throw new Error('Select at least one domain or department');
+  if (includeLd01Holarchy && !domainCodes.includes('LD01')) throw new Error('LD01 must be selected before installing its holarchy');
+  const payload = { domain_codes: [...domainCodes].sort(), department_keys: [...departmentKeys].sort(), include_ld01_holarchy: includeLd01Holarchy };
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${orgId + ':' + workspaceId + ':' + idempotencyKey}, 0))`;
+    const previous = await tx`
+      SELECT id,request_payload,result_payload,(request_payload = ${JSON.stringify(payload)}::jsonb) AS payload_matches FROM enterprise.structure_installation_requests
+      WHERE organization_id=${orgId}::uuid AND workspace_id=${workspaceId}::uuid AND idempotency_key=${idempotencyKey}
+      LIMIT 1
+    `;
+    if (previous.length) {
+      if (!previous[0].payload_matches) throw new Error('Idempotency key already used with a different installation payload');
+      await tx`
+        INSERT INTO enterprise.structure_installation_events
+          (organization_id,workspace_id,request_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+        VALUES (${orgId}::uuid,${workspaceId}::uuid,${previous[0].id}::uuid,'INSTALLATION_REPLAYED','WORKSPACE',${workspaceId}::uuid,${user.id}::uuid,
+          ${JSON.stringify({ idempotency_key: idempotencyKey })}::jsonb)
+      `;
+      return previous[0].result_payload;
+    }
+
+    const domains = domainCodes.length ? await tx`
+      SELECT domain_code FROM areas.domain_blueprints
+      WHERE domain_code = ANY(${domainCodes}) AND status='ACTIVE'
+      ORDER BY sort_order
+    ` : [];
+    if (domains.length !== domainCodes.length) throw new Error('One or more selected domain blueprints are unavailable');
+    const departments = departmentKeys.length ? await tx`
+      SELECT department_key FROM enterprise.department_blueprints
+      WHERE department_key = ANY(${departmentKeys}) AND status='ACTIVE'
+      ORDER BY sort_order
+    ` : [];
+    if (departments.length !== departmentKeys.length) throw new Error('One or more selected department blueprints are unavailable');
+
+    const installedDomains: Array<{ id: string; domain_code: string; created: boolean }> = [];
+    for (const item of domains) {
+      const rows = await tx`
+        INSERT INTO areas.domain_installations
+          (organization_id,workspace_id,domain_code,installed_by_user_id)
+        VALUES (${orgId}::uuid,${workspaceId}::uuid,${item.domain_code},${user.id}::uuid)
+        ON CONFLICT (workspace_id,domain_code) DO NOTHING
+        RETURNING id,domain_code
+      `;
+      const created = rows.length > 0;
+      const installed = rows[0] ?? (await tx`
+        SELECT id,domain_code FROM areas.domain_installations
+        WHERE organization_id=${orgId}::uuid AND workspace_id=${workspaceId}::uuid AND domain_code=${item.domain_code}
+      `)[0];
+      installedDomains.push({ ...installed, created });
+    }
+    const installedDepartments: Array<{ id: string; department_key: string; created: boolean }> = [];
+    for (const item of departments) {
+      const rows = await tx`
+        INSERT INTO enterprise.department_installations
+          (organization_id,workspace_id,department_key,installed_by_user_id)
+        VALUES (${orgId}::uuid,${workspaceId}::uuid,${item.department_key},${user.id}::uuid)
+        ON CONFLICT (workspace_id,department_key) DO NOTHING
+        RETURNING id,department_key
+      `;
+      const created = rows.length > 0;
+      const installed = rows[0] ?? (await tx`
+        SELECT id,department_key FROM enterprise.department_installations
+        WHERE organization_id=${orgId}::uuid AND workspace_id=${workspaceId}::uuid AND department_key=${item.department_key}
+      `)[0];
+      installedDepartments.push({ ...installed, created });
+    }
+
+    const installedHolons: Array<{ id: string; holon_code: string; created: boolean }> = [];
+    if (includeLd01Holarchy) {
+      const ld01 = installedDomains.find((item) => item.domain_code === 'LD01');
+      if (!ld01) throw new Error('LD01 installation is required for its holarchy');
+      const blueprints = await tx`
+        SELECT holon_code,parent_holon_code FROM areas.holon_blueprints
+        WHERE area_code='LD01' AND status='ACTIVE' ORDER BY sort_order
+      `;
+      if (blueprints.length !== 17) throw new Error('Canonical LD01 holarchy blueprint is incomplete');
+      const parentIds = new Map<string, string>();
+      for (const item of blueprints) {
+        const parentId = item.parent_holon_code ? parentIds.get(item.parent_holon_code) ?? null : null;
+        if (item.parent_holon_code && !parentId) throw new Error('LD01 holon parent blueprint is unresolved');
+        const rows = await tx`
+          INSERT INTO areas.holon_installations
+            (organization_id,workspace_id,domain_installation_id,domain_code,holon_code,parent_installation_id,installed_by_user_id)
+          VALUES (${orgId}::uuid,${workspaceId}::uuid,${ld01.id}::uuid,'LD01',${item.holon_code},${parentId}::uuid,${user.id}::uuid)
+          ON CONFLICT (domain_installation_id,holon_code) DO NOTHING
+          RETURNING id,holon_code
+        `;
+        const created = rows.length > 0;
+        const installed = rows[0] ?? (await tx`
+          SELECT id,holon_code FROM areas.holon_installations
+          WHERE domain_installation_id=${ld01.id}::uuid AND holon_code=${item.holon_code}
+        `)[0];
+        parentIds.set(item.holon_code, installed.id);
+        installedHolons.push({ ...installed, created });
+      }
+    }
+
+    const result = {
+      organization_id: orgId, workspace_id: workspaceId, idempotency_key: idempotencyKey,
+      installed_domains: installedDomains.map(({ id, domain_code }) => ({ id, domain_code })),
+      installed_departments: installedDepartments.map(({ id, department_key }) => ({ id, department_key })),
+      installed_holons: installedHolons.map(({ id, holon_code }) => ({ id, holon_code })),
+      counts: { domains: installedDomains.length, departments: installedDepartments.length, holons: installedHolons.length },
+    };
+    const requests = await tx`
+      INSERT INTO enterprise.structure_installation_requests
+        (organization_id,workspace_id,idempotency_key,request_payload,result_payload,created_by_user_id)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${idempotencyKey},${JSON.stringify(payload)}::jsonb,${JSON.stringify(result)}::jsonb,${user.id}::uuid)
+      RETURNING id
+    `;
+    const requestId = requests[0].id;
+    for (const item of installedDomains) if (item.created) await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,request_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${requestId}::uuid,'DOMAIN_INSTALLED','DOMAIN',${item.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({ domain_code: item.domain_code })}::jsonb)
+    `;
+    for (const item of installedDepartments) if (item.created) await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,request_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${requestId}::uuid,'DEPARTMENT_INSTALLED','DEPARTMENT',${item.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({ department_key: item.department_key })}::jsonb)
+    `;
+    for (const item of installedHolons) if (item.created) await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,request_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${requestId}::uuid,'HOLON_INSTALLED','HOLON',${item.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({ holon_code: item.holon_code })}::jsonb)
+    `;
+    return result;
+  });
+}
+async function requireWorkspaceAdmin(tx: Tx, userId: string, orgId: string, workspaceId: string) {
+  const rows = await tx`
+    SELECT wm.workspace_role
+    FROM enterprise.workspace_memberships wm
+    JOIN enterprise.workspaces w ON w.id=wm.workspace_id AND w.organization_id=wm.organization_id
+    WHERE wm.organization_id=${orgId}::uuid AND wm.workspace_id=${workspaceId}::uuid
+      AND wm.user_id=${userId}::uuid AND wm.membership_status='ACTIVE'
+      AND w.workspace_status='ACTIVE' AND wm.workspace_role IN ('OWNER','ADMIN')
+  `;
+  if (!rows.length) throw new Error('Workspace OWNER or ADMIN role required');
+}
+async function listInstallationEngines(tx: Tx, orgId: string, workspaceId: string) {
+  const ownership = await tx`
+    SELECT a.id,a.entity_type,a.installation_id,a.principal_type,a.user_id,a.agent_principal_id,
+      a.assignment_role,a.assignment_status,a.starts_at,a.expires_at,
+      ap.agent_key,ap.display_name AS agent_name
+    FROM enterprise.installation_ownership_assignments a
+    LEFT JOIN identity.agent_principals ap ON ap.id=a.agent_principal_id
+    WHERE a.organization_id=${orgId}::uuid AND a.workspace_id=${workspaceId}::uuid
+    ORDER BY a.created_at
+  `;
+  const dependencies = await tx`
+    SELECT id,source_entity_type,source_installation_id,depends_on_entity_type,
+      depends_on_installation_id,dependency_type,dependency_status,created_at,removed_at
+    FROM enterprise.installation_dependencies
+    WHERE organization_id=${orgId}::uuid AND workspace_id=${workspaceId}::uuid
+    ORDER BY created_at
+  `;
+  const capabilities = await tx`
+    SELECT ci.id,ci.target_entity_type,ci.target_installation_id,ci.capability_id,
+      c.capability_key,ci.capability_version_id,cv.version,cv.name,
+      ci.installation_status,ci.configuration,ci.installed_at,ci.removed_at
+    FROM catalog.capability_installations ci
+    JOIN catalog.capabilities c ON c.id=ci.capability_id
+    JOIN catalog.capability_versions cv ON cv.id=ci.capability_version_id
+    WHERE ci.organization_id=${orgId}::uuid AND ci.workspace_id=${workspaceId}::uuid
+    ORDER BY ci.installed_at
+  `;
+  return { ownership_assignments: ownership, dependencies, capability_installations: capabilities };
+}
+async function assignInstallationOwnership(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  const entityType = requiredString(body.entity_type, 'entity_type', 16);
+  const installationId = requiredString(body.installation_id, 'installation_id');
+  const principalType = requiredString(body.principal_type, 'principal_type', 8);
+  const assignmentRole = requiredString(body.assignment_role, 'assignment_role', 20);
+  if (!['DOMAIN','DEPARTMENT','HOLON'].includes(entityType) ||
+      !['USER','AGENT'].includes(principalType) ||
+      !['OWNER','MANAGER','TECHNICIAN','STEWARD','OBSERVER'].includes(assignmentRole)) {
+    throw new Error('Invalid ownership assignment dimensions');
+  }
+  const userId = principalType === 'USER' ? requiredString(body.user_id, 'user_id') : null;
+  const agentId = principalType === 'AGENT' ? requiredString(body.agent_principal_id, 'agent_principal_id') : null;
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    if (assignmentRole === 'OWNER') {
+      const current = await tx`
+        SELECT id,principal_type,user_id,agent_principal_id FROM enterprise.installation_ownership_assignments
+        WHERE organization_id=${orgId}::uuid AND workspace_id=${workspaceId}::uuid
+          AND entity_type=${entityType} AND installation_id=${installationId}::uuid
+          AND assignment_role='OWNER' AND assignment_status='ACTIVE'
+        FOR UPDATE
+      `;
+      if (current.length && current[0].principal_type===principalType &&
+          current[0].user_id===userId && current[0].agent_principal_id===agentId) return current[0];
+      for (const prior of current) {
+        await tx`UPDATE enterprise.installation_ownership_assignments SET assignment_status='REVOKED',revoked_at=now() WHERE id=${prior.id}::uuid`;
+        await tx`
+          INSERT INTO enterprise.structure_installation_events
+            (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+          VALUES (${orgId}::uuid,${workspaceId}::uuid,'OWNERSHIP_REVOKED','OWNERSHIP',${prior.id}::uuid,${user.id}::uuid,
+            ${JSON.stringify({reason:'OWNER_TRANSFER'})}::jsonb)
+        `;
+      }
+    }
+    const rows = await tx`
+      INSERT INTO enterprise.installation_ownership_assignments
+        (organization_id,workspace_id,entity_type,installation_id,principal_type,user_id,agent_principal_id,
+         assignment_role,assigned_by_user_id)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${entityType},${installationId}::uuid,${principalType},
+        ${userId}::uuid,${agentId}::uuid,${assignmentRole},${user.id}::uuid)
+      RETURNING id,entity_type,installation_id,principal_type,user_id,agent_principal_id,assignment_role,assignment_status,created_at
+    `;
+    const assignment = rows[0];
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'OWNERSHIP_ASSIGNED','OWNERSHIP',${assignment.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({entity_type:entityType,installation_id:installationId,principal_type:principalType,assignment_role:assignmentRole,user_id:userId,agent_principal_id:agentId})}::jsonb)
+    `;
+    return assignment;
+  });
+}
+async function revokeInstallationOwnership(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  const workspaceId = requiredString(body.workspace_id,'workspace_id');
+  const assignmentId = requiredString(body.assignment_id,'assignment_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    const rows = await tx`
+      UPDATE enterprise.installation_ownership_assignments
+      SET assignment_status='REVOKED',revoked_at=now()
+      WHERE id=${assignmentId}::uuid AND organization_id=${orgId}::uuid
+        AND workspace_id=${workspaceId}::uuid AND assignment_status='ACTIVE'
+      RETURNING id,entity_type,installation_id,assignment_role,assignment_status
+    `;
+    if (!rows.length) throw new Error('Active ownership assignment not found');
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'OWNERSHIP_REVOKED','OWNERSHIP',${assignmentId}::uuid,${user.id}::uuid,
+        ${JSON.stringify({reason:body.reason ?? 'REVOKED_BY_ADMIN'})}::jsonb)
+    `;
+    return rows[0];
+  });
+}
+async function addInstallationDependency(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  const workspaceId = requiredString(body.workspace_id,'workspace_id');
+  const sourceType = requiredString(body.source_entity_type,'source_entity_type',16);
+  const sourceId = requiredString(body.source_installation_id,'source_installation_id');
+  const targetType = requiredString(body.depends_on_entity_type,'depends_on_entity_type',16);
+  const targetId = requiredString(body.depends_on_installation_id,'depends_on_installation_id');
+  const dependencyType = body.dependency_type === undefined ? 'REQUIRES' : requiredString(body.dependency_type,'dependency_type',20);
+  if (!['DOMAIN','DEPARTMENT','HOLON'].includes(sourceType) || !['DOMAIN','DEPARTMENT','HOLON'].includes(targetType) ||
+      !['REQUIRES','BLOCKS','INFORMS','CONTAINS'].includes(dependencyType)) throw new Error('Invalid dependency dimensions');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    const rows = await tx`
+      INSERT INTO enterprise.installation_dependencies
+        (organization_id,workspace_id,source_entity_type,source_installation_id,
+         depends_on_entity_type,depends_on_installation_id,dependency_type,created_by_user_id)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${sourceType},${sourceId}::uuid,
+        ${targetType},${targetId}::uuid,${dependencyType},${user.id}::uuid)
+      ON CONFLICT (workspace_id,source_entity_type,source_installation_id,depends_on_entity_type,depends_on_installation_id,dependency_type)
+      DO UPDATE SET dependency_status='ACTIVE',removed_at=NULL,created_by_user_id=EXCLUDED.created_by_user_id
+      RETURNING id,source_entity_type,source_installation_id,depends_on_entity_type,depends_on_installation_id,dependency_type,dependency_status
+    `;
+    const dependency = rows[0];
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'DEPENDENCY_ADDED','DEPENDENCY',${dependency.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({source_entity_type:sourceType,source_installation_id:sourceId,depends_on_entity_type:targetType,depends_on_installation_id:targetId,dependency_type:dependencyType})}::jsonb)
+    `;
+    return dependency;
+  });
+}
+async function removeInstallationDependency(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  const workspaceId = requiredString(body.workspace_id,'workspace_id');
+  const dependencyId = requiredString(body.dependency_id,'dependency_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    const rows = await tx`
+      UPDATE enterprise.installation_dependencies SET dependency_status='REMOVED',removed_at=now()
+      WHERE id=${dependencyId}::uuid AND organization_id=${orgId}::uuid
+        AND workspace_id=${workspaceId}::uuid AND dependency_status='ACTIVE'
+      RETURNING id,source_entity_type,source_installation_id,depends_on_entity_type,depends_on_installation_id
+    `;
+    if (!rows.length) throw new Error('Active dependency not found');
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'DEPENDENCY_REMOVED','DEPENDENCY',${dependencyId}::uuid,${user.id}::uuid,'{}'::jsonb)
+    `;
+    return rows[0];
+  });
+}
+async function installCapability(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  const workspaceId = requiredString(body.workspace_id,'workspace_id');
+  const targetType = requiredString(body.target_entity_type,'target_entity_type',16);
+  const targetId = requiredString(body.target_installation_id,'target_installation_id');
+  const capabilityId = requiredString(body.capability_id,'capability_id');
+  const versionId = requiredString(body.capability_version_id,'capability_version_id');
+  const configuration = body.configuration && typeof body.configuration==='object' && !Array.isArray(body.configuration) ? body.configuration : {};
+  if (!['DOMAIN','DEPARTMENT','HOLON'].includes(targetType)) throw new Error('Invalid capability target type');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    const capability = await tx`
+      SELECT c.owner_organization_id FROM catalog.capabilities c
+      JOIN catalog.capability_versions v ON v.capability_id=c.id
+      WHERE c.id=${capabilityId}::uuid AND v.id=${versionId}::uuid
+        AND c.capability_status='ACTIVE' AND v.version_status='ACTIVE'
+    `;
+    if (!capability.length) throw new Error('Active capability version not found');
+    const capabilityOwnerOrgId = String(capability[0].owner_organization_id);
+    let entitlementId: string | null = null;
+    if (capabilityOwnerOrgId !== orgId) {
+      entitlementId = requiredString(body.entitlement_id,'entitlement_id');
+      const entitlement = await tx`
+        SELECT id FROM commerce.capability_entitlements
+        WHERE id=${entitlementId}::uuid
+          AND buyer_organization_id=${orgId}::uuid
+          AND seller_organization_id=${capabilityOwnerOrgId}::uuid
+          AND capability_id=${capabilityId}::uuid
+          AND capability_version_id=${versionId}::uuid
+          AND entitlement_status='ACTIVE'
+          AND (expires_at IS NULL OR expires_at > now())
+      `;
+      if (!entitlement.length) throw new Error('Active matching marketplace entitlement required');
+    } else if (body.entitlement_id !== undefined && body.entitlement_id !== null) {
+      throw new Error('First-party capability installation must not include entitlement_id');
+    }
+    const rows = await tx`
+      INSERT INTO catalog.capability_installations
+        (organization_id,workspace_id,target_entity_type,target_installation_id,capability_id,
+         capability_owner_organization_id,capability_version_id,entitlement_id,configuration,installed_by_user_id)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,${targetType},${targetId}::uuid,${capabilityId}::uuid,
+        ${capabilityOwnerOrgId}::uuid,${versionId}::uuid,${entitlementId}::uuid,
+        ${JSON.stringify(configuration)}::jsonb,${user.id}::uuid)
+      ON CONFLICT (workspace_id,target_entity_type,target_installation_id,capability_id,capability_version_id)
+      DO UPDATE SET installation_status='ACTIVE',removed_at=NULL,configuration=EXCLUDED.configuration,
+        entitlement_id=EXCLUDED.entitlement_id
+      RETURNING id,target_entity_type,target_installation_id,capability_id,capability_version_id,
+        entitlement_id,installation_status,configuration
+    `;
+    const installation = rows[0];
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'CAPABILITY_INSTALLED','CAPABILITY',${installation.id}::uuid,${user.id}::uuid,
+        ${JSON.stringify({target_entity_type:targetType,target_installation_id:targetId,capability_id:capabilityId,capability_version_id:versionId,entitlement_id:entitlementId})}::jsonb)
+    `;
+    return installation;
+  });
+}
+async function removeCapabilityInstallation(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  const workspaceId = requiredString(body.workspace_id,'workspace_id');
+  const installationId = requiredString(body.capability_installation_id,'capability_installation_id');
+  return await withServiceRole(async (tx) => {
+    await requireWorkspaceAdmin(tx,user.id,orgId,workspaceId);
+    const rows = await tx`
+      UPDATE catalog.capability_installations SET installation_status='REMOVED',removed_at=now()
+      WHERE id=${installationId}::uuid AND organization_id=${orgId}::uuid
+        AND workspace_id=${workspaceId}::uuid AND installation_status='ACTIVE'
+      RETURNING id,target_entity_type,target_installation_id,capability_id,capability_version_id
+    `;
+    if (!rows.length) throw new Error('Active capability installation not found');
+    await tx`
+      INSERT INTO enterprise.structure_installation_events
+        (organization_id,workspace_id,event_type,entity_type,entity_id,actor_user_id,event_payload)
+      VALUES (${orgId}::uuid,${workspaceId}::uuid,'CAPABILITY_REMOVED','CAPABILITY',${installationId}::uuid,${user.id}::uuid,'{}'::jsonb)
+    `;
+    return rows[0];
+  });
+}
+
+async function listCapabilities(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    return await tx`
+      SELECT c.id,c.capability_key,c.current_version,c.capability_status,
+        json_build_object('id',cv.id,'version',cv.version,'name',cv.name) AS version
+      FROM catalog.capabilities c
+      JOIN LATERAL (
+        SELECT id,version,name FROM catalog.capability_versions
+        WHERE capability_id=c.id ORDER BY version DESC LIMIT 1
+      ) cv ON true
+      WHERE c.owner_organization_id=${orgId}::uuid
+      ORDER BY c.created_at DESC
+    `;
+  });
+}
+async function listCapabilityEntitlements(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id,'organization_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx,user.id,orgId);
+    return await tx`
+      SELECT e.id,e.order_id,e.seller_organization_id,e.listing_id,e.capability_id,
+        e.capability_version_id,e.entitlement_status,e.granted_at,e.expires_at,e.revoked_at,
+        o.listing_title_snapshot
+      FROM commerce.capability_entitlements e
+      JOIN commerce.orders o ON o.id=e.order_id
+      WHERE e.buyer_organization_id=${orgId}::uuid
+      ORDER BY e.granted_at DESC
+      LIMIT 200
+    `;
+  });
+}
+
+async function listOrders(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  return await withServiceRole(async (tx) => {
+    const membership = await tx`
+      SELECT 1 FROM identity.organization_memberships
+      WHERE organization_id=${orgId}::uuid AND user_id=${user.id}::uuid AND membership_status='ACTIVE'
+    `;
+    if (!membership.length) throw new Error('Active organization membership required');
+    return await tx`
+      SELECT * FROM commerce.orders
+      WHERE buyer_organization_id=${orgId}::uuid OR seller_organization_id=${orgId}::uuid
+      ORDER BY created_at DESC LIMIT 100
+    `;
+  });
+}
+
+async function listProviderListings(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    return await tx`
+      SELECT id, listing_key, title, description, price_amount, currency,
+        listing_status, created_at, published_at
+      FROM catalog.listings
+      WHERE owner_organization_id=${orgId}::uuid
+      ORDER BY created_at DESC
+    `;
+  });
+}
+async function createOrganization(user: User, body: Record<string, unknown>) {
+  const name = requiredString(body.name, 'name', 160);
+  const key = requiredString(body.organization_key, 'organization_key', 64).toUpperCase();
+  const type = requiredString(body.organization_type, 'organization_type', 40);
+  if (!/^[A-Z0-9][A-Z0-9_-]{2,63}$/.test(key)) throw new Error('Invalid organization_key format');
+  // Platform-operator bootstrap is deliberately excluded from self-service tenant creation.
+  const allowed = ['INTERNAL_VENTURE','EXTERNAL_ENTERPRISE','SUPPLIER','CUSTOMER','PARTNER'];
+  if (!allowed.includes(type)) throw new Error('Invalid organization_type; platform operator bootstrap is restricted');
+  return await withServiceRole(async (tx) => {
+    const rows = await tx`
+      INSERT INTO identity.organizations (organization_key,name,organization_type,created_by_user_id)
+      VALUES (${key},${name},${type},${user.id}::uuid)
+      RETURNING id,organization_key,name,organization_type,status,created_at
+    `;
+    const org = rows[0];
+    await tx`
+      INSERT INTO identity.organization_memberships (organization_id,user_id,membership_status,joined_at)
+      VALUES (${org.id}::uuid,${user.id}::uuid,'ACTIVE',now())
+    `;
+    await tx`
+      INSERT INTO identity.role_bindings
+        (organization_id,subject_user_id,role_code,scope_type,scope_id,granted_by_user_id)
+      VALUES (
+        ${org.id}::uuid,${user.id}::uuid,
+        'B1_CEO',
+        'ORGANIZATION',NULL,${user.id}::uuid
+      )
+    `;
+    return org;
+  });
+}
+async function createTenant(user: User, body: Record<string, unknown>) {
+  const name = requiredString(body.organization_name, 'organization_name', 160);
+  const workspaceName = body.workspace_name === undefined
+    ? 'Main Workspace'
+    : requiredString(body.workspace_name, 'workspace_name', 160);
+  const organizationKey = `USR_${user.id.replace(/-/g, '').slice(0, 24).toUpperCase()}`;
+  const workspaceKey = 'main';
+
+  return await withServiceRole(async (tx) => {
+    // Serialize retries for one authenticated principal. The deterministic key
+    // makes onboarding idempotent if the client loses the first response.
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`;
+
+    const insertedOrganizations = await tx`
+      INSERT INTO identity.organizations
+        (organization_key, name, organization_type, created_by_user_id)
+      VALUES (${organizationKey}, ${name}, 'EXTERNAL_ENTERPRISE', ${user.id}::uuid)
+      ON CONFLICT (organization_key) DO NOTHING
+      RETURNING id, organization_key, name, organization_type, status, created_at, created_by_user_id
+    `;
+    let organization = insertedOrganizations[0];
+    if (!organization) {
+      const existing = await tx`
+        SELECT id, organization_key, name, organization_type, status, created_at, created_by_user_id
+        FROM identity.organizations
+        WHERE organization_key = ${organizationKey}
+        LIMIT 1
+      `;
+      if (!existing.length || existing[0].created_by_user_id !== user.id ||
+          existing[0].name !== name || existing[0].organization_type !== 'EXTERNAL_ENTERPRISE' ||
+          existing[0].status !== 'ACTIVE') {
+        throw new Error('Tenant onboarding key exists with a different owner or payload');
+      }
+      organization = existing[0];
+    }
+
+    let organizationMembership = await tx`
+      SELECT membership_status FROM identity.organization_memberships
+      WHERE organization_id = ${organization.id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `;
+    if (!organizationMembership.length) {
+      await tx`
+        INSERT INTO identity.organization_memberships
+          (organization_id, user_id, membership_status, joined_at)
+        VALUES (${organization.id}::uuid, ${user.id}::uuid, 'ACTIVE', now())
+        ON CONFLICT (organization_id, user_id) DO NOTHING
+      `;
+      organizationMembership = await tx`
+        SELECT membership_status FROM identity.organization_memberships
+        WHERE organization_id = ${organization.id}::uuid AND user_id = ${user.id}::uuid
+        LIMIT 1
+      `;
+    }
+    if (!organizationMembership.length || organizationMembership[0].membership_status !== 'ACTIVE') {
+      throw new Error('Tenant onboarding requires an active organization membership');
+    }
+
+    const roleBindings = await tx`
+      SELECT binding_status, starts_at, expires_at
+      FROM identity.role_bindings
+      WHERE organization_id = ${organization.id}::uuid
+        AND subject_user_id = ${user.id}::uuid
+        AND role_code = 'B1_CEO' AND scope_type = 'ORGANIZATION' AND scope_id IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (!roleBindings.length) {
+      await tx`
+        INSERT INTO identity.role_bindings
+          (organization_id, subject_user_id, role_code, scope_type, scope_id, granted_by_user_id)
+        VALUES (${organization.id}::uuid, ${user.id}::uuid, 'B1_CEO', 'ORGANIZATION', NULL, ${user.id}::uuid)
+      `;
+    } else if (roleBindings[0].binding_status !== 'ACTIVE' ||
+        new Date(roleBindings[0].starts_at).getTime() > Date.now() ||
+        (roleBindings[0].expires_at && new Date(roleBindings[0].expires_at).getTime() <= Date.now())) {
+      throw new Error('Tenant onboarding owner role is not active');
+    }
+
+    const insertedWorkspaces = await tx`
+      INSERT INTO enterprise.workspaces
+        (organization_id, workspace_key, name, description, created_by_user_id)
+      VALUES (${organization.id}::uuid, ${workspaceKey}, ${workspaceName}, '', ${user.id}::uuid)
+      ON CONFLICT (organization_id, workspace_key) DO NOTHING
+      RETURNING id, organization_id, workspace_key, name, description, workspace_status, created_at, created_by_user_id
+    `;
+    let workspace = insertedWorkspaces[0];
+    if (!workspace) {
+      const existing = await tx`
+        SELECT id, organization_id, workspace_key, name, description, workspace_status, created_at, created_by_user_id
+        FROM enterprise.workspaces
+        WHERE organization_id = ${organization.id}::uuid AND workspace_key = ${workspaceKey}
+        LIMIT 1
+      `;
+      if (!existing.length || existing[0].created_by_user_id !== user.id ||
+          existing[0].name !== workspaceName || existing[0].workspace_status !== 'ACTIVE') {
+        throw new Error('Default workspace key exists with a different owner or payload');
+      }
+      workspace = existing[0];
+    }
+
+    let workspaceMembership = await tx`
+      SELECT membership_status, workspace_role
+      FROM enterprise.workspace_memberships
+      WHERE organization_id = ${organization.id}::uuid
+        AND workspace_id = ${workspace.id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `;
+    if (!workspaceMembership.length) {
+      await tx`
+        INSERT INTO enterprise.workspace_memberships
+          (organization_id, workspace_id, user_id, membership_status, workspace_role, granted_by_user_id)
+        VALUES (${organization.id}::uuid, ${workspace.id}::uuid, ${user.id}::uuid, 'ACTIVE', 'OWNER', ${user.id}::uuid)
+        ON CONFLICT (workspace_id, user_id) DO NOTHING
+      `;
+      workspaceMembership = await tx`
+        SELECT membership_status, workspace_role
+        FROM enterprise.workspace_memberships
+        WHERE organization_id = ${organization.id}::uuid
+          AND workspace_id = ${workspace.id}::uuid AND user_id = ${user.id}::uuid
+        LIMIT 1
+      `;
+    }
+    if (!workspaceMembership.length || workspaceMembership[0].membership_status !== 'ACTIVE' ||
+        workspaceMembership[0].workspace_role !== 'OWNER') {
+      throw new Error('Tenant onboarding requires an active workspace OWNER membership');
+    }
+
+    if (insertedWorkspaces.length) {
+      await tx`
+        INSERT INTO enterprise.structure_installation_events
+          (organization_id, workspace_id, event_type, entity_type, entity_id, actor_user_id, event_payload)
+        VALUES (
+          ${organization.id}::uuid, ${workspace.id}::uuid, 'WORKSPACE_CREATED', 'WORKSPACE',
+          ${workspace.id}::uuid, ${user.id}::uuid,
+          ${JSON.stringify({ workspace_key: workspaceKey, onboarding: true })}::jsonb
+        )
+      `;
+    }
+
+    return { organization, workspace };
+  });
+}
+
+async function registerAgent(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const agentKey = requiredString(body.agent_key, 'agent_key', 96).toUpperCase();
+  const displayName = requiredString(body.display_name, 'display_name', 160);
+  const agentClass = requiredString(body.agent_class, 'agent_class', 40);
+  const runtime = requiredString(body.runtime, 'runtime', 120);
+  const scopeType = requiredString(body.scope_type, 'scope_type', 24);
+  const scopeId = body.scope_id == null ? null : requiredString(body.scope_id, 'scope_id');
+  const allowedClasses = ['GOVERNANCE','ORCHESTRATOR','AREA_OWNER','DEPARTMENT_OWNER','MANAGER','TECHNICIAN','SPECIALIST'];
+  if (!/^[A-Z0-9][A-Z0-9._-]{1,95}$/.test(agentKey)) throw new Error('Invalid agent_key format');
+  if (!allowedClasses.includes(agentClass)) throw new Error('Invalid agent_class');
+  if (!['WORKSPACE','ORGANIZATION'].includes(scopeType)) throw new Error('Agents may be delegated only to a workspace or organization');
+  if ((scopeType === 'WORKSPACE') !== Boolean(scopeId)) throw new Error('WORKSPACE delegation requires scope_id; ORGANIZATION delegation must omit it');
+  const rawPermissions = Array.isArray(body.permission_codes) ? body.permission_codes : [];
+  const permissions = rawPermissions.map((x) => requiredString(x, 'permission_code', 100));
+  if (!permissions.length || permissions.length > 32 ||
+      permissions.some((code) => !/^[A-Z][A-Z0-9_.:-]{1,99}$/.test(code)) ||
+      new Set(permissions).size !== permissions.length) {
+    throw new Error('permission_codes must contain 1–32 unique uppercase permission codes');
+  }
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    if (scopeType === 'WORKSPACE') await requireWorkspaceMember(tx, user.id, orgId, scopeId!);
+
+    // Agent keys identify one canonical principal per organization. Re-registering
+    // the same key updates that principal and adds/refreshes its scope delegation;
+    // it never creates a second identity for a second workspace.
+    const principals = await tx`
+      INSERT INTO identity.agent_principals
+        (organization_id,agent_key,display_name,agent_class,runtime,created_by_user_id)
+      VALUES (${orgId}::uuid,${agentKey},${displayName},${agentClass},${runtime},${user.id}::uuid)
+      ON CONFLICT (organization_id,agent_key) DO UPDATE
+        SET display_name=EXCLUDED.display_name,
+            agent_class=EXCLUDED.agent_class,
+            runtime=EXCLUDED.runtime
+        WHERE identity.agent_principals.principal_status='ACTIVE'
+      RETURNING id,organization_id,agent_key,display_name,agent_class,runtime,principal_status,created_at
+    `;
+    if (!principals.length) {
+      throw new Error('An agent principal with this key already exists but is not ACTIVE; reactivate it through governance before delegating it.');
+    }
+    const agent = principals[0];
+
+    // Expired rows must leave the active-delegation uniqueness boundary before
+    // an assignment can be renewed.
+    await tx`
+      UPDATE identity.agent_delegations
+      SET delegation_status='EXPIRED'
+      WHERE organization_id=${orgId}::uuid
+        AND agent_principal_id=${agent.id}::uuid
+        AND scope_type=${scopeType}
+        AND scope_id IS NOT DISTINCT FROM ${scopeId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+        AND expires_at IS NOT NULL
+        AND expires_at <= now()
+    `;
+
+    const existing = await tx`
+      SELECT id
+      FROM identity.agent_delegations
+      WHERE organization_id=${orgId}::uuid
+        AND agent_principal_id=${agent.id}::uuid
+        AND scope_type=${scopeType}
+        AND scope_id IS NOT DISTINCT FROM ${scopeId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    let delegationId: string;
+    if (existing.length) {
+      const updated = await tx`
+        UPDATE identity.agent_delegations
+        SET permission_codes=${permissions}
+        WHERE id=${existing[0].id}::uuid
+        RETURNING id
+      `;
+      delegationId = updated[0].id;
+    } else {
+      const created = await tx`
+        INSERT INTO identity.agent_delegations
+          (organization_id,agent_principal_id,delegator_user_id,scope_type,scope_id,permission_codes)
+        VALUES (${orgId}::uuid,${agent.id}::uuid,${user.id}::uuid,${scopeType},${scopeId}::uuid,${permissions})
+        RETURNING id
+      `;
+      delegationId = created[0].id;
+    }
+    return { ...agent, delegation_id: delegationId, permission_codes: permissions };
+  });
+}
+async function revokeAgentDelegation(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const workspaceId = requiredString(body.workspace_id, 'workspace_id');
+  const delegationId = requiredString(body.delegation_id, 'delegation_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    await requireWorkspaceMember(tx, user.id, orgId, workspaceId);
+    const rows = await tx`
+      UPDATE identity.agent_delegations
+      SET delegation_status='REVOKED', revoked_at=now()
+      WHERE id=${delegationId}::uuid
+        AND organization_id=${orgId}::uuid
+        AND scope_type='WORKSPACE'
+        AND scope_id=${workspaceId}::uuid
+        AND delegation_status='ACTIVE'
+        AND revoked_at IS NULL
+      RETURNING id,agent_principal_id,delegation_status,revoked_at
+    `;
+    if (!rows.length) throw new Error('Active workspace agent delegation not found');
+    return rows[0];
+  });
+}
+
+async function createCapability(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const key = requiredString(body.capability_key, 'capability_key', 96).toLowerCase();
+  const name = requiredString(body.name, 'name', 160);
+  const purpose = requiredString(body.purpose, 'purpose', 2000);
+  const input = body.input_contract && typeof body.input_contract === 'object' ? body.input_contract : {};
+  const output = body.output_contract && typeof body.output_contract === 'object' ? body.output_contract : {};
+  const permissions = Array.isArray(body.permission_codes) ? body.permission_codes.map((x) => requiredString(x, 'permission_code', 100)) : [];
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    const rows = await tx`
+      INSERT INTO catalog.capabilities (owner_organization_id,capability_key,created_by_user_id)
+      VALUES (${orgId}::uuid,${key},${user.id}::uuid)
+      RETURNING id,owner_organization_id,capability_key,current_version,capability_status,created_at
+    `;
+    const capability = rows[0];
+    const versions = await tx`
+      INSERT INTO catalog.capability_versions
+        (capability_id,version,name,purpose,input_contract,output_contract,permission_codes,created_by_user_id)
+      VALUES (${capability.id}::uuid,1,${name},${purpose},${JSON.stringify(input)}::jsonb,${JSON.stringify(output)}::jsonb,${permissions},${user.id}::uuid)
+      RETURNING id,capability_id,version,name,purpose,input_contract,output_contract,permission_codes,version_status
+    `;
+    return { ...capability, version: versions[0] };
+  });
+}
+async function createListing(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const key = requiredString(body.listing_key, 'listing_key', 96).toLowerCase();
+  const capabilityId = requiredString(body.capability_id, 'capability_id');
+  const versionId = requiredString(body.capability_version_id, 'capability_version_id');
+  const title = requiredString(body.title, 'title', 160);
+  const description = requiredString(body.description, 'description', 4000);
+  const amount = Number(body.price_amount);
+  const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
+  const criteria = Array.isArray(body.acceptance_criteria) ? body.acceptance_criteria.map((x) => requiredString(x, 'acceptance_criterion', 500)) : [];
+  if (!Number.isFinite(amount) || amount < 0 || !/^[A-Z]{3}$/.test(currency) || !criteria.length) throw new Error('Invalid price, currency or acceptance_criteria');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    const rows = await tx`
+      INSERT INTO catalog.listings
+        (listing_key,owner_organization_id,capability_id,capability_version_id,version,title,description,price_amount,currency,acceptance_criteria,created_by_user_id)
+      SELECT ${key},c.owner_organization_id,c.id,cv.id,1,${title},${description},${amount},${currency},${criteria},${user.id}::uuid
+      FROM catalog.capabilities c
+      JOIN catalog.capability_versions cv ON cv.capability_id=c.id AND cv.id=${versionId}::uuid
+      WHERE c.id=${capabilityId}::uuid AND c.owner_organization_id=${orgId}::uuid
+        AND c.capability_status='ACTIVE' AND cv.version_status='ACTIVE'
+      RETURNING id,listing_key,owner_organization_id,capability_id,capability_version_id,version,title,description,price_amount,currency,acceptance_criteria,listing_status,created_at
+    `;
+    if (!rows.length) throw new Error('Active capability version not found for this organization');
+    return rows[0];
+  });
+}
+async function publishListing(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.organization_id, 'organization_id');
+  const listingId = requiredString(body.listing_id, 'listing_id');
+  return await withServiceRole(async (tx) => {
+    await requireOrgRole(tx, user.id, orgId);
+    const rows = await tx`
+      UPDATE catalog.listings SET listing_status='PUBLISHED',published_at=now()
+      WHERE id=${listingId}::uuid AND owner_organization_id=${orgId}::uuid AND listing_status='DRAFT'
+      RETURNING id,listing_key,title,listing_status,published_at
+    `;
+    if (!rows.length) throw new Error('Draft listing not found or already published');
+    return rows[0];
+  });
+}
+async function browseListings() {
+  return await withServiceRole(async (tx) => await tx`
+    SELECT l.id,l.listing_key,l.title,l.description,l.price_amount,l.currency,
+      l.acceptance_criteria,l.created_at,o.name AS seller_name,
+      c.capability_key,cv.version AS capability_version,cv.name AS capability_name
+    FROM catalog.listings l
+    JOIN identity.organizations o ON o.id=l.owner_organization_id
+    JOIN catalog.capabilities c ON c.id=l.capability_id
+    JOIN catalog.capability_versions cv ON cv.id=l.capability_version_id
+    WHERE l.listing_status='PUBLISHED' AND c.capability_status='ACTIVE' AND cv.version_status='ACTIVE'
+    ORDER BY l.created_at DESC LIMIT 100
+  `);
+}
+async function createOrder(user: User, body: Record<string, unknown>) {
+  const orgId = requiredString(body.buyer_organization_id, 'buyer_organization_id');
+  const listingId = requiredString(body.listing_id, 'listing_id');
+  const idempotencyKey = requiredString(body.idempotency_key, 'idempotency_key', 200);
+  return await withServiceRole(async (tx) => {
+    const rows = await tx`SELECT * FROM api.create_marketplace_order(${user.id}::uuid,${orgId}::uuid,${listingId}::uuid,${idempotencyKey})`;
+    return rows[0];
+  });
+}
+function financeLines(value: unknown) {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 100) throw new Error('Invalid journal lines');
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`Invalid journal line ${index + 1}`);
+    const line = item as Record<string, unknown>;
+    const accountId = requiredString(line.account_id, 'account_id', 64);
+    const decimal = (v: unknown, field: string) => {
+      if (typeof v !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(v)) throw new Error(`Invalid ${field}`);
+      return v;
+    };
+    const debit = decimal(line.debit_amount, 'debit_amount');
+    const credit = decimal(line.credit_amount, 'credit_amount');
+    if ((Number(debit) > 0) === (Number(credit) > 0)) throw new Error('Each journal line must contain exactly one positive debit or credit');
+    const description = line.description === undefined ? null : requiredString(line.description, 'line description', 500);
+    return { account_id: accountId, debit_amount: debit, credit_amount: credit, description };
+  });
+}
+async function provisionFinanceChartOfAccounts(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id');
+  const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
+  const chartVersion = body.chart_version === undefined ? '2026.1' : requiredString(body.chart_version, 'chart_version', 16);
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  if (!/^\d{4}[.]\d+$/.test(chartVersion)) throw new Error('Invalid chart_version');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, organizationId);
+    const rows = await tx`SELECT api.provision_finance_chart_of_accounts(
+      ${user.id}::uuid,${organizationId}::uuid,${currency}::char(3),${chartVersion}
+    ) AS chart`;
+    return rows[0]?.chart;
+  });
+}
+
+
+function financeDecimal(value: unknown, field: string, nullable = false): string | null {
+  if (nullable && (value === undefined || value === null || value === '')) return null;
+  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value)) throw new Error(`Invalid ${field}`);
+  return value;
+}
+function financeInteger(value: unknown, field: string, fallback: number, min: number, max: number): number {
+  const n = value === undefined ? fallback : value;
+  if (!Number.isInteger(n) || (n as number) < min || (n as number) > max) throw new Error(`Invalid ${field}`);
+  return n as number;
+}
+async function createFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const policyKey = requiredString(body.policy_key, 'policy_key', 80);
+  const version = financeInteger(body.version, 'version', 1, 1, 1000000);
+  const policyName = requiredString(body.policy_name, 'policy_name', 160);
+  const scopeType = requiredString(body.scope_type, 'scope_type', 32);
+  if (!['PLATFORM','SELLER_ORGANIZATION'].includes(scopeType)) throw new Error('Invalid scope_type');
+  const scopeOrgId = body.scope_organization_id === undefined || body.scope_organization_id === null
+    ? null : requiredString(body.scope_organization_id, 'scope_organization_id');
+  if ((scopeType === 'PLATFORM' && scopeOrgId !== null) || (scopeType === 'SELLER_ORGANIZATION' && scopeOrgId === null)) throw new Error('Invalid scope_organization_id for scope_type');
+  const currency = body.currency === undefined || body.currency === null || body.currency === ''
+    ? null : requiredString(body.currency, 'currency', 3).toUpperCase();
+  if (currency !== null && !/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  const rateBps = financeInteger(body.fee_rate_bps, 'fee_rate_bps', 0, 0, 10000);
+  const fixed = financeDecimal(body.fixed_fee_amount ?? '0', 'fixed_fee_amount')!;
+  const minimum = financeDecimal(body.minimum_fee_amount, 'minimum_fee_amount', true);
+  const maximum = financeDecimal(body.maximum_fee_amount, 'maximum_fee_amount', true);
+  const roundingScale = financeInteger(body.rounding_scale, 'rounding_scale', 2, 0, 6);
+  const effectiveFrom = body.effective_from === undefined ? new Date().toISOString() : requiredString(body.effective_from, 'effective_from', 64);
+  const effectiveTo = body.effective_to === undefined || body.effective_to === null
+    ? null : requiredString(body.effective_to, 'effective_to', 64);
+  if (Number(maximum ?? 'Infinity') < Number(minimum ?? '0')) throw new Error('maximum_fee_amount must be greater than or equal to minimum_fee_amount');
+  if (Number(fixed) < 0) throw new Error('Invalid fixed_fee_amount');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.create_fee_policy(
+      ${user.id}::uuid,${ownerId}::uuid,${policyKey},${version}::integer,${policyName},
+      ${scopeType},${scopeOrgId}::uuid,${currency}::char(3),${rateBps}::integer,
+      ${fixed}::numeric,${minimum}::numeric,${maximum}::numeric,${roundingScale}::smallint,
+      ${effectiveFrom}::timestamptz,${effectiveTo}::timestamptz
+    ) AS policy_id`;
+    return rows[0];
+  });
+}
+async function activateFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const policyId = requiredString(body.policy_id, 'policy_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.activate_fee_policy(${user.id}::uuid,${ownerId}::uuid,${policyId}::uuid) AS policy_id`;
+    return rows[0];
+  });
+}
+async function applyOrderFeePolicy(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const orderId = requiredString(body.order_id, 'order_id');
+  const policyId = requiredString(body.policy_id, 'policy_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.apply_order_fee_policy(
+      ${user.id}::uuid,${ownerId}::uuid,${orderId}::uuid,${policyId}::uuid
+    ) AS fee_snapshot`;
+    return rows[0]?.fee_snapshot;
+  });
+}
+
+async function postPaidPayoutItemFinanceEntry(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const payoutItemId = requiredString(body.payout_item_id, 'payout_item_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.post_paid_payout_item_finance_entry(
+      ${user.id}::uuid,${ownerId}::uuid,${payoutItemId}::uuid
+    ) AS posting`;
+    return rows[0]?.posting;
+  });
+}
+
+async function postSucceededRefundFinanceEntry(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const refundId = requiredString(body.refund_id, 'refund_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.post_succeeded_refund_finance_entry(
+      ${user.id}::uuid,${ownerId}::uuid,${refundId}::uuid
+    ) AS posting`;
+    return rows[0]?.posting;
+  });
+}
+
+async function postCapturedOrderFinanceEntry(user: User, body: Record<string, unknown>) {
+  const ownerId = requiredString(body.owner_organization_id, 'owner_organization_id');
+  const paymentIntentId = requiredString(body.payment_intent_id, 'payment_intent_id');
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, ownerId);
+    const rows = await tx`SELECT api.post_captured_order_finance_entry(
+      ${user.id}::uuid,${ownerId}::uuid,${paymentIntentId}::uuid
+    ) AS posting`;
+    return rows[0]?.posting;
+  });
+}
+
+async function postFinanceJournalEntry(user: User, body: Record<string, unknown>) {
+  const organizationId = requiredString(body.organization_id, 'organization_id');
+  const entryNumber = requiredString(body.entry_number, 'entry_number', 100);
+  const idempotencyKey = requiredString(body.idempotency_key, 'idempotency_key', 200);
+  const sourceType = requiredString(body.source_type, 'source_type', 40);
+  const sourceId = body.source_id === undefined || body.source_id === null ? null : requiredString(body.source_id, 'source_id', 64);
+  const description = requiredString(body.description, 'description', 1000);
+  const currency = requiredString(body.currency, 'currency', 3).toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Invalid currency');
+  const lines = financeLines(body.lines);
+  return await withServiceRole(async (tx) => {
+    await requireFinanceRole(tx, user.id, organizationId);
+    const rows = await tx`SELECT api.post_finance_journal_entry(
+      ${user.id}::uuid,${organizationId}::uuid,${entryNumber},${idempotencyKey},${sourceType},
+      ${sourceId}::uuid,${description},${currency}::char(3),${JSON.stringify(lines)}::jsonb
+    ) AS journal_entry_id`;
+    return rows[0];
+  });
+}
+
+async function transitionOrder(user: User, body: Record<string, unknown>) {
+  const orderId = requiredString(body.order_id, 'order_id');
+  const orgId = requiredString(body.actor_organization_id, 'actor_organization_id');
+  const target = requiredString(body.target_status, 'target_status', 40);
+  const reason = requiredString(body.reason, 'reason', 1000);
+  return await withServiceRole(async (tx) => {
+    const rows = await tx`SELECT * FROM api.transition_marketplace_order(${user.id}::uuid,${orderId}::uuid,${orgId}::uuid,${target},${reason})`;
+    return rows[0];
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  try {
+    if (req.method === 'GET') {
+      const health = await withServiceRole(async (tx) => (await tx`SELECT current_database() AS database_name, now() AS checked_at`)[0]);
+      return response({ status: 'ok', service: 'marketplace-api', version: '0.9.0', persistence: 'supabase-cloud', database: health });
+    }
+    if (req.method !== 'POST') return response({ error: 'Method not allowed' }, 405);
+    const body = await req.json() as Record<string, unknown>;
+    const action = requiredString(body.action, 'action', 60);
+    if (action === 'browse_listings') return response({ data: await browseListings() });
+    // Global reference taxonomies are intentionally public, read-only catalog data.
+    // They contain no tenant records or secrets; the private schemas remain server-only.
+    if (action === 'list_taxonomy_blueprints') return response({ data: await listTaxonomyBlueprints() });
+    if (action === 'list_adapter_families') return response({ data: await listAdapterFamilies() });
+    if (action === 'list_provider_adapter_blueprints') {
+      const familyKey = body.family_key === undefined ? null : requiredString(body.family_key, 'family_key', 100);
+      return response({ data: await listProviderAdapterBlueprints(familyKey) });
+    }
+    if (action === 'list_holon_blueprints') {
+      const areaCode = body.area_code === undefined ? null : requiredString(body.area_code, 'area_code', 4);
+      return response({ data: await listHolonBlueprints(areaCode) });
+    }
+    const user = await authenticate(req);
+    let data: unknown;
+    switch (action) {
+      case 'get_settings': data = await getSettings(user, body); break;
+      case 'update_settings': data = await updateSettings(user, body); break;
+      case 'list_organizations': data = await listOrganizations(user); break;
+      case 'list_workspaces': data = await listWorkspaces(user, body); break;
+      case 'list_workspace_members': data = await listWorkspaceMembers(user, body); break;
+      case 'list_workspace_agents': data = await listWorkspaceAgents(user, body); break;
+      case 'revoke_agent_delegation': data = await revokeAgentDelegation(user, body); break;
+      case 'list_workspace_structure': data = await listWorkspaceStructure(user, body); break;
+      case 'create_workspace': data = await createWorkspace(user, body); break;
+      case 'install_structure': data = await installStructure(user, body); break;
+      case 'assign_installation_ownership': data = await assignInstallationOwnership(user, body); break;
+      case 'revoke_installation_ownership': data = await revokeInstallationOwnership(user, body); break;
+      case 'add_installation_dependency': data = await addInstallationDependency(user, body); break;
+      case 'remove_installation_dependency': data = await removeInstallationDependency(user, body); break;
+      case 'install_capability': data = await installCapability(user, body); break;
+      case 'remove_capability_installation': data = await removeCapabilityInstallation(user, body); break;
+      case 'list_capabilities': data = await listCapabilities(user, body); break;
+      case 'list_orders': data = await listOrders(user, body); break;
+      case 'list_capability_entitlements': data = await listCapabilityEntitlements(user, body); break;
+      case 'list_provider_listings': data = await listProviderListings(user, body); break;
+      case 'create_tenant': data = await createTenant(user, body); break;
+      case 'create_organization': data = await createOrganization(user, body); break;
+      case 'register_agent': data = await registerAgent(user, body); break;
+      case 'create_capability': data = await createCapability(user, body); break;
+      case 'create_listing': data = await createListing(user, body); break;
+      case 'publish_listing': data = await publishListing(user, body); break;
+      case 'create_order': data = await createOrder(user, body); break;
+      case 'transition_order': data = await transitionOrder(user, body); break;
+      case 'provision_finance_chart_of_accounts': data = await provisionFinanceChartOfAccounts(user, body); break;
+      case 'create_fee_policy': data = await createFeePolicy(user, body); break;
+      case 'activate_fee_policy': data = await activateFeePolicy(user, body); break;
+      case 'apply_order_fee_policy': data = await applyOrderFeePolicy(user, body); break;
+      case 'post_finance_journal_entry': data = await postFinanceJournalEntry(user, body); break;
+      case 'post_captured_order_finance_entry': data = await postCapturedOrderFinanceEntry(user, body); break;
+      case 'post_succeeded_refund_finance_entry': data = await postSucceededRefundFinanceEntry(user, body); break;
+      case 'post_paid_payout_item_finance_entry': data = await postPaidPayoutItemFinanceEntry(user, body); break;
+      default: return response({ error: 'Unknown action', action }, 404);
+    }
+    return response({ data, actor_user_id: user.id });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = message.includes('Authentication') || message.includes('session') ? 401 : 400;
+    console.error('marketplace-api', message);
+    return response({ error: message }, status);
+  }
+});

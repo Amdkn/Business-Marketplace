@@ -50,11 +50,12 @@ export function ItRdApp() {
   /* Brief-F — couche d'écriture. Un humain doit pouvoir :
    *   1. acquitter une entrée de drift (severity = alert)
    *   2. poster une nouvelle entrée de journal (manuel + agent)
-   * Les deux passent par `addItem` / `updateItem` du store CMS. Toast
+   * Les deux passent par les mutations CMS persistées du store. Toast
    * global au résultat (succès, warning, info). */
   const addToast = useShellStore(s => s.addToast);
-  const addItem = useCmsStore(s => s.addItem);
-  const updateItem = useCmsStore(s => s.updateItem);
+  const addItem = useCmsStore(s => s.addItemPersisted);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const [mutatingItemId, setMutatingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (detail) {
@@ -73,15 +74,22 @@ export function ItRdApp() {
   const okCount = useCmsStore(s => (s.items['services'] ?? []).filter(x => x.status === 'ok').length);
   const totalServices = useCmsStore(s => s.items['services']?.length ?? 0);
 
-  const acknowledgeDrift = (id: string): void => {
-    const current = (drift as Array<Record<string, unknown>>).find((d) => d.id === id);
+  const acknowledgeDrift = async (id: string): Promise<void> => {
+    if (mutatingItemId) return;
+    const current = (drift as Array<Record<string, unknown>>).find((entry) => entry.id === id);
     if (!current) return;
     if (current.severity === 'ok') {
       addToast({ source: 'IT/R&D', type: 'info', message: 'Déjà nominal.' });
       return;
     }
-    updateItem('it_drift', id, { severity: 'ok' });
-    addToast({ source: 'IT/R&D', type: 'success', message: 'Drift acquitté — marqué ok.' });
+    setMutatingItemId(id);
+    try {
+      const result = await updateItem('it_drift', id, { severity: 'ok' });
+      if (result.ok) addToast({ source: 'IT/R&D', type: 'success', message: 'Drift acquitté et enregistré.' });
+      else addToast({ source: 'IT/R&D', type: 'warning', message: result.error ?? 'Drift acknowledgement was not saved.' });
+    } finally {
+      setMutatingItemId(null);
+    }
   };
 
   /* Experiments kanban — order declared once so the loop terminates cleanly. */
@@ -95,27 +103,37 @@ export function ItRdApp() {
     building: '#7c3aed',
     shipped: '#16a34a',
   };
-  const moveExpStage = (id: string, fromStage: string): void => {
+  const moveExpStage = async (id: string, fromStage: string): Promise<void> => {
     const next = EXP_STAGE_NEXT[fromStage];
     if (!next) {
       addToast({ source: 'IT/R&D', type: 'info', message: 'Déjà shipped — fin de la chaîne.' });
       return;
     }
-    updateItem('it_experiments', id, { stage: next });
-    addToast({ source: 'IT/R&D', type: 'success', message: `Expérience déplacée vers "${next}"` });
+    if (mutatingItemId) return;
+    setMutatingItemId(id);
+    try {
+      const result = await updateItem('it_experiments', id, { stage: next });
+      if (result.ok) addToast({ source: 'IT/R&D', type: 'success', message: `Expérience enregistrée vers "${next}"` });
+      else addToast({ source: 'IT/R&D', type: 'warning', message: result.error ?? 'Experiment stage was not saved.' });
+    } finally {
+      setMutatingItemId(null);
+    }
   };
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState('');
   const [composerAction, setComposerAction] = useState<'note' | 'deploy' | 'drift' | 'lock' | 'eval' | 'correction' | 'rollback' | 'wake'>('note');
+  const [savingJournal, setSavingJournal] = useState(false);
 
-  const submitJournalEntry = (): void => {
+  const submitJournalEntry = async (): Promise<void> => {
+    if (savingJournal) return;
     const title = composerTitle.trim();
     if (title.length === 0) {
       addToast({ source: 'IT/R&D', type: 'warning', message: 'Le titre est obligatoire.' });
       return;
     }
-    const result = addItem('it_journal', {
+    setSavingJournal(true);
+    const result = await addItem('it_journal', {
       title,
       actor: 'human:ops',
       action: composerAction,
@@ -132,6 +150,7 @@ export function ItRdApp() {
     } else {
       addToast({ source: 'IT/R&D', type: 'warning', message: result.error ?? 'Création impossible.' });
     }
+    setSavingJournal(false);
   };
 
   const cancelComposer = (): void => {
@@ -277,7 +296,8 @@ export function ItRdApp() {
           {nextStage ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); moveExpStage(String(item.id), stage); }}
+              onClick={(e) => { e.stopPropagation(); void moveExpStage(String(item.id), stage); }}
+              disabled={mutatingItemId === String(item.id)}
               data-move-exp-stage={String(item.id)}
               className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-white px-1.5 py-0.5 rounded transition-all hover:opacity-90"
               style={{ background: nextAccent }}
@@ -349,7 +369,7 @@ export function ItRdApp() {
               value={composerTitle}
               onChange={(e) => setComposerTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitJournalEntry();
+                if (e.key === 'Enter') void submitJournalEntry();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire l'événement…"
@@ -390,7 +410,8 @@ export function ItRdApp() {
               </button>
               <button
                 type="button"
-                onClick={submitJournalEntry}
+                onClick={() => { void submitJournalEntry(); }}
+                disabled={savingJournal}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: ACCENT, color: '#ffffff' }}
               >
@@ -539,14 +560,17 @@ export function ItRdApp() {
   const [driftCurrent, setDriftCurrent] = useState('');
   const [driftThreshold, setDriftThreshold] = useState('');
   const [driftSeverity, setDriftSeverity] = useState<'ok' | 'watch' | 'drift' | 'alert'>('drift');
+  const [savingDrift, setSavingDrift] = useState(false);
 
-  const submitNewDrift = (): void => {
+  const submitNewDrift = async (): Promise<void> => {
+    if (savingDrift) return;
     const name = driftName.trim();
     if (name.length === 0) {
       addToast({ source: 'IT/R&D', type: 'warning', message: 'Le nom est obligatoire.' });
       return;
     }
-    const result = addItem('it_drift', {
+    setSavingDrift(true);
+    const result = await addItem('it_drift', {
       name,
       metric: driftMetric.trim() || '—',
       reference: driftReference.trim() || '0',
@@ -570,6 +594,7 @@ export function ItRdApp() {
     } else {
       addToast({ source: 'IT/R&D', type: 'warning', message: result.error ?? 'Création impossible.' });
     }
+    setSavingDrift(false);
   };
 
   const cancelDriftComposer = (): void => {
@@ -626,7 +651,7 @@ export function ItRdApp() {
               value={driftName}
               onChange={(e) => setDriftName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewDrift();
+                if (e.key === 'Enter') void submitNewDrift();
                 if (e.key === 'Escape') cancelDriftComposer();
               }}
               placeholder="ex. quiz latency"
@@ -639,7 +664,7 @@ export function ItRdApp() {
                 <input
                   value={driftMetric}
                   onChange={(e) => setDriftMetric(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. p95 latency (ms)"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -664,7 +689,7 @@ export function ItRdApp() {
                 <input
                   value={driftReference}
                   onChange={(e) => setDriftReference(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 800"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -675,7 +700,7 @@ export function ItRdApp() {
                 <input
                   value={driftCurrent}
                   onChange={(e) => setDriftCurrent(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 1200"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -686,7 +711,7 @@ export function ItRdApp() {
                 <input
                   value={driftThreshold}
                   onChange={(e) => setDriftThreshold(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitNewDrift(); if (e.key === 'Escape') cancelDriftComposer(); }}
                   placeholder="ex. 1000"
                   className="text-[12px] font-mono rounded-lg border px-2.5 py-1.5 outline-none"
                   style={{ background: 'var(--theme-bg)', borderColor: 'var(--panel-border)', color: 'var(--theme-text)' }}
@@ -704,7 +729,8 @@ export function ItRdApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewDrift}
+                onClick={() => { void submitNewDrift(); }}
+                disabled={savingDrift}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: ACCENT, color: '#ffffff' }}
               >
@@ -791,7 +817,8 @@ export function ItRdApp() {
                     {severity !== 'ok' ? (
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); acknowledgeDrift(String(entry.id)); }}
+                        onClick={(e) => { e.stopPropagation(); void acknowledgeDrift(String(entry.id)); }}
+                        disabled={mutatingItemId === String(entry.id)}
                         className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider transition-all hover:opacity-90"
                         style={{ background: 'rgba(22,163,74,0.18)', color: '#15803d', border: '1px solid #86efac' }}
                         aria-label={`Acquitter ${entry.name}`}

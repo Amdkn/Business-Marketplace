@@ -40,6 +40,7 @@ interface AlertItem extends Record<string, unknown> {
   riskScore: string;
   hypothesis: string;
   trace: string;
+  status: string;
 }
 
 const CHANGE_TONE: Record<ChangeItem['status'], 'accent' | 'ok' | 'warn' | 'danger' | 'neutral'> = {
@@ -63,44 +64,61 @@ export function OperationsApp() {
   const incidents = useCmsStore(s => s.items['incidents']) ?? [];
   const changes = useCmsStore(s => s.items['changes']) ?? [];
   const alerts = useCmsStore(s => s.items['alerts']) ?? [];
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<OperationsDetailItem | null>(null);
+  const [savingOperation, setSavingOperation] = useState(false);
+  const [mutatingOperationId, setMutatingOperationId] = useState<string | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
 
   /* Brief-F — couche d'écriture. Une mutation par surface :
    *   - alerts   : ack (raw → triaged)              — mutation au plus utile
    *   - changes  : approve / reject (proposed → …)  — file d'attente humaine
    *   - alerts   : composeur d'alerte               — addItem
-   * Les toasts globaux rendent le résultat visible. Les mutations CMS sont
-   * optimistes : `updateItem` fait l'écriture locale d'abord puis persiste.
-   * En cas d'échec, le rollback est une nouvelle mutation inverse — le toast
-   * d'erreur porte le message. */
-  const acknowledgeAlert = (id: string): void => {
-    const current = (alerts as Array<Record<string, unknown>>).find((a) => a.id === id);
+   * Les toasts globaux rendent le résultat visible. Les mutations strictes
+   * publient l'état local uniquement après confirmation du repository cloud. */
+  const acknowledgeAlert = async (id: string): Promise<void> => {
+    if (mutatingOperationId) return;
+    const current = (alerts as Array<Record<string, unknown>>).find((alert) => alert.id === id);
     if (!current) return;
-    if (current.enrichment === 'enriched') {
-      addToast({ source: 'Operations', type: 'info', message: 'Alerte déjà enrichie — triage déjà fait.' });
+    if (current.status === 'triage en cours') {
+      addToast({ source: 'Operations', type: 'info', message: 'Triage déjà démarré.' });
       return;
     }
-    updateItem('alerts', id, { enrichment: 'enriched', status: 'triage en cours' });
-    addToast({ source: 'Operations', type: 'success', message: 'Alerte acquittée — triage marqué.' });
+    setMutatingOperationId(id);
+    try {
+      const result = await updateItem('alerts', id, { status: 'triage en cours' });
+      if (result.ok) addToast({ source: 'Operations', type: 'success', message: 'Triage démarré et enregistré. Runtime enrichment remains unavailable.' });
+      else addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Démarrage du triage non enregistré.' });
+    } finally {
+      setMutatingOperationId(null);
+    }
   };
 
-  const decideChange = (id: string, decision: 'approved' | 'rejected'): void => {
-    const current = (changes as Array<Record<string, unknown>>).find((c) => c.id === id);
+  const decideChange = async (id: string, decision: 'approved' | 'rejected'): Promise<void> => {
+    if (mutatingOperationId) return;
+    const current = (changes as Array<Record<string, unknown>>).find((change) => change.id === id);
     if (!current) return;
     if (current.status === decision) {
       addToast({ source: 'Operations', type: 'info', message: `Déjà ${decision}.` });
       return;
     }
-    updateItem('changes', id, { status: decision });
-    addToast({
-      source: 'Operations',
-      type: decision === 'approved' ? 'success' : 'warning',
-      message: `Changement ${decision === 'approved' ? 'approuvé' : 'rejeté'}.`,
-    });
+    setMutatingOperationId(id);
+    try {
+      const result = await updateItem('changes', id, { status: decision });
+      if (result.ok) {
+        addToast({
+          source: 'Operations',
+          type: decision === 'approved' ? 'success' : 'warning',
+          message: `Changement ${decision === 'approved' ? 'approuvé' : 'rejeté'} et enregistré.`,
+        });
+      } else {
+        addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Décision non enregistrée.' });
+      }
+    } finally {
+      setMutatingOperationId(null);
+    }
   };
 
   const [composerOpen, setComposerOpen] = useState(false);
@@ -116,31 +134,37 @@ export function OperationsApp() {
   const [changePolicy, setChangePolicy] = useState('');
   const [changeProposedBy, setChangeProposedBy] = useState('human:ops');
 
-  const submitNewChange = (): void => {
+  const submitNewChange = async (): Promise<void> => {
+    if (savingOperation) return;
     const title = changeTitle.trim();
     if (title.length === 0) {
       addToast({ source: 'Operations', type: 'warning', message: 'Le titre est obligatoire.' });
       return;
     }
-    const result = addItem('changes', {
-      title,
-      summary: changeSummary.trim() || title,
-      why: changeWhy.trim() || '—',
-      risk: changeRisk,
-      policy: changePolicy.trim() || '—',
-      status: 'proposed',
-      proposedBy: changeProposedBy.trim() || 'human:ops',
-    });
-    if (result.ok) {
-      addToast({ source: 'Operations', type: 'success', message: `Changement proposé : ${title}` });
-      setChangeTitle('');
-      setChangeSummary('');
-      setChangeWhy('');
-      setChangeRisk('low');
-      setChangePolicy('');
-      setChangeComposerOpen(false);
-    } else {
-      addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Création impossible.' });
+    setSavingOperation(true);
+    try {
+      const result = await addItem('changes', {
+        title,
+        summary: changeSummary.trim() || title,
+        why: changeWhy.trim() || '—',
+        risk: changeRisk,
+        policy: changePolicy.trim() || '—',
+        status: 'proposed',
+        proposedBy: changeProposedBy.trim() || 'human:ops',
+      });
+      if (result.ok) {
+        addToast({ source: 'Operations', type: 'success', message: `Changement proposé et enregistré : ${title}` });
+        setChangeTitle('');
+        setChangeSummary('');
+        setChangeWhy('');
+        setChangeRisk('low');
+        setChangePolicy('');
+        setChangeComposerOpen(false);
+      } else {
+        addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Création impossible.' });
+      }
+    } finally {
+      setSavingOperation(false);
     }
   };
 
@@ -153,29 +177,36 @@ export function OperationsApp() {
     setChangeComposerOpen(false);
   };
 
-  const submitNewAlert = (): void => {
+  const submitNewAlert = async (): Promise<void> => {
+    if (savingOperation) return;
     const title = composerTitle.trim();
     if (title.length === 0) {
       addToast({ source: 'Operations', type: 'warning', message: 'Le titre est obligatoire.' });
       return;
     }
-    const result = addItem('alerts', {
-      title,
-      when: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      severity: composerSeverity,
-      enrichment: 'enriched',
-      source: composerSource.trim() || 'manual · ops',
-      riskScore: '—',
-      hypothesis: title,
-      trace: '—',
-    });
-    if (result.ok) {
-      addToast({ source: 'Operations', type: 'success', message: `Alerte ajoutée : ${title}` });
-      setComposerTitle('');
-      setComposerSource('');
-      setComposerOpen(false);
-    } else {
-      addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Création impossible.' });
+    setSavingOperation(true);
+    try {
+      const result = await addItem('alerts', {
+        title,
+        when: new Date().toISOString(),
+        severity: composerSeverity,
+        enrichment: 'raw',
+        source: composerSource.trim() || 'manual · ops',
+        riskScore: null,
+        hypothesis: null,
+        trace: null,
+        status: 'open',
+      });
+      if (result.ok) {
+        addToast({ source: 'Operations', type: 'success', message: `Alerte ajoutée et enregistrée : ${title}` });
+        setComposerTitle('');
+        setComposerSource('');
+        setComposerOpen(false);
+      } else {
+        addToast({ source: 'Operations', type: 'warning', message: result.error ?? 'Création impossible.' });
+      }
+    } finally {
+      setSavingOperation(false);
     }
   };
 
@@ -363,7 +394,7 @@ export function OperationsApp() {
               value={changeTitle}
               onChange={(e) => setChangeTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewChange();
+                if (e.key === 'Enter') void submitNewChange();
                 if (e.key === 'Escape') cancelChangeComposer();
               }}
               placeholder="ex. Add tag-based search to the vault"
@@ -382,7 +413,7 @@ export function OperationsApp() {
               value={changeSummary}
               onChange={(e) => setChangeSummary(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewChange();
+                if (e.key === 'Enter') void submitNewChange();
                 if (e.key === 'Escape') cancelChangeComposer();
               }}
               placeholder="Une phrase qui dit le quoi"
@@ -439,7 +470,7 @@ export function OperationsApp() {
                   value={changePolicy}
                   onChange={(e) => setChangePolicy(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChange();
+                    if (e.key === 'Enter') void submitNewChange();
                     if (e.key === 'Escape') cancelChangeComposer();
                   }}
                   placeholder="ex. ADR-OPS-013"
@@ -460,7 +491,7 @@ export function OperationsApp() {
                   value={changeProposedBy}
                   onChange={(e) => setChangeProposedBy(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewChange();
+                    if (e.key === 'Enter') void submitNewChange();
                     if (e.key === 'Escape') cancelChangeComposer();
                   }}
                   placeholder="ex. human:ops"
@@ -480,7 +511,8 @@ export function OperationsApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewChange}
+                onClick={() => void submitNewChange()}
+                disabled={savingOperation}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: ACCENT, color: '#ffffff' }}
               >
@@ -548,7 +580,8 @@ export function OperationsApp() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => decideChange(String(c.id), 'approved')}
+                          onClick={() => void decideChange(String(c.id), 'approved')}
+                          disabled={mutatingOperationId === String(c.id)}
                           className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider transition-all hover:opacity-90"
                           style={{ background: 'rgba(22,163,74,0.14)', color: '#15803d', border: '1px solid #86efac' }}
                           aria-label={`Approuver ${c.title}`}
@@ -557,7 +590,8 @@ export function OperationsApp() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => decideChange(String(c.id), 'rejected')}
+                          onClick={() => void decideChange(String(c.id), 'rejected')}
+                          disabled={mutatingOperationId === String(c.id)}
                           className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider transition-all hover:opacity-90"
                           style={{ background: 'rgba(220,38,38,0.14)', color: '#b91c1c', border: '1px solid #fca5a5' }}
                           aria-label={`Rejeter ${c.title}`}
@@ -577,12 +611,12 @@ export function OperationsApp() {
   };
 
   const Alertes = () => {
-    const rawCount = alerts.filter((a) => a.enrichment === 'raw').length;
+    const rawCount = alerts.filter((a) => a.status !== 'triage en cours').length;
     return (
       <div className="p-7">
         <SectionHead
           title="Alertes"
-          subtitle="Incidents pre-enrichis a froid — traces, extrait de log, hypothese et risque deja poses"
+          subtitle="Incidents enregistrés dans le workspace. Enrichissement automatique et télémétrie runtime non connectés."
           action={
             <button
               type="button"
@@ -617,7 +651,7 @@ export function OperationsApp() {
               value={composerTitle}
               onChange={(e) => setComposerTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewAlert();
+                if (e.key === 'Enter') void submitNewAlert();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire l'incident…"
@@ -658,7 +692,7 @@ export function OperationsApp() {
                   value={composerSource}
                   onChange={(e) => setComposerSource(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewAlert();
+                    if (e.key === 'Enter') void submitNewAlert();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="ex. manual · ops"
@@ -678,11 +712,12 @@ export function OperationsApp() {
               </button>
               <button
                 type="button"
-                onClick={submitNewAlert}
+                onClick={() => void submitNewAlert()}
+                disabled={savingOperation}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: ACCENT, color: '#ffffff' }}
               >
-                Ajouter l'alerte
+                {savingOperation ? 'Enregistrement…' : 'Ajouter l’alerte'}
               </button>
             </div>
           </div>
@@ -692,7 +727,7 @@ export function OperationsApp() {
             className="mb-4 rounded-xl border p-3 text-[12px]"
             style={{ background: 'rgba(245,158,11,0.08)', borderColor: '#fcd34d', color: '#92400e' }}
           >
-            <span className="font-extrabold uppercase tracking-wider">{rawCount}</span> alerte{rawCount > 1 ? 's' : ''} non acquittée{rawCount > 1 ? 's' : ''} — cliquer "Trier" sur la fiche pour acquitter.
+            <span className="font-extrabold uppercase tracking-wider">{rawCount}</span> alerte{rawCount > 1 ? 's' : ''} en attente de triage — démarrer le triage depuis la fiche.
           </div>
         ) : null}
         {alerts.length === 0 ? (
@@ -733,15 +768,16 @@ export function OperationsApp() {
                       <span className="mx-2">·</span>
                       risk {a.riskScore} · {sevTone === 'danger' ? 'page on-call' : sevTone === 'warn' ? 'monitored' : 'clear'}
                     </span>
-                    {a.enrichment === 'raw' ? (
+                    {a.status !== 'triage en cours' ? (
                       <button
                         type="button"
-                        onClick={() => acknowledgeAlert(String(a.id))}
+                        onClick={() => void acknowledgeAlert(String(a.id))}
+                        disabled={mutatingOperationId === String(a.id)}
                         className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider transition-all hover:opacity-90 shrink-0"
                         style={{ background: 'rgba(245,158,11,0.18)', color: '#b45309', border: '1px solid #fcd34d' }}
-                        aria-label={`Acquitter ${a.title}`}
+                        aria-label={`Démarrer le triage de ${a.title}`}
                       >
-                        <CheckCircle2 className="w-3 h-3" /> trier
+                        <CheckCircle2 className="w-3 h-3" /> démarrer le triage
                       </button>
                     ) : null}
                   </div>

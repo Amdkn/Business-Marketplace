@@ -459,23 +459,28 @@ export function SettingsApp() {
     // `settings_integrations`, enregistrée par `seedSettingsCms()` au
     // chargement du module. Plus de valeurs en dur dans le JSX.
     const items = useCmsStore((s) => s.items['settings_integrations']) ?? [];
-    const updateItem = useCmsStore((s) => s.updateItem);
+    const updateItem = useCmsStore((s) => s.updateItemPersisted);
+    const [savingIntegrationId, setSavingIntegrationId] = useState<string | null>(null);
     const openApp = useShellStore((s) => s.openApp);
     const addToast = useShellStore((s) => s.addToast);
 
-    // La liste était en lecture seule : trois cartes, un badge, aucune
-    // action. Connecter/Déconnecter est la seule mutation qui a du sens
-    // ici — l'ajout d'une intégration passe par le Marketplace, ce que
-    // dit déjà l'état vide plus bas. Même chemin d'écriture que la grille
-    // du Marketplace : updateItem + toast, pour que l'effet soit visible
-    // au-delà de la carte.
-    const toggleConnection = (id: string, name: string, connected: boolean) => {
-      updateItem('settings_integrations', id, { status: connected ? 'not connected' : 'connected' });
-      addToast({
-        source: 'Settings',
-        type: connected ? 'info' : 'success',
-        message: connected ? `${name} déconnecté.` : `${name} connecté.`,
-      });
+    const toggleConnection = async (id: string, name: string, connected: boolean): Promise<void> => {
+      if (savingIntegrationId) return;
+      setSavingIntegrationId(id);
+      try {
+        const result = await updateItem('settings_integrations', id, { status: connected ? 'not connected' : 'connected' });
+        if (result.ok) {
+          addToast({
+            source: 'Settings',
+            type: connected ? 'info' : 'success',
+            message: connected ? `${name} déconnecté et enregistré.` : `${name} connecté et enregistré.`,
+          });
+        } else {
+          addToast({ source: 'Settings', type: 'warning', message: result.error ?? 'Integration state was not saved.' });
+        }
+      } finally {
+        setSavingIntegrationId(null);
+      }
     };
 
     return (
@@ -536,7 +541,8 @@ export function SettingsApp() {
                     <Badge tone={connected ? 'ok' : 'neutral'}>{status}</Badge>
                     <button
                       type="button"
-                      onClick={() => toggleConnection(String(it.id), name, connected)}
+                      onClick={() => { void toggleConnection(String(it.id), name, connected); }}
+                      disabled={savingIntegrationId === String(it.id)}
                       data-integration-toggle={String(it.id)}
                       aria-label={`${connected ? 'Déconnecter' : 'Connecter'} ${name}`}
                       className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"

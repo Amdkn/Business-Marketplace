@@ -5,14 +5,14 @@
  *    - Overview  → operating doctrine + today's standup
  *    - Team      → human squad (X-Men)
  *    - Agents    → agent list
- *    - Squads    → B3 bench: 5 specialist AI agents with state/load/latency/tokens
+ *    - Squads    → canonical workspace agent principals and delegations
  *    - Content   → per-agent docs library
- *    - Cadence   → 7-day × 24-hour standup heatmap + sprint tasks
+ *    - Cadence   → persisted weekly mission planning
  *    - Culture   → operating values
  *  2-level subpage nav: section (left sidebar) → item detail (drill via CMS). */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Users, Bot, Heart, Cpu, FileText, Calendar, Zap,
+  Users, Bot, Heart, FileText, Calendar, Zap,
   Atom, LayoutDashboard, Crown, Activity, CheckCircle2, Play,
   UserSearch, Brain, BookMarked,
   ListChecks, Plus, Trash2, X,
@@ -35,29 +35,18 @@ import { useScenariosStore } from '../../stores/scenarios.store';
 registerItemDetail('people', PeopleItemDetail);
 import { launchTour, TOUR_IDS } from '../../lib/tours';
 import { PeopleDetailPage, type PeopleDetailItem } from './PeopleDetailPage';
-import {
-  FLEET_AGENTS, STATE_META, type FleetAgent,
-  DAYS, HOURS, SCHEDULE_GRID, SCHEDULE_TASKS, type ScheduleTask,
-} from './fleet';
+import { DAYS, HOURS } from './fleet';
 import { seedPeopleCms } from './seed';
+import {
+  listWorkspaceAgents, listWorkspaceMembers, listScheduledMissions, createScheduledMission, deleteScheduledMission,
+  type WorkspaceAgent, type WorkspaceMember, type ScheduledMission, type ScheduleKind,
+} from './people.repo';
 
 seedPeopleCms();
 
 // Green Lantern accent — emerald. Matches Domaine 1 brand for the SOB convergence.
 const ACCENT = '#059669';
 const ACCENT_SOFT = '#10b981';
-
-/** Map agent roles to their squad. Green Lanterns = B2 Visionaries (design/governance),
- *  X-Men = B3 Specialists (execute shippable work). */
-function squadForAgent(agent: FleetAgent): 'green-lanterns' | 'xmen' {
-  // Orchestrator is the B2 Visionary routing all work.
-  return agent.code === 'A-00' ? 'green-lanterns' : 'xmen';
-}
-
-const SQUAD_META: Record<'green-lanterns' | 'xmen', { label: string; tagline: string; accent: string }> = {
-  'green-lanterns': { label: 'Green Lanterns', tagline: 'B2 Visionaries · design and govern', accent: '#059669' },
-  'xmen':          { label: 'X-Men',          tagline: 'B3 Specialists · execute the work',  accent: '#0d9488' },
-};
 
 function Culture() {
   const values = [
@@ -123,9 +112,6 @@ function Culture() {
  *  shows the daily standup, and gives the coach ONE primary action.
  *  Implements the Border Beam visual effect on the standup hero card. */
 function Overview() {
-  const active   = FLEET_AGENTS.filter(a => a.state === 'EXECUTING');
-  const idle     = FLEET_AGENTS.filter(a => a.state === 'IDLE');
-  const blocked  = FLEET_AGENTS.filter(a => a.state === 'RETRY' || a.state === 'BLOCKED' || a.state === 'AWAITING');
   const pendingScenarios = useScenariosStore((s) => s.scenarioOrder.filter((id) => s.scenarios[id]?.status === 'pending').length);
 
   // T2 — first standup tour. Fires once when the user lands on the People
@@ -135,9 +121,9 @@ function Overview() {
   }, []);
 
   const steps: { n: string; title: string; body: string }[] = [
-    { n: '1', title: 'Standup at 9am',       body: 'Your agents post overnight work to your inbox.' },
-    { n: '2', title: 'Agents ship work',      body: 'Specialists run on autopilot inside the boundaries you set.' },
-    { n: '3', title: 'You approve in 10 min', body: 'Yes or no on the queue. Ship or kill. Move on.' },
+    { n: '1', title: 'Verify identity', body: 'Every agent has one canonical principal in the organization registry.' },
+    { n: '2', title: 'Delegate authority', body: 'Workspace access is explicit, scoped, and revocable.' },
+    { n: '3', title: 'Plan persisted missions', body: 'Schedule work against active workspace delegations.' },
   ];
 
   return (
@@ -148,10 +134,10 @@ function Overview() {
           Domaine 01 · RH & Méta-Gouvernance
         </span>
         <h1 className="text-[28px] font-bold tracking-tight text-[var(--theme-text)]" style={{ fontFamily: 'var(--theme-font-display)' }}>
-          Your Agent Factory. Your daily standup.
+          Your Agent Directory. Your daily governance.
         </h1>
         <p className="text-[13.5px] text-[var(--theme-text-muted)] max-w-2xl leading-relaxed">
-          You govern {FLEET_AGENTS.length} specialist agents here. Run a 10-minute standup every morning, approve what they ship, and bring new capabilities online through 2-week sprints. Your agents do the work. You stay the Gatekeeper.
+          Govern canonical agent identities and workspace delegations here. Runtime status and execution metrics appear only after a real runtime feed is connected.
         </p>
       </div>
 
@@ -179,7 +165,7 @@ function Overview() {
       {/* Today's Standup — Border Beam on the hero card */}
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— TODAY'S STANDUP</span>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— WORKSPACE CONTROL</span>
           <span className="text-[10px] font-mono text-[var(--theme-text-dim)]">· {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
         </div>
         <div className="relative rounded-2xl p-[2px] overflow-hidden" style={{ background: 'linear-gradient(120deg, transparent 0%, rgba(16,185,129,0.0) 30%, #10b981 50%, rgba(16,185,129,0.0) 70%, transparent 100%)', backgroundSize: '200% 200%', animation: 'border-beam 4s linear infinite' }}>
@@ -199,7 +185,7 @@ function Overview() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-bold text-[var(--theme-text)]">B1 Gatekeeper standing by</span>
+                  <span className="text-[15px] font-bold text-[var(--theme-text)]">B1 · Workspace governance</span>
                   <span
                     className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
                     style={{ color: '#15803d', background: 'rgba(22,163,74,0.12)', border: '1px solid #86efac' }}
@@ -208,7 +194,7 @@ function Overview() {
                   </span>
                 </div>
                 <p className="text-[12.5px] text-[var(--theme-text-muted)] mt-1 leading-snug">
-                  {active.length} of {FLEET_AGENTS.length} agents ran overnight. {blocked.length > 0 ? `${blocked.length} need your call.` : 'No blockers.'}
+                  Runtime telemetry is not connected. Review workspace agent assignments and browser-local proposals awaiting a human decision.
                 </p>
               </div>
               <button
@@ -232,7 +218,7 @@ function Overview() {
               </button>
             </div>
 
-            {/* Standup metrics — act / idle / blocked */}
+            {/* Runtime telemetry is unavailable until a runtime feed is connected. */}
             <div className="grid grid-cols-3 gap-3 mt-5">
               <div
                 className="rounded-xl p-3.5"
@@ -240,21 +226,21 @@ function Overview() {
               >
                 <div className="flex items-center gap-1.5">
                   <Activity className="w-3.5 h-3.5" style={{ color: '#15803d' }} />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#15803d' }}>Active</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#15803d' }}>Runtime state</span>
                 </div>
-                <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#166534' }}>{active.length}</div>
+                <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#166534' }}>—</div>
                 <div className="text-[10.5px] mt-0.5 truncate" style={{ color: '#15803d' }}>
-                  {active.map(a => a.name).join(', ') || 'none'}
+                  Not reported
                 </div>
               </div>
               <div className="rounded-xl bg-[var(--theme-surface-hover)] border border-[var(--panel-border-subtle)] p-3.5">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-muted)]">Idle</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-muted)]">Current activity</span>
                 </div>
-                <div className="text-[24px] font-bold text-[var(--theme-text)] mt-1 tabular-nums">{idle.length}</div>
+                <div className="text-[24px] font-bold text-[var(--theme-text)] mt-1 tabular-nums">—</div>
                 <div className="text-[10.5px] text-[var(--theme-text-muted)] mt-0.5 truncate">
-                  {idle.map(a => a.name).join(', ') || 'none'}
+                  Not reported
                 </div>
               </div>
               <div
@@ -263,11 +249,11 @@ function Overview() {
               >
                 <div className="flex items-center gap-1.5">
                   <Heart className="w-3.5 h-3.5" style={{ color: '#b45309' }} />
-                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#b45309' }}>Blocked</span>
+                  <span className="text-[9.5px] font-mono uppercase tracking-wider" style={{ color: '#b45309' }}>Telemetry</span>
                 </div>
-                <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#92400e' }}>{blocked.length}</div>
+                <div className="text-[24px] font-bold mt-1 tabular-nums" style={{ color: '#92400e' }}>—</div>
                 <div className="text-[10.5px] mt-0.5 truncate" style={{ color: '#b45309' }}>
-                  {blocked.map(a => a.name).join(', ') || 'none'}
+                  Not reported
                 </div>
               </div>
             </div>
@@ -282,7 +268,7 @@ function Overview() {
                 </>
               ) : (
                 <>
-                  <span>Open <span className="font-semibold text-[var(--theme-text)]">Squads</span> to clear the {blocked.length > 0 ? 'blocked' : 'queue'}</span>
+                  <span>Open <span className="font-semibold text-[var(--theme-text)]">Squads</span> to review workspace agent assignments</span>
                   <span className="ml-auto text-[9.5px] font-mono text-[var(--theme-text-dim)]">~10 min</span>
                 </>
               )}
@@ -293,7 +279,7 @@ function Overview() {
 
       {/* Footer micro-CTA (i-have-adhd: action-first, one primary) */}
       <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)]">
-        <span>Coach OS ships what you approve. Nothing more.</span>
+        <span>Marketplace agent identities and delegated authority remain under workspace governance.</span>
         <span className="font-mono uppercase tracking-wider text-[9.5px]">v2.0 · SOB Convergence</span>
       </div>
     </div>
@@ -302,175 +288,52 @@ function Overview() {
 
 /** Fleet card — per-agent status card matching the template's "agent-cards"
  *  section. Clickable to open the agent's detail page. */
-function FleetCard({ agent, onClick, 'data-fleet-card': fleetCardAttr }: { agent: FleetAgent; onClick: () => void; 'data-fleet-card'?: string }) {
-  const state = STATE_META[agent.state];
-  const isProcessing = agent.state === 'EXECUTING' || agent.state === 'RETRY';
-  return (
-    <button
-      onClick={onClick}
-      data-fleet-card={fleetCardAttr}
-      className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-4 flex flex-col gap-3 text-left transition-all hover:scale-[1.015] hover:shadow-md active:scale-[0.99] cursor-pointer"
-    >
-      <div className="flex items-center gap-2.5">
-        <div className="relative shrink-0">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-[11px] tracking-wider text-[color:#fff]"
-            style={{ background: agent.accent }}
-          >
-            {agent.initials}
-          </div>
-          <span
-            className="absolute -top-0.5 -right-0.5 inline-flex"
-            title={isProcessing ? 'Processing now' : 'Idle'}
-            aria-hidden="true"
-          >
-            {isProcessing ? (
-              <span className="relative inline-flex w-2.5 h-2.5">
-                <span className="absolute inset-0 rounded-full opacity-75 animate-ping" style={{ background: '#16a34a' }} />
-                <span
-                  className="relative rounded-full w-2.5 h-2.5"
-                  style={{ background: '#16a34a', boxShadow: '0 0 0 2px var(--theme-surface)' }}
-                />
-              </span>
-            ) : (
-              <span className="relative inline-flex w-2.5 h-2.5">
-                <span className="absolute inset-0 rounded-full bg-[var(--theme-text-dim)]" />
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[14px] font-bold text-[var(--theme-text)] truncate">{agent.name}</span>
-            <span className="font-mono text-[9px] font-bold text-[var(--theme-text-dim)] px-1.5 py-0.5 rounded bg-[var(--panel-border-subtle)]">{agent.code}</span>
-          </div>
-          <div className="text-[11px] text-[var(--theme-text-muted)] truncate">{agent.role} · <span className="font-mono text-[var(--theme-text-dim)]">{agent.channel}</span></div>
-        </div>
-        <span
-          className={`inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${state.pulse ? 'animate-pulse' : ''}`}
-          style={{ color: state.color, background: state.bg }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: state.color }} />
-          {state.label}
-        </span>
-      </div>
+function Fleet({ onAgentClick }: { onAgentClick: (agent: WorkspaceAgent) => void }) {
+  const [agents, setAgents] = useState<WorkspaceAgent[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-      <p className="text-[12px] text-[var(--theme-text)] leading-snug line-clamp-2">{agent.task}</p>
-
-      {/* Load bar */}
-      <div>
-        <div className="flex items-center justify-between text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)] mb-1">
-          <span>Load</span>
-          <span className="text-[var(--theme-text)] font-bold">{agent.load}%</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-[var(--panel-border-subtle)] overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${agent.load}%`,
-              background: agent.load > 80 ? '#b91c1c' : agent.load > 50 ? '#0891b2' : '#16a34a',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Metrics row */}
-      <div className="grid grid-cols-4 gap-1.5 text-center">
-        <div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Tasks</div>
-          <div className="text-[13px] font-bold text-[var(--theme-text)] tabular-nums">{agent.tasksToday}</div>
-        </div>
-        <div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Tokens</div>
-          <div className="text-[13px] font-bold text-[var(--theme-text)] tabular-nums">{agent.tokens}</div>
-        </div>
-        <div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Latency</div>
-          <div className="text-[13px] font-bold text-[var(--theme-text)] tabular-nums">{agent.latency}</div>
-        </div>
-        <div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Succ.</div>
-          <div className="text-[13px] font-bold text-[var(--theme-text)] tabular-nums">{agent.success}%</div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between text-[9.5px] font-mono text-[var(--theme-text-dim)] pt-1.5 border-t border-[var(--panel-border-subtle)]">
-        <span>model · <span className="text-[var(--theme-text-muted)]">{agent.defaultModel}</span></span>
-        <span>share · <span className="text-[var(--theme-text-muted)] font-bold">{agent.share}%</span></span>
-        <span className="ml-auto text-[var(--theme-text-muted)]">Open ›</span>
-      </div>
-    </button>
-  );
-}
-
-/** Ancien rendu inline `FleetDetail` (148 lignes) — archivé 2026-08-10.
- *  Le clic sur une carte de la Fleet peuple désormais `detail` du PeopleApp,
- *  ce qui rend la fiche riche `<PeopleDetailPage>` dans l'overlay. Le rendu
- *  inline faisait doublon avec la fiche riche et ne s'ouvrait plus depuis
- *  la régression qui a vidé la branche `{detail ? ...}`. Conservé ici à
- *  titre de comparaison (suppression matérielle interdite par la doctrine). */
-function _UnusedLegacyFleetDetail_REMOVED() { return null; }
-// Référencée pour satisfaire `tsc` sans supprimer le code archivé (doctrine
-// ci-dessus : suppression matérielle interdite). Ne change aucun rendu.
-void _UnusedLegacyFleetDetail_REMOVED;
-
-function Fleet({ onAgentClick }: { onAgentClick: (agent: FleetAgent) => void }) {
-  const grouped: Array<{ key: 'green-lanterns' | 'xmen'; agents: FleetAgent[] }> = [
-    { key: 'green-lanterns', agents: FLEET_AGENTS.filter(a => squadForAgent(a) === 'green-lanterns') },
-    { key: 'xmen',          agents: FLEET_AGENTS.filter(a => squadForAgent(a) === 'xmen') },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    listWorkspaceAgents()
+      .then((rows) => { if (!cancelled) setAgents(rows); })
+      .catch((reason: unknown) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load workspace agents');
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="p-7 h-full flex flex-col gap-5 overflow-y-auto custom-scrollbar">
       <SectionHead
-        title="B3 Agent Bench"
-        subtitle="Squads · live state by Green Lanterns and X-Men"
-        action={
-          <div className="flex items-center gap-2">
-            <Badge tone="accent">{FLEET_AGENTS.length} agents</Badge>
-            <Badge tone="ok">
-              <span className="w-1.5 h-1.5 rounded-full mr-1" style={{ background: '#16a34a' }} />
-              {FLEET_AGENTS.filter(a => a.state === 'EXECUTING').length} executing
-            </Badge>
-          </div>
-        }
+        title="Workspace Agent Bench"
+        subtitle="Canonical principals delegated to this workspace · runtime metrics are not yet ingested"
+        action={<Badge tone="accent">{agents?.length ?? '—'} assigned</Badge>}
       />
-      <div className="flex flex-col gap-6">
-        {grouped.map(({ key, agents }) => {
-          const meta = SQUAD_META[key];
-          if (agents.length === 0) return null;
-          return (
-            <div key={key} className="flex flex-col gap-3">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1.5 h-5 rounded-full" style={{ background: meta.accent }} />
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[var(--theme-text)]">{meta.label}</span>
-                  <span className="text-[10.5px] text-[var(--theme-text-muted)] truncate">{meta.tagline}</span>
+      {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700" role="alert">{error}</div>}
+      {agents === null && !error && <div className="animate-pulse rounded-xl bg-[var(--theme-surface-hover)] p-8" role="status">Loading canonical agent assignments…</div>}
+      {agents && agents.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--panel-border)] p-8 text-center text-sm text-[var(--theme-text-muted)]">No agent principal has an active delegation to this workspace.</div>}
+      {agents && agents.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {agents.map((agent) => (
+            <button key={agent.id} type="button" onClick={() => onAgentClick(agent)}
+              className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-solid)] p-5 text-left shadow-sm transition hover:shadow-md">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-[var(--theme-text)]">{agent.displayName}</div>
+                  <div className="mt-1 truncate font-mono text-[10px] text-[var(--theme-text-dim)]">{agent.agentKey}</div>
                 </div>
-                <span className="ml-auto text-[9.5px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">
-                  {agents.length} on bench
-                </span>
+                <Badge tone={agent.principalStatus === 'ACTIVE' ? 'ok' : 'warn'}>{agent.principalStatus}</Badge>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {agents.map(a => (
-                  <FleetCard
-                    key={a.code}
-                    agent={a}
-                    data-fleet-card={a.code}
-                    /* Le clic peuple le state `detail` du PeopleApp, ce qui :
-                       1) rend `<PeopleDetailPage>` dans l'overlay (la fiche riche),
-                       2) synchronise le fil d'Ariane via l'effet de PeopleApp.
-                       Avant cette correction, ce clic n'ouvrait qu'une fiche
-                       simplifiée inline (`FleetDetail`) et la fiche riche
-                       799 lignes (`PeopleDetailPage`) restait morte. */
-                    onClick={() => onAgentClick(a)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--panel-border-subtle)] pt-3 text-[11px]">
+                <div><dt className="text-[var(--theme-text-dim)]">Class</dt><dd className="mt-1 font-semibold text-[var(--theme-text)]">{agent.agentClass}</dd></div>
+                <div><dt className="text-[var(--theme-text-dim)]">Runtime</dt><dd className="mt-1 truncate font-semibold text-[var(--theme-text)]">{agent.runtime}</dd></div>
+                <div><dt className="text-[var(--theme-text-dim)]">Delegated permissions</dt><dd className="mt-1 font-semibold text-[var(--theme-text)]">{agent.permissionCodes.length}</dd></div>
+                <div><dt className="text-[var(--theme-text-dim)]">Telemetry</dt><dd className="mt-1 font-semibold text-[var(--theme-text)]">Unavailable</dd></div>
+              </dl>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -501,7 +364,7 @@ function heatColor(value: number): string {
   return `rgba(var(--theme-accent-rgb), ${opacity.toFixed(2)})`;
 }
 
-const TASK_KIND_COLOR: Record<ScheduleTask['kind'], string> = {
+const TASK_KIND_COLOR: Record<ScheduleKind, string> = {
   sync:    '#0891b2',
   run:     '#0d9488',
   audit:   '#9333ea',
@@ -510,7 +373,7 @@ const TASK_KIND_COLOR: Record<ScheduleTask['kind'], string> = {
 };
 
 /** Map task kind to the SOB sprint cadence terminology coaches actually use. */
-const TASK_KIND_LABEL: Record<ScheduleTask['kind'], string> = {
+const TASK_KIND_LABEL: Record<ScheduleKind, string> = {
   sync:     'Daily Standup',
   run:      'Sprint Work',
   audit:    'Sprint Review',
@@ -519,510 +382,284 @@ const TASK_KIND_LABEL: Record<ScheduleTask['kind'], string> = {
 };
 
 function Schedule() {
-  // Brief G — Cadence prioritaire. Les compteurs, le panneau de case et le
-  // contour des cellules réagissent aux tâches réellement planifiées, plus
-  // au seed statique `SCHEDULE_GRID`. La heatmap reste visuellement intacte
-  // (mêmes couleurs, même échelle) ; seuls les compteurs et l'indicateur
-  // « cette case a des tâches » suivent `tasks`.
-  const addToast = useShellStore(s => s.addToast);
-  const [tasks, setTasks] = useState<ScheduleTask[]>(SCHEDULE_TASKS);
+  const addToast = useShellStore((state) => state.addToast);
+  const [agents, setAgents] = useState<WorkspaceAgent[]>([]);
+  const [tasks, setTasks] = useState<ScheduledMission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<{ day: typeof DAYS[number]; hour: number } | null>(null);
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerLabel, setComposerLabel] = useState('');
-  const [composerAgent, setComposerAgent] = useState<string>('Orchestrator');
-  const [composerKind, setComposerKind] = useState<ScheduleTask['kind']>('run');
+  const [composerAgentId, setComposerAgentId] = useState('');
+  const [composerKind, setComposerKind] = useState<ScheduleKind>('run');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // T4 — cadence tour. Fires once on first mount of the Cadence section.
+  const refresh = async () => {
+    const currentAgents = await listWorkspaceAgents();
+    const currentTasks = await listScheduledMissions(currentAgents);
+    setAgents(currentAgents);
+    setTasks(currentTasks);
+  };
+
   useEffect(() => {
-    void launchTour(TOUR_IDS.CADENCE);
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([listWorkspaceAgents()])
+      .then(async ([currentAgents]) => {
+        const currentTasks = await listScheduledMissions(currentAgents);
+        if (!cancelled) {
+          setAgents(currentAgents);
+          setTasks(currentTasks);
+          setError(null);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load persisted missions');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  // Auto-cancel a pending delete-confirm after 4 s (same rhythm as
-  // CollectionRepeater — la cohérence évite de réinventer le geste).
+  useEffect(() => { void launchTour(TOUR_IDS.CADENCE); }, []);
+
   useEffect(() => {
     if (!confirmDeleteId) return;
     const handle = window.setTimeout(() => setConfirmDeleteId(null), 4000);
     return () => window.clearTimeout(handle);
   }, [confirmDeleteId]);
 
-  const agentOptions = useMemo(() => {
-    const set = new Set<string>(FLEET_AGENTS.map((a) => a.name));
-    for (const t of tasks) set.add(t.agent);
-    return ['all', ...Array.from(set).sort()];
-  }, [tasks]);
-
+  const agentOptions = useMemo(() => agents.filter((agent) => agent.principalStatus === 'ACTIVE').map((agent) => ({ id: agent.id, name: agent.displayName })), [agents]);
   const filteredTasks = picked
-    ? tasks.filter((t) => {
-        const matchesDay = t.day === picked.day;
-        const matchesHour = picked.hour >= t.startHour && picked.hour < t.endHour;
-        const matchesAgent = agentFilter === 'all' || t.agent === agentFilter;
-        return matchesDay && matchesHour && matchesAgent;
-      })
+    ? tasks.filter((task) =>
+        task.day === picked.day &&
+        picked.hour >= task.startHour &&
+        picked.hour < task.endHour &&
+        (agentFilter === 'all' || task.agentPrincipalId === agentFilter))
     : [];
 
-  // Counters derived from real tasks, not from SCHEDULE_GRID. Pour chaque
-  // heure, on compte le nombre de tâches qui couvrent cette heure
-  // (startHour ≤ h < endHour). peakHour = heure la plus chargée,
-  // quietestHour = heure la moins chargée. weekdayAvg = part des
-  // (jour × heure) en semaine (Mon-Fri, 5×24 = 120 slots) couverte par
-  // au moins une tâche — c'est la métrique que l'utilisateur a explicitée
-  // (« doit suivre les tâches réelles après création »).
   const hourCounts = useMemo(
-    () => Array.from({ length: 24 }, (_, h) =>
-      tasks.filter((t) => h >= t.startHour && h < t.endHour).length
-    ),
+    () => Array.from({ length: 24 }, (_, hour) =>
+      tasks.filter((task) => hour >= task.startHour && hour < task.endHour).length),
     [tasks],
   );
   const peakHour = hourCounts.indexOf(Math.max(...hourCounts, 0));
   const quietestHour = hourCounts.indexOf(Math.min(...hourCounts, 0));
   const weekdayAvg = useMemo(() => {
-    const weekdayDays: ReadonlyArray<typeof DAYS[number]> = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const weekdays: ReadonlyArray<typeof DAYS[number]> = ['Mon','Tue','Wed','Thu','Fri'];
     const slots = new Set<string>();
-    for (const t of tasks) {
-      if (!weekdayDays.includes(t.day)) continue;
-      for (let h = t.startHour; h < t.endHour; h += 1) {
-        slots.add(`${t.day}-${h}`);
-      }
+    for (const task of tasks) {
+      if (!weekdays.includes(task.day)) continue;
+      for (let hour = task.startHour; hour < task.endHour; hour += 1) slots.add(`${task.day}-${hour}`);
     }
-    return Math.round((slots.size / (5 * 24)) * 100);
+    return Math.round((slots.size / 120) * 100);
   }, [tasks]);
+  const plannedGrid = useMemo(() => DAYS.map((day) =>
+    HOURS.map((hour) => Math.min(100, tasks.filter((task) =>
+      task.day === day && hour >= task.startHour && hour < task.endHour).length * 45))),
+  [tasks]);
 
-  const submitTask = (e: React.FormEvent<HTMLFormElement>): void => {
-    e.preventDefault();
-    if (!picked) return;
-    const label = composerLabel.trim();
-    if (label.length === 0) {
-      addToast({ source: 'Cadence', type: 'warning', message: 'Le titre est obligatoire.' });
-      return;
+  const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!picked || !composerLabel.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await createScheduledMission({
+        day: picked.day,
+        startHour: picked.hour,
+        endHour: Math.min(24, picked.hour + 1),
+        agentPrincipalId: composerAgentId || null,
+        label: composerLabel,
+        kind: composerKind,
+      });
+      await refresh();
+      setComposerLabel('');
+      setComposerAgentId('');
+      setComposerKind('run');
+      setComposerOpen(false);
+      addToast({ source: 'Cadence', type: 'success', message: 'Mission persistée dans le workspace.' });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Unable to persist mission';
+      setError(message);
+      addToast({ source: 'Cadence', type: 'warning', message });
+    } finally {
+      setSaving(false);
     }
-    const newTask: ScheduleTask = {
-      id: `t-cad-${Date.now().toString(36)}`,
-      day: picked.day,
-      startHour: picked.hour,
-      endHour: picked.hour + 1,
-      agent: composerAgent.trim() || 'Orchestrator',
-      label,
-      kind: composerKind,
-    };
-    setTasks((prev) => [...prev, newTask]);
-    setComposerLabel('');
-    setComposerAgent('Orchestrator');
-    setComposerKind('run');
-    setComposerOpen(false);
-    addToast({
-      source: 'Cadence',
-      type: 'success',
-      message: `Tâche planifiée : ${label}`,
-    });
   };
 
-  const cancelComposer = (): void => {
+  const cancelComposer = () => {
     setComposerOpen(false);
     setComposerLabel('');
-    setComposerAgent('Orchestrator');
+    setComposerAgentId('');
     setComposerKind('run');
   };
 
-  const handleDeleteClick = (id: string): void => {
+  const handleDeleteClick = async (id: string) => {
     if (confirmDeleteId !== id) {
       setConfirmDeleteId(id);
       return;
     }
-    const target = tasks.find((t) => t.id === id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-    setConfirmDeleteId(null);
-    addToast({
-      source: 'Cadence',
-      type: 'success',
-      message: `Tâche retirée : ${target?.label ?? id}`,
-    });
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteScheduledMission(id);
+      await refresh();
+      setConfirmDeleteId(null);
+      addToast({ source: 'Cadence', type: 'success', message: 'Mission supprimée du workspace.' });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Unable to delete mission';
+      setError(message);
+      addToast({ source: 'Cadence', type: 'warning', message });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="p-7 h-full flex flex-col gap-5 overflow-y-auto custom-scrollbar">
       <SectionHead
         title="Standup Cadence"
-        subtitle="Daily standup, sprint review, retrospective · 7-day × 24-hour"
-        action={<Badge tone="accent">UTC</Badge>}
+        subtitle="Persisted workspace missions · planned work, not runtime activity"
+        action={<Badge tone="accent">Weekly · UTC</Badge>}
       />
+      {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700" role="alert">{error}</div>}
+      {loading && <div className="rounded-xl bg-[var(--theme-surface-hover)] p-5 text-sm text-[var(--theme-text-muted)]" role="status">Loading persisted workspace missions…</div>}
 
-      {/* Heatmap */}
       <div className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— ACTIVITY HEATMAP · 7d × 24h</div>
-            <div className="text-[12px] text-[var(--theme-text-muted)] mt-0.5">
-              Clique une case pour voir les tâches prévues
-              {picked ? ` · ${picked.day} ${String(picked.hour).padStart(2, '0')}:00` : ''}
-            </div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— PLANNED MISSIONS · 7d × 24h</div>
+            <div className="text-[12px] text-[var(--theme-text-muted)] mt-0.5">La densité représente les missions planifiées et enregistrées, pas une activité d'exécution.</div>
+            {picked && <div className="text-[11px] text-[var(--theme-text-dim)] mt-1">{picked.day} · {String(picked.hour).padStart(2, '0')}:00 UTC</div>}
           </div>
-          <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">
-            <span>quiet</span>
-            <div className="flex gap-0.5">
-              {[0.06, 0.25, 0.5, 0.75, 0.95].map(o => (
-                <div key={o} className="w-3 h-3 rounded-sm" style={{ background: `rgba(var(--theme-accent-rgb), ${o})` }} />
-              ))}
-            </div>
-            <span>busy</span>
-          </div>
+          <div className="flex gap-1 text-[9px] font-mono uppercase text-[var(--theme-text-dim)]"><span>empty</span><span>→</span><span>scheduled</span></div>
         </div>
-
         <div className="overflow-x-auto custom-scrollbar">
           <div className="min-w-[700px]">
-            {/* Header row: hours */}
             <div className="grid" style={{ gridTemplateColumns: '40px repeat(24, 1fr)', gap: '2px' }}>
               <div />
-              {HOURS.map(h => (
-                <div key={h} className="text-[9px] font-mono text-[var(--theme-text-dim)] text-center">
-                  {h % 6 === 0 ? h : ''}
-                </div>
-              ))}
+              {HOURS.map((hour) => <div key={hour} className="text-[9px] font-mono text-[var(--theme-text-dim)] text-center">{hour % 6 === 0 ? hour : ''}</div>)}
             </div>
-            {/* Day rows */}
-            {DAYS.map((day, dayIdx) => (
+            {DAYS.map((day, dayIndex) => (
               <div key={day} className="grid mt-1" style={{ gridTemplateColumns: '40px repeat(24, 1fr)', gap: '2px' }}>
                 <div className="text-[10px] font-mono uppercase text-[var(--theme-text-muted)] font-semibold pr-2 text-right self-center">{day}</div>
-                {HOURS.map(h => {
-                  const isPicked = picked?.day === day && picked.hour === h;
-                  const hasTask = tasks.some(
-                    (t) => t.day === day && h >= t.startHour && h < t.endHour,
-                  );
-                  return (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => { setPicked({ day, hour: h }); setConfirmDeleteId(null); }}
-                      data-cadence-cell
-                      data-day={day}
-                      data-hour={h}
-                      aria-label={`${day} ${h}:00 — activity ${SCHEDULE_GRID[dayIdx][h]}${hasTask ? ' · a des tâches prévues' : ''}`}
-                      className="h-5 rounded-sm transition-all hover:ring-1 hover:ring-[var(--theme-accent)] focus:outline-none"
-                      style={{
-                        background: heatColor(SCHEDULE_GRID[dayIdx][h]),
-                        boxShadow: isPicked ? '0 0 0 2px var(--theme-accent)' : hasTask ? 'inset 0 0 0 1px rgba(255,255,255,0.18)' : 'none',
-                        cursor: 'pointer',
-                      }}
-                    />
-                  );
+                {HOURS.map((hour) => {
+                  const isPicked = picked?.day === day && picked.hour === hour;
+                  const count = tasks.filter((task) => task.day === day && hour >= task.startHour && hour < task.endHour).length;
+                  return <button key={hour} type="button" disabled={loading}
+                    onClick={() => { setPicked({ day, hour }); setConfirmDeleteId(null); }}
+                    data-cadence-cell data-day={day} data-hour={hour}
+                    aria-label={`${day} ${hour}:00 — ${count} persisted planned missions`}
+                    className="h-5 rounded-sm transition-all hover:ring-1 hover:ring-[var(--theme-accent)] focus:outline-none disabled:cursor-not-allowed"
+                    style={{ background: heatColor(plannedGrid[dayIndex][hour]), boxShadow: isPicked ? '0 0 0 2px var(--theme-accent)' : count ? 'inset 0 0 0 1px rgba(255,255,255,0.2)' : 'none' }} />;
                 })}
               </div>
             ))}
           </div>
         </div>
-
-        {/* Stats row — derived from real tasks, per brief G */}
         <div className="mt-4 pt-3 border-t border-[var(--panel-border-subtle)] grid grid-cols-3 gap-4">
-          <div>
-            <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Peak hour</div>
-            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{String(peakHour).padStart(2, '0')}:00 UTC</div>
-          </div>
-          <div>
-            <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Quietest</div>
-            <div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{String(quietestHour).padStart(2, '0')}:00 UTC</div>
-          </div>
-          <div>
-            <div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Weekday avg</div>
-            <div className="text-[20px] font-bold mt-0.5" style={{ color: '#15803d' }}>{weekdayAvg}%</div>
-          </div>
+          <div><div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Peak planned hour</div><div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{tasks.length ? `${String(peakHour).padStart(2, '0')}:00 UTC` : '—'}</div></div>
+          <div><div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Least scheduled</div><div className="text-[20px] font-bold text-[var(--theme-text)] mt-0.5">{tasks.length ? `${String(quietestHour).padStart(2, '0')}:00 UTC` : '—'}</div></div>
+          <div><div className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">Weekday coverage</div><div className="text-[20px] font-bold mt-0.5" style={{ color: '#15803d' }}>{tasks.length ? `${weekdayAvg}%` : '—'}</div></div>
         </div>
       </div>
 
-      {/* Picked cell detail — what runs at this hour/day, with create + delete */}
-      {picked && (
-        <div
-          data-cadence-detail
-          className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-5"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">
-              — CASE · {picked.day} {String(picked.hour).padStart(2, '0')}:00 UTC
-            </div>
-            <select
-              value={agentFilter}
-              onChange={(e) => setAgentFilter(e.target.value)}
-              data-cadence-agent-filter
-              className="ml-auto px-2 py-1 rounded-lg text-[10.5px] font-semibold outline-none"
-              style={{
-                background: 'var(--theme-bg)',
-                color: 'var(--theme-text)',
-                border: '1px solid var(--panel-border)',
-              }}
-            >
-              {agentOptions.map((a) => (
-                <option key={a} value={a}>
-                  {a === 'all' ? 'Tous les agents' : a}
-                </option>
-              ))}
+      {picked && <div data-cadence-detail className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— SLOT · {picked.day} {String(picked.hour).padStart(2, '0')}:00 UTC</div>
+          <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value)} data-cadence-agent-filter
+            className="ml-auto px-2 py-1 rounded-lg text-[10.5px] font-semibold outline-none"
+            style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)', border: '1px solid var(--panel-border)' }}>
+            <option value="all">Tous les agents</option>
+            {agentOptions.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+          </select>
+          <button type="button" onClick={() => { setPicked(null); setAgentFilter('all'); setConfirmDeleteId(null); setComposerOpen(false); }}
+            className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-[11px] font-semibold" data-cadence-close>Fermer</button>
+        </div>
+
+        {composerOpen && <form data-cadence-composer onSubmit={submitTask} className="mb-4 rounded-xl border p-3 flex flex-col gap-2"
+          style={{ background: 'var(--canvas)', borderColor: 'var(--panel-border-subtle)' }}>
+          <div className="flex items-center justify-between">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--theme-text-dim)]">Nouvelle mission · {picked.day} {String(picked.hour).padStart(2, '0')}:00–{String(Math.min(24,picked.hour+1)).padStart(2, '0')}:00</div>
+            <button type="button" onClick={cancelComposer} aria-label="Annuler" className="w-5 h-5 rounded-md flex items-center justify-center hover:bg-[var(--theme-surface-hover)]" style={{ color: 'var(--theme-text-muted)' }}><X className="w-3 h-3" /></button>
+          </div>
+          <input autoFocus required value={composerLabel} onChange={(event) => setComposerLabel(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Escape') cancelComposer(); }}
+            placeholder="Intitulé de la mission…" data-cadence-composer-label
+            className="px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
+            style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)', border: '1px solid var(--panel-border)' }} />
+          <div className="flex items-center gap-2">
+            <select value={composerAgentId} onChange={(event) => setComposerAgentId(event.target.value)} data-cadence-composer-agent
+              className="flex-1 px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
+              style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)', border: '1px solid var(--panel-border)' }}>
+              <option value="">Non assignée</option>
+              {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
             </select>
-            <button
-              type="button"
-              onClick={() => { setPicked(null); setAgentFilter('all'); setConfirmDeleteId(null); setComposerOpen(false); }}
-              className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-[11px] font-semibold"
-              data-cadence-close
-              aria-label="Fermer le détail"
-            >
-              Fermer
+            <select value={composerKind} onChange={(event) => setComposerKind(event.target.value as ScheduleKind)} data-cadence-composer-kind
+              className="flex-1 px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
+              style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)', border: '1px solid var(--panel-border)' }}>
+              {(['sync','run','audit','review','sync-up'] as ScheduleKind[]).map((kind) => <option key={kind} value={kind}>{TASK_KIND_LABEL[kind]}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={cancelComposer} className="h-7 px-3 rounded-lg text-[11px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>Annuler</button>
+            <button type="submit" disabled={saving || !composerLabel.trim()} data-cadence-composer-submit
+              className="h-7 px-3 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50" style={{ background: ACCENT }}>
+              {saving ? 'Enregistrement…' : 'Planifier'}
             </button>
           </div>
+        </form>}
 
-          {/* Create form — opens when composerOpen is true. Hidden when
-              the user is just browsing tasks; the empty-state CTA below
-              flips the flag. */}
-          {composerOpen && (
-            <form
-              data-cadence-composer
-              onSubmit={submitTask}
-              className="mb-4 rounded-xl border p-3 flex flex-col gap-2"
-              style={{
-                background: 'var(--canvas)',
-                borderColor: 'var(--panel-border-subtle)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--theme-text-dim)]">
-                  Nouvelle tâche — {picked.day} {String(picked.hour).padStart(2, '0')}:00–{String(picked.hour + 1).padStart(2, '0')}:00
-                </div>
-                <button
-                  type="button"
-                  onClick={cancelComposer}
-                  aria-label="Annuler"
-                  className="w-5 h-5 rounded-md flex items-center justify-center hover:bg-[var(--theme-surface-hover)]"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-              <input
-                autoFocus
-                value={composerLabel}
-                onChange={(e) => setComposerLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') cancelComposer();
-                }}
-                placeholder="Intitulé de la tâche…"
-                data-cadence-composer-label
-                className="px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
-                style={{
-                  background: 'var(--theme-bg)',
-                  color: 'var(--theme-text)',
-                  border: '1px solid var(--panel-border)',
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <select
-                  value={composerAgent}
-                  onChange={(e) => setComposerAgent(e.target.value)}
-                  data-cadence-composer-agent
-                  className="flex-1 px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
-                  style={{
-                    background: 'var(--theme-bg)',
-                    color: 'var(--theme-text)',
-                    border: '1px solid var(--panel-border)',
-                  }}
-                >
-                  {FLEET_AGENTS.map((a) => (
-                    <option key={a.code} value={a.name}>{a.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={composerKind}
-                  onChange={(e) => setComposerKind(e.target.value as ScheduleTask['kind'])}
-                  data-cadence-composer-kind
-                  className="flex-1 px-2.5 py-1.5 rounded-lg text-[12px] outline-none"
-                  style={{
-                    background: 'var(--theme-bg)',
-                    color: 'var(--theme-text)',
-                    border: '1px solid var(--panel-border)',
-                  }}
-                >
-                  {(Object.keys(TASK_KIND_LABEL) as ScheduleTask['kind'][]).map((k) => (
-                    <option key={k} value={k}>{TASK_KIND_LABEL[k]}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={cancelComposer}
-                  className="h-7 px-3 rounded-lg text-[11px] font-semibold"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  data-cadence-composer-submit
-                  className="h-7 px-3 rounded-lg text-[11px] font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  style={{ background: ACCENT }}
-                >
-                  Planifier
-                </button>
-              </div>
-            </form>
-          )}
+        {filteredTasks.length === 0 ? <div data-cadence-empty className="flex flex-col items-center gap-2 py-6 rounded-xl border border-dashed text-center"
+          style={{ borderColor: 'var(--panel-border)', background: 'var(--theme-surface)', color: 'var(--theme-text-muted)' }}>
+          <div className="text-[12.5px] font-semibold" style={{ color: 'var(--theme-text)' }}>Aucune mission sur ce créneau{agentFilter !== 'all' ? ` pour ${agentFilter}` : ''}.</div>
+          <div className="text-[11px]" style={{ color: 'var(--theme-text-dim)' }}>La mission sera enregistrée dans le registre partagé du workspace.</div>
+          {!composerOpen && <button type="button" onClick={() => setComposerOpen(true)} data-cadence-empty-create
+            className="mt-1 flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider"
+            style={{ background: ACCENT, color: '#ffffff' }}><Plus className="w-3 h-3" />Planifier une mission</button>}
+        </div> : <ul className="flex flex-col gap-2">
+          {filteredTasks.map((task) => {
+            const kindColor = TASK_KIND_COLOR[task.kind];
+            const confirming = confirmDeleteId === task.id;
+            return <li key={task.id} data-cadence-task={task.id} className="flex items-center gap-3 px-3 py-2 rounded-lg"
+              style={{ background: 'var(--canvas)', border: '1px solid var(--panel-border-subtle)' }}>
+              <span className="font-mono text-[10px] uppercase text-[var(--theme-text-muted)] w-10 shrink-0">{task.day}</span>
+              <span className="font-mono text-[11px] text-[var(--theme-text)] tabular-nums w-24 shrink-0">{String(task.startHour).padStart(2, '0')}:00–{String(task.endHour).padStart(2, '0')}:00</span>
+              <span className="inline-flex items-center text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+                style={{ color: kindColor, background: `${kindColor}1a` }}>{TASK_KIND_LABEL[task.kind]}</span>
+              <span className="text-[12.5px] text-[var(--theme-text)] truncate flex-1">{task.label}</span>
+              <span className="text-[10px] font-mono text-[var(--theme-text-dim)] shrink-0">@ {task.agent}</span>
+              <button type="button" disabled={saving} onClick={() => void handleDeleteClick(task.id)}
+                aria-label={confirming ? `Confirmer la suppression de ${task.label}` : `Supprimer ${task.label}`}
+                data-cadence-delete={task.id} className="h-6 px-2 rounded-md text-[10px] font-semibold uppercase tracking-wider"
+                style={confirming ? { background: '#dc2626', color: '#fff' } : { background: 'transparent', color: 'var(--theme-text-dim)' }}>
+                <Trash2 className="w-3 h-3" />{confirming ? 'Confirmer ?' : ''}
+              </button>
+            </li>;
+          })}
+        </ul>}
+      </div>}
 
-          {filteredTasks.length === 0 ? (
-            <div
-              data-cadence-empty
-              className="flex flex-col items-center gap-2 py-6 rounded-xl border border-dashed text-center"
-              style={{
-                borderColor: 'var(--panel-border)',
-                background: 'var(--theme-surface)',
-                color: 'var(--theme-text-muted)',
-              }}
-            >
-              <div className="text-[12.5px] font-semibold" style={{ color: 'var(--theme-text)' }}>
-                Aucune tâche sur ce créneau
-                {agentFilter !== 'all' ? ` pour ${agentFilter}` : ''}.
-              </div>
-              <div className="text-[11px]" style={{ color: 'var(--theme-text-dim)' }}>
-                Coche la heatmap puis ouvre le panneau pour planifier ta première tâche.
-              </div>
-              {!composerOpen && (
-                <button
-                  type="button"
-                  onClick={() => setComposerOpen(true)}
-                  data-cadence-empty-create
-                  className="mt-1 flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    background: ACCENT,
-                    color: '#ffffff',
-                    boxShadow: `0 2px 8px ${ACCENT}40`,
-                  }}
-                >
-                  <Plus className="w-3 h-3" />
-                  Planifier une tâche
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <ul className="flex flex-col gap-2">
-                {filteredTasks.map((t) => {
-                  const kindColor = TASK_KIND_COLOR[t.kind];
-                  const cadenceLabel = TASK_KIND_LABEL[t.kind];
-                  const isConfirming = confirmDeleteId === t.id;
-                  return (
-                    <li
-                      key={t.id}
-                      data-cadence-task={t.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg group"
-                      style={{ background: 'var(--canvas)', border: '1px solid var(--panel-border-subtle)' }}
-                    >
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--theme-text-muted)] w-10 shrink-0">{t.day}</span>
-                      <span className="font-mono text-[11px] text-[var(--theme-text)] tabular-nums w-24 shrink-0">
-                        {String(t.startHour).padStart(2, '0')}:00–{String(t.endHour).padStart(2, '0')}:00
-                      </span>
-                      <span
-                        className="inline-flex items-center text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
-                        style={{ color: kindColor, background: `${kindColor}1a` }}
-                      >
-                        {cadenceLabel}
-                      </span>
-                      <span className="text-[12.5px] text-[var(--theme-text)] truncate flex-1">{t.label}</span>
-                      <span className="text-[10px] font-mono text-[var(--theme-text-dim)] shrink-0">@ {t.agent}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteClick(t.id)}
-                        aria-label={isConfirming ? `Confirmer la suppression de ${t.label}` : `Supprimer ${t.label}`}
-                        data-cadence-delete={t.id}
-                        className="h-6 px-2 rounded-md text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 transition-all"
-                        style={
-                          isConfirming
-                            ? { background: '#dc2626', color: '#fff' }
-                            : {
-                                background: 'transparent',
-                                color: 'var(--theme-text-dim)',
-                                opacity: 0,
-                              }
-                        }
-                        onMouseEnter={(e) => {
-                          if (!isConfirming) (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isConfirming) (e.currentTarget as HTMLButtonElement).style.opacity = '0';
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        {isConfirming ? 'Confirmer ?' : ''}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {!composerOpen && (
-                <button
-                  type="button"
-                  onClick={() => setComposerOpen(true)}
-                  data-cadence-add-another
-                  className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold transition-all hover:underline"
-                  style={{ color: ACCENT }}
-                >
-                  <Plus className="w-3 h-3" />
-                  Ajouter une autre tâche
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Planned tasks — reframed as Daily Standup / Sprint Review / Retrospective */}
       <div className="bg-[var(--panel-solid)] rounded-2xl border border-[var(--panel-border)] shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Zap className="w-4 h-4" style={{ color: '#15803d' }} />
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— SPRINT CADENCE · THIS WEEK</div>
-          <Badge tone="accent">{tasks.length} tâches</Badge>
+        <div className="flex items-center gap-2 mb-3"><Zap className="w-4 h-4" style={{ color: '#15803d' }} />
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--theme-text-dim)]">— WORKSPACE MISSION REGISTER</div>
+          <Badge tone="accent">{tasks.length} persisted</Badge>
         </div>
-        {tasks.length === 0 ? (
-          <div
-            className="flex flex-col items-center gap-2 py-6 rounded-xl border border-dashed text-center"
-            style={{
-              borderColor: 'var(--panel-border)',
-              background: 'var(--theme-surface)',
-              color: 'var(--theme-text-muted)',
-            }}
-          >
-            <div className="text-[12.5px]">Aucune tâche planifiée pour l'instant.</div>
-            <div className="text-[11px]" style={{ color: 'var(--theme-text-dim)' }}>
-              Clique une case de la heatmap puis ouvre le panneau pour planifier la première.
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {tasks.map(t => {
-              const kindColor = TASK_KIND_COLOR[t.kind];
-              const cadenceLabel = TASK_KIND_LABEL[t.kind];
-              return (
-                <div key={t.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--theme-surface-hover)] transition-colors">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--theme-text-muted)] w-10 shrink-0">{t.day}</span>
-                  <span className="font-mono text-[11px] text-[var(--theme-text)] tabular-nums w-24 shrink-0">
-                    {String(t.startHour).padStart(2, '0')}:00–{String(t.endHour).padStart(2, '0')}:00
-                  </span>
-                  <span
-                    className="inline-flex items-center text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
-                    style={{ color: kindColor, background: `${kindColor}1a` }}
-                    title={`Kind: ${t.kind}`}
-                  >
-                    {cadenceLabel}
-                  </span>
-                  <span className="text-[12.5px] text-[var(--theme-text)] truncate flex-1">{t.label}</span>
-                  <span className="text-[10px] font-mono text-[var(--theme-text-dim)] shrink-0">@ {t.agent}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {tasks.length === 0 ? <div className="py-5 text-center text-sm text-[var(--theme-text-muted)]">No scheduled missions have been created in this workspace.</div> :
+          <div className="flex flex-col gap-2">{tasks.map((task) => <div key={task.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--theme-surface-hover)]">
+            <span className="w-10 shrink-0 font-mono text-[10px] text-[var(--theme-text-muted)]">{task.day}</span>
+            <span className="w-24 shrink-0 font-mono text-[11px] text-[var(--theme-text)]">{String(task.startHour).padStart(2,'0')}:00–{String(task.endHour).padStart(2,'0')}:00</span>
+            <span className="flex-1 truncate text-[12px] text-[var(--theme-text)]">{task.label}</span>
+            <span className="text-[10px] text-[var(--theme-text-dim)]">@ {task.agent}</span>
+          </div>)}</div>}
       </div>
     </div>
   );
 }
 
 export function PeopleApp() {
-  const teamDrill = useCollectionDrill('team', 'Team');
-  const agentsDrill = useCollectionDrill('people_agents', 'Agents');
   const personasDrill = useCollectionDrill('personas', 'Personas');
   const memoryDrill = useCollectionDrill('memory', 'Mémoire');
   const codexDrill = useCollectionDrill('codex', 'Codex');
@@ -1030,13 +667,9 @@ export function PeopleApp() {
   // Brief FIX-7 — silence bruyant. Six collections consommées ici, chacune
   // avec son discriminant (`status: 'registered' | 'unknown'`) pour qu'un
   // défaut de registre ne se déguise pas en section vide.
-  const teamRead = useCmsCollectionStatus('team');
-  const agentsRead = useCmsCollectionStatus('people_agents');
   const personasRead = useCmsCollectionStatus('personas');
   const memoryRead = useCmsCollectionStatus('memory');
   const codexRead = useCmsCollectionStatus('codex');
-  const teamCount = teamRead.items.length;
-  const agentsCount = agentsRead.items.length;
   const personasCount = personasRead.items.length;
   const memoryCount = memoryRead.items.length;
   const codexCount = codexRead.items.length;
@@ -1051,25 +684,22 @@ export function PeopleApp() {
     }
   }, [detail, setWindowDetail]);
 
-  /** Open the rich fiche for a Fleet agent.
-   *  Constructs a PeopleDetailItem so `<PeopleDetailPage>` can render its
-   *  full soft-UI surface (vitals, ladder, signal log, capabilities,
-   *  handoffs). T3 tour fires once on first open. */
-  const openAgentDetail = (agent: FleetAgent) => {
-    const squadLabel = squadForAgent(agent) === 'green-lanterns' ? 'Green Lanterns' : 'X-Men';
+  /** Open the canonical agent principal detail; no runtime metrics are inferred. */
+  const openAgentDetail = (agent: WorkspaceAgent) => {
     setDetail({
-      id: agent.code,
-      title: agent.name,
-      subtitle: `${agent.role} · ${agent.channel}`,
-      status: agent.state,
-      initials: agent.initials,
+      id: agent.id,
+      title: agent.displayName,
+      subtitle: `${agent.agentClass} · ${agent.runtime}`,
+      status: agent.principalStatus,
+      initials: agent.displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
       fields: [],
-      squad: [{ name: squadLabel, color: agent.accent }],
+      squad: [{ name: agent.agentClass, color: '#059669' }],
       meta: [
-        { label: 'Channel',         value: agent.channel },
-        { label: 'Default model',   value: agent.defaultModel },
-        { label: 'Tasks today',     value: String(agent.tasksToday) },
-        { label: 'Share of fleet',  value: `${agent.share}%` },
+        { label: 'Agent key', value: agent.agentKey },
+        { label: 'Runtime', value: agent.runtime },
+        { label: 'Principal status', value: agent.principalStatus },
+        { label: 'Delegated permissions', value: agent.permissionCodes.join(', ') || 'None' },
+        { label: 'Runtime telemetry', value: 'Unavailable' },
       ],
     });
   };
@@ -1083,24 +713,39 @@ export function PeopleApp() {
   }, [detail]);
 
   const Team = () => {
+    const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+      let cancelled = false;
+      listWorkspaceMembers()
+        .then((rows) => { if (!cancelled) setMembers(rows); })
+        .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load workspace members'); });
+      return () => { cancelled = true; };
+    }, []);
     return (
-      <div className="p-7 flex flex-col gap-3">
-        <UnknownCollectionBanner collectionId="team" status={teamRead.status} appName="People" testFilePath="src/apps/people/seed-collections.test.ts" />
-        <SectionHead title="Team" subtitle="Your human squad (X-Men doctrine)" action={<Badge tone="accent">{teamCount} members</Badge>} />
-        <CollectionRepeater collectionId="team" onOpen={teamDrill.open} />
+      <div className="p-7 flex flex-col gap-4">
+        <SectionHead title="Team" subtitle="Human identities from identity.profiles and active workspace memberships." action={<Badge tone="accent">{members?.length ?? '—'} members</Badge>} />
+        {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+        {members === null && !error && <div role="status" className="rounded-xl bg-[var(--theme-surface-hover)] p-6 text-sm text-[var(--theme-text-muted)]">Loading workspace membership…</div>}
+        {members && members.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--panel-border)] p-8 text-center text-sm text-[var(--theme-text-muted)]">No active human membership is assigned to this workspace.</div>}
+        {members && members.length > 0 && <div className="overflow-x-auto rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-solid)]">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-[var(--panel-border)] text-[10px] uppercase tracking-wider text-[var(--theme-text-dim)]">
+              <tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Organization role</th><th className="px-4 py-3">Workspace role</th><th className="px-4 py-3">Membership</th></tr>
+            </thead>
+            <tbody>{members.map((member) => <tr key={member.id} className="border-b border-[var(--panel-border-subtle)] last:border-0">
+              <td className="px-4 py-3"><div className="font-semibold text-[var(--theme-text)]">{member.name}</div><div className="mt-0.5 font-mono text-[10px] text-[var(--theme-text-dim)]">{member.id}</div></td>
+              <td className="px-4 py-3 text-[var(--theme-text-muted)]">{member.roleCode ?? 'Not assigned'}</td>
+              <td className="px-4 py-3 text-[var(--theme-text-muted)]">{member.workspaceRole}</td>
+              <td className="px-4 py-3"><Badge tone={member.membershipStatus === 'ACTIVE' ? 'ok' : 'warn'}>{member.membershipStatus}</Badge></td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
       </div>
     );
   };
 
-  const Agents = () => {
-    return (
-      <div className="p-7 flex flex-col gap-3">
-        <UnknownCollectionBanner collectionId="people_agents" status={agentsRead.status} appName="People" testFilePath="src/apps/people/seed-collections.test.ts" />
-        <SectionHead title="Agents" subtitle="AI workers on the People domain" action={<Badge tone="accent">{agentsCount} configured</Badge>} />
-        <CollectionRepeater collectionId="people_agents" onOpen={agentsDrill.open} />
-      </div>
-    );
-  };
+  const Agents = () => <Fleet onAgentClick={openAgentDetail} />;
 
   const Personas = () => {
     return (
@@ -1149,7 +794,6 @@ export function PeopleApp() {
     { id: 'approvals', label: 'Approvals',  icon: ListChecks,       render: () => <ApprovalsView /> },
     { id: 'team',      label: 'Team',       icon: Users,            render: Team },
     { id: 'agents',    label: 'Agents',     icon: Bot,              render: Agents },
-    { id: 'fleet',     label: 'Squads',     icon: Cpu,              render: () => <Fleet onAgentClick={openAgentDetail} /> },
     { id: 'content',   label: 'Content',    icon: FileText,         render: Content },
     { id: 'schedule',  label: 'Cadence',    icon: Calendar,         render: Schedule },
     { id: 'culture',   label: 'Culture',    icon: Heart,            render: Culture },
@@ -1162,8 +806,7 @@ export function PeopleApp() {
     overview:  'SOB',
     approvals: 'SOB',
     team:      'Squads',
-    agents:    'Squads',
-    fleet:     'B3 Agents',
+    agents:    'B3 Agents',
     content:   'B3 Agents',
     schedule:  'Cadence',
     culture:   'Culture',
@@ -1180,8 +823,6 @@ export function PeopleApp() {
     drill: { openId: string | null; open: (id: string) => void; close: () => void };
     collectionId: string;
   }> = [
-    { drill: teamDrill,     collectionId: 'team' },
-    { drill: agentsDrill,   collectionId: 'people_agents' },
     { drill: personasDrill, collectionId: 'personas' },
     { drill: memoryDrill,   collectionId: 'memory' },
     { drill: codexDrill,    collectionId: 'codex' },

@@ -45,10 +45,10 @@ const journalItems: CmsItem[] = [
   },
   {
     id: 'jrn-002',
-    title: 'P95 latency drift — supabase-omk-saas',
+    title: 'P95 latency drift — supabase-marketplace',
     actor: 'agent:drift-watcher',
     action: 'drift',
-    entity: 'supabase-omk-saas',
+    entity: 'supabase-marketplace',
     ts: '2026-08-05 06:11',
     outcome: 'open',
     projects: 'open drifts = 3 (p95 latency, voice fidelity, auto-brief acceptance) · 1 threshold exceeded',
@@ -245,7 +245,7 @@ const driftDef = def({
 const driftItems: CmsItem[] = [
   {
     id: 'drift-p95-latency',
-    name: 'p95 read latency — supabase-omk-saas',
+    name: 'p95 read latency — supabase-marketplace',
     metric: '+95% over reference',
     severity: 'drift',
     reference: '40 ms',
@@ -381,7 +381,7 @@ const evalsItems: CmsItem[] = [
     trials: 200,
     distribution: '200 / 0 / 0',
     ranAt: '2026-08-05 02:00',
-    failures: 'None. All 200 cross-tenant probes were correctly blocked by the RLS policy. Both the omk_saas and omk_internal schemas pass the adversarial test.',
+    failures: 'None. All 200 cross-tenant probes were correctly blocked by the RLS policy. Both the dashboard and workspace_data schemas pass the adversarial test.',
     note: 'Critical security eval. Run nightly on the 200-probe adversarial suite. No failures in 14 consecutive runs.',
   },
   {

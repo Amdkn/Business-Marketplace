@@ -52,8 +52,9 @@ export function LegalApp() {
   const contracts = contractsRead.items;
   const policies = policiesRead.items;
   const checks = checksRead.items;
-  const updateItem = useCmsStore(s => s.updateItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
   const [detail, setDetail] = useState<LegalDetailItem | null>(null);
+  const [mutatingCheckId, setMutatingCheckId] = useState<string | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
 
   useEffect(() => {
@@ -69,20 +70,30 @@ export function LegalApp() {
    *  status and the visibility pill on the Compliance summary. The clearedAt
    *  timestamp is stamped on the transition to 'Yes' so the audit trail
    *  shows when each item was actually signed off. */
-  const toggle = (id: string) => {
-    const current = checks.find(c => c.id === id);
+  const toggle = async (id: string): Promise<void> => {
+    if (mutatingCheckId) return;
+    const current = checks.find((check) => check.id === id);
     if (!current) return;
     const isDone = String(current.done) === 'Yes';
     const nextDone = isDone ? 'No' : 'Yes';
     const label = String(current.label);
-    updateItem('legal_ai_act_checks', id, {
-      done: nextDone,
-      clearedAt: isDone ? '—' : new Date().toISOString().slice(0, 10),
-    });
-    if (!isDone) {
-      addToast({ source: 'Legal', type: 'success', message: `AI-Act item cleared: ${label}` });
-    } else {
-      addToast({ source: 'Legal', type: 'warning', message: `AI-Act item re-opened: ${label}` });
+    setMutatingCheckId(id);
+    try {
+      const result = await updateItem('legal_ai_act_checks', id, {
+        done: nextDone,
+        clearedAt: isDone ? '—' : new Date().toISOString().slice(0, 10),
+      });
+      if (result.ok) {
+        addToast({
+          source: 'Legal',
+          type: isDone ? 'warning' : 'success',
+          message: isDone ? `AI-Act item re-opened and saved: ${label}` : `AI-Act item cleared and saved: ${label}`,
+        });
+      } else {
+        addToast({ source: 'Legal', type: 'warning', message: result.error ?? 'Compliance check was not saved.' });
+      }
+    } finally {
+      setMutatingCheckId(null);
     }
   };
 

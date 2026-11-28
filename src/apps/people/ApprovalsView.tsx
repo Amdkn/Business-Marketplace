@@ -16,7 +16,7 @@
  * Si une étape de la fusion échoue, RIEN n'est appliqué — l'UI le rend
  * explicite, sans escamoter l'échec (cf. capture preuve 6 du brief).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ListChecks, CheckCircle2, X, AlertTriangle, Trash2, RotateCcw,
   Sparkles, ShieldCheck, Eye, ChevronRight, GitMerge, Bot, Plus,
@@ -30,8 +30,9 @@ import { THEME_META } from '../../lib/themes/tokens';
 import { useCmsStore } from '../../lib/cms/cms.store';
 import { useShellStore } from '../../stores/shell.store';
 import { useCmsCollectionStatus } from './useCmsCollectionStatus';
+import { listWorkspaceAgents } from './people.repo';
 import { UnknownCollectionBanner } from '../../components/UnknownCollectionBanner';
-import { FLEET_AGENTS } from './fleet';
+
 import {
   linkScenarioToAgent,
   unlinkScenario,
@@ -42,23 +43,24 @@ function shortDate(ts: number): string {
   return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** Combined agent options for the "Nouveau scénario" form.
- *  Fleet (B3 operational agents) + People agents (RH/méta) — both can
- *  deposit proposals into a scenario. Order is stable for the dropdown. */
-function useAgentOptions(): { code: string; name: string; source: 'fleet' | 'people' }[] {
-  // Brief FIX-7 — silence bruyant. Si la collection people_agents n'est
-  // pas dans le registre, le dropdown tombe à [fleet] sans rien dire.
-  // On lit le discriminant via le hook ; le bandeau global est rendu
-  // au-dessus de la file d'approbation, pas dans la liste.
-  const peopleAgentsRead = useCmsCollectionStatus('people_agents');
-  const peopleAgents = peopleAgentsRead.items;
-  const fleet = FLEET_AGENTS.map((a) => ({ code: a.code, name: a.name, source: 'fleet' as const }));
-  const people = peopleAgents.map((it) => ({
-    code: String(it.codename ?? it.id),
-    name: String(it.name ?? it.id),
-    source: 'people' as const,
-  }));
-  return [...fleet, ...people];
+/** Active workspace delegations are the only valid agent targets for approvals. */
+function useAgentOptions(): { options: { code: string; name: string; source: 'workspace' }[]; error: string | null } {
+  const [options, setOptions] = useState<{ code: string; name: string; source: 'workspace' }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listWorkspaceAgents()
+      .then((agents) => {
+        if (!cancelled) setOptions(agents
+          .filter((agent) => agent.principalStatus === 'ACTIVE')
+          .map((agent) => ({ code: agent.agentKey, name: agent.displayName, source: 'workspace' as const })));
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load active workspace agents');
+      });
+    return () => { cancelled = true; };
+  }, []);
+  return { options, error };
 }
 
 const STATUS_TONE: Record<Scenario['status'], 'accent' | 'ok' | 'warn' | 'danger' | 'neutral'> = {
@@ -301,11 +303,12 @@ function ScenarioDetail({
   const [editThemeId, setEditThemeId] = useState<string>('');
   const [editAppId, setEditAppId] = useState<string>('');
   const [nameEdit, setNameEdit] = useState<string | null>(null);
+  const [decisionSaving, setDecisionSaving] = useState(false);
 
   const canEdit = scenario.status === 'draft' || scenario.status === 'pending';
   const canMerge = scenario.status === 'pending' && scenario.proposals.length > 0;
   const agentCode = getAgentCodeForScenario(scenario.id);
-  const agentOptions = useAgentOptions();
+  const { options: agentOptions } = useAgentOptions();
   const linkedAgent = agentOptions.find((a) => a.code === agentCode);
 
   const handleEditProposal = (proposalId: string) => {
@@ -333,51 +336,55 @@ function ScenarioDetail({
     submitForApproval(scenario.id);
   };
 
-  const handleReject = () => {
-    rejectScenario(scenario.id);
-    // Mirror the approve path: a rejection is also a decision that must
-    // be auditable. Persist it through the CMS, with the same toast on
-    // success or failure. Keeping the two paths symmetric means a
-    // regression on one will not silently affect the other.
-    const addItem = useCmsStore.getState().addItem;
-    const addToast = useShellStore.getState().addToast;
-    const result = addItem('approval_decisions', {
-      scenarioId: scenario.id,
-      scenarioName: scenario.name,
-      verdict: 'rejected',
-      decidedBy: 'B1 Gatekeeper',
-      proposalCount: scenario.proposals.length,
-      rationale: scenario.rationale ?? '—',
-      decidedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-    });
-    if (result.ok) {
-      addToast({ source: 'Approvals', type: 'success', message: `Rejet enregistré : ${scenario.name}` });
-    } else {
-      addToast({ source: 'Approvals', type: 'warning', message: result.error ?? 'Rejet non enregistré.' });
+  const handleReject = async () => {
+    if (decisionSaving) return;
+    setDecisionSaving(true);
+    try {
+      rejectScenario(scenario.id);
+      const addItem = useCmsStore.getState().addItemPersisted;
+      const addToast = useShellStore.getState().addToast;
+      const result = await addItem('approval_decisions', {
+        scenarioId: scenario.id,
+        scenarioName: scenario.name,
+        verdict: 'rejected',
+        decidedBy: 'B1 Gatekeeper',
+        proposalCount: scenario.proposals.length,
+        rationale: scenario.rationale ?? '—',
+        decidedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      });
+      if (result.ok) {
+        addToast({ source: 'Approvals', type: 'success', message: `Rejet enregistré dans le workspace : ${scenario.name}` });
+      } else {
+        addToast({ source: 'Approvals', type: 'warning', message: result.error ?? 'Rejet non enregistré dans le workspace.' });
+      }
+    } finally {
+      setDecisionSaving(false);
     }
   };
 
-  const handleApproveAndMerge = () => {
-    approveAndMerge(scenario.id, applicateurs);
-    // Log the decision in the CMS — the audit trail lives next to the
-    // scenario, not in the volatile scenarios store. `addItem` is the
-    // canonical write path; it returns `{ ok, error }` so a failure to
-    // register is surfaced as a toast instead of being silently dropped.
-    const addItem = useCmsStore.getState().addItem;
-    const addToast = useShellStore.getState().addToast;
-    const result = addItem('approval_decisions', {
-      scenarioId: scenario.id,
-      scenarioName: scenario.name,
-      verdict: 'approved',
-      decidedBy: 'B1 Gatekeeper',
-      proposalCount: scenario.proposals.length,
-      rationale: scenario.rationale ?? '—',
-      decidedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-    });
-    if (result.ok) {
-      addToast({ source: 'Approvals', type: 'success', message: `Décision enregistrée : ${scenario.name}` });
-    } else {
-      addToast({ source: 'Approvals', type: 'warning', message: result.error ?? 'Décision non enregistrée.' });
+  const handleApproveAndMerge = async () => {
+    if (decisionSaving) return;
+    setDecisionSaving(true);
+    try {
+      await approveAndMerge(scenario.id, applicateurs);
+      const addItem = useCmsStore.getState().addItemPersisted;
+      const addToast = useShellStore.getState().addToast;
+      const result = await addItem('approval_decisions', {
+        scenarioId: scenario.id,
+        scenarioName: scenario.name,
+        verdict: 'approved',
+        decidedBy: 'B1 Gatekeeper',
+        proposalCount: scenario.proposals.length,
+        rationale: scenario.rationale ?? '—',
+        decidedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      });
+      if (result.ok) {
+        addToast({ source: 'Approvals', type: 'success', message: `Décision enregistrée dans le workspace : ${scenario.name}` });
+      } else {
+        addToast({ source: 'Approvals', type: 'warning', message: result.error ?? 'Décision non enregistrée dans le workspace.' });
+      }
+    } finally {
+      setDecisionSaving(false);
     }
   };
 
@@ -553,7 +560,7 @@ function ScenarioDetail({
               className="text-[12px] font-bold text-[color:#fff] px-3.5 py-2 rounded-xl"
               style={{ background: '#0891b2' }}
               data-submit-for-approval
-              disabled={scenario.proposals.length === 0}
+              disabled={scenario.proposals.length === 0 || decisionSaving}
               title="Soumettre le scénario à l'approbation"
             >
               <ShieldCheck className="w-3.5 h-3.5 inline-block mr-1.5" />
@@ -568,11 +575,11 @@ function ScenarioDetail({
                 className="text-[12px] font-bold text-[color:#fff] px-3.5 py-2 rounded-xl"
                 style={{ background: '#059669', boxShadow: '0 4px 12px rgba(5,150,105,0.3)' }}
                 data-approve-merge
-                disabled={!canMerge}
+                disabled={!canMerge || decisionSaving}
                 title="Fusionner atomiquement toutes les propositions retenues"
               >
                 <GitMerge className="w-3.5 h-3.5 inline-block mr-1.5" />
-                Approve &amp; Merge
+                {decisionSaving ? 'Enregistrement…' : 'Approve &amp; Merge'}
               </button>
               <button
                 type="button"
@@ -582,10 +589,11 @@ function ScenarioDetail({
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.10)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 data-reject-scenario
+                disabled={decisionSaving}
                 title="Rejeter ce scénario — aucune modification ne sera appliquée"
               >
                 <X className="w-3.5 h-3.5 inline-block mr-1.5" />
-                Rejeter
+                {decisionSaving ? 'Enregistrement…' : 'Rejeter'}
               </button>
             </>
           )}
@@ -684,7 +692,11 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
   const [newName, setNewName] = useState('');
   const [newAgent, setNewAgent] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
-  const agentOptions = useAgentOptions();
+  const { options: agentOptions, error: agentOptionsError } = useAgentOptions();
+
+  useEffect(() => {
+    if (creating && !newAgent && agentOptions.length > 0) setNewAgent(agentOptions[0].code);
+  }, [creating, newAgent, agentOptions]);
 
   // Tri : pending d'abord, puis draft, puis le reste (récent d'abord à l'intérieur).
   const tier = (s: Scenario): number => {
@@ -824,13 +836,15 @@ function ScenarioQueue({ onOpen }: { onOpen: (id: string) => void }) {
               }}
               data-new-scenario-agent
             >
+              {agentOptions.length === 0 && <option value="" disabled>Aucun agent actif délégué à ce workspace</option>}
               {agentOptions.map((a) => (
                 <option key={`${a.source}:${a.code}`} value={a.code}>
-                  {a.code} · {a.name}{a.source === 'people' ? ' · People' : ''}
+                  {a.code} · {a.name} · Workspace
                 </option>
               ))}
             </select>
           </label>
+          {agentOptionsError && <div role="alert" className="text-[11px] text-rose-700">{agentOptionsError}</div>}
 
           {nameError && (
             <div
@@ -902,7 +916,6 @@ export function ApprovalsView() {
   // action et la décision est perdue. On annonce le défaut avant que
   // l'utilisateur ne clique.
   const approvalDecisionsRead = useCmsCollectionStatus('approval_decisions');
-  const agentsAvailableRead = useCmsCollectionStatus('people_agents');
 
   if (openScenario) {
     return (
@@ -920,15 +933,9 @@ export function ApprovalsView() {
         appName="People"
       testFilePath="src/apps/people/seed-collections.test.ts"
       />
-      <UnknownCollectionBanner
-        collectionId="people_agents"
-        status={agentsAvailableRead.status}
-        appName="People"
-      testFilePath="src/apps/people/seed-collections.test.ts"
-      />
       <SectionHead
         title="Approvals"
-        subtitle="L'agent propose, vous tranchez. Ship or kill, en 10 minutes."
+        subtitle="Les scénarios et propositions restent locaux à ce navigateur; les décisions approuvées/rejetées sont journalisées dans le workspace."
         action={
           <div className="flex items-center gap-2">
             {pendingCount > 0 && (

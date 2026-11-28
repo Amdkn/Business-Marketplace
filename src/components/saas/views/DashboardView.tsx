@@ -1,14 +1,11 @@
 // src/components/views/DashboardView.tsx
-// Zero Bug Sprint — rewired to use new omk_saas.* schema fields.
+// Zero Bug Sprint — rewired to use Marketplace tenant schema fields.
 //
 // Bug fixes (D6 #98, D6 #102, D6 #104):
-//   - `client.progress` removed (no DB column) → use a fake "Progress" from
-//     derived status (active = 80, prospect = 20, paused = 50, archived = 100).
+//   - Never synthesize a client progress percentage from status; show persisted status only.
 //   - `client.status` translated via CLIENT_STATUS_LABEL.
-//   - "View Swarm Details" button now navigates to /agents (was dead).
+//   - "View Agent Directory" button now navigates to /agents (was dead).
 //   - Added <BackButton /> + EmptyState handling for clients/agents.
-//   - <ProgressBar> replaced by hand-rolled div (component still uses progress
-//     prop, but we derive a number from status for the demo).
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,18 +14,11 @@ import { Badge } from '../components/Badge';
 import { clientsRepo } from '../data/clients.repo';
 import { agentsRepo } from '../data/agents.repo';
 import type { Client, Agent } from '../lib/types';
-import { CLIENT_STATUS_LABEL, AGENT_ROLE_LABEL, AGENT_STATUS_LABEL } from '../lib/statusLabels';
+import { CLIENT_STATUS_LABEL, AGENT_STATUS_LABEL } from '../lib/statusLabels';
 import { RefreshCw, CheckCircle, Activity, BarChart3, ArrowUpRight, Briefcase, Cpu } from 'lucide-react';
 import { BackButton } from '../components/BackButton';
 import { EmptyState } from '../components/EmptyState';
 import { safeArray, safeStr } from '../lib/safe';
-
-const STATUS_PROGRESS: Record<Client['status'], number> = {
-  active: 80,
-  prospect: 20,
-  paused: 50,
-  archived: 100,
-};
 
 const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'info' | 'danger'> = {
   active: 'success',
@@ -36,12 +26,6 @@ const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'info'
   paused: 'warning',
   archived: 'danger',
 };
-
-const HARDCODED_TASKS = [
-  { title: 'Validation devis client TechFlow', time: 'Today', type: 'warning' as const },
-  { title: 'Retard livraison projet GreenScale', time: 'Yesterday', type: 'danger' as const },
-  { title: 'Mise à jour Stripe requise', time: '2 days ago', type: 'info' as const },
-];
 
 interface DashboardViewProps {
   onNavigate?: (tab: string) => void;
@@ -92,7 +76,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Ecosystem Vitals</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Live data from omk_saas.clients and omk_saas.agents
+            Live data from this workspace’s clients and agent directory
           </p>
         </div>
         <button
@@ -119,14 +103,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <Card className="p-5">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm font-medium text-slate-500">Active Agents</p>
+              <p className="text-sm font-medium text-slate-500">Enabled Agent Principals</p>
               <h3 className="text-2xl font-bold text-slate-900 mt-2">{activeAgents}</h3>
             </div>
             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
               <Cpu className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-xs text-slate-400 mt-4">of {agents.length} total</p>
+          <p className="text-xs text-slate-400 mt-4">of {agents.length} delegated · runtime state not reported</p>
         </Card>
         <Card className="p-5">
           <div className="flex justify-between items-start">
@@ -163,33 +147,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <h3 className="text-lg font-semibold text-slate-900">Wind Direction</h3>
               <span className="text-sm text-slate-500 italic">Things requiring validation</span>
             </div>
-            <div className="space-y-3">
-              {HARDCODED_TASKS.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-4 rounded-lg border border-stone-100 bg-stone-50/50 hover:bg-stone-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        item.type === 'warning'
-                          ? 'bg-amber-500'
-                          : item.type === 'danger'
-                          ? 'bg-red-500'
-                          : 'bg-blue-500'
-                      }`}
-                    />
-                    <div>
-                      <p className="font-medium text-slate-900 text-sm">{item.title}</p>
-                      <p className="text-xs text-slate-500 mt-1">{item.time}</p>
-                    </div>
-                  </div>
-                  <button className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors flex items-center gap-1 group">
-                    Review{' '}
-                    <ArrowUpRight className="w-4 h-4 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                </div>
-              ))}
+            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 px-5 py-8 text-center">
+              <p className="text-sm font-medium text-slate-700">Validation feed not connected</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Connect the approval and incident event sources to show verified pending actions here.
+              </p>
             </div>
           </Card>
 
@@ -203,7 +165,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             ) : (
               <div className="space-y-4">
                 {clients.slice(0, 3).map((client) => {
-                  const progress = STATUS_PROGRESS[client.status];
                   const initials = safeStr(client.name)
                     .split(' ')
                     .map((n) => n[0] ?? '')
@@ -229,18 +190,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 max-w-xs w-full lg:px-8">
-                        <div className="flex justify-between text-xs mb-2">
-                          <span className="text-slate-500">Status weight</span>
-                          <span className="font-medium text-slate-900">{progress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
                       <Badge variant={VARIANT_BY_STATUS[client.status]}>
                         {CLIENT_STATUS_LABEL[client.status]}
                       </Badge>
@@ -255,14 +204,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="space-y-6">
           <Card className="p-6 bg-slate-900 text-white border-slate-800">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold">AI Agents Swarm</h3>
-              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                24/7 Active
-              </span>
+              <h3 className="text-lg font-semibold">Workspace Agents</h3>
+              <span className="px-2 py-1 bg-white/10 text-slate-300 text-xs rounded-full font-medium">{agents.length} assigned</span>
             </div>
             {agents.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">No agents configured yet.</p>
+              <p className="text-sm text-slate-400 italic">No agent delegation is active in this workspace.</p>
             ) : (
               <div className="space-y-4">
                 {agents.slice(0, 4).map((agent) => (
@@ -275,7 +221,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                       <div className="min-w-0">
                         <span className="text-sm font-medium truncate block">{agent.name}</span>
                         <span className="text-[10px] text-slate-400 truncate block">
-                          {agent.role ? AGENT_ROLE_LABEL[agent.role] : '—'}
+                          {safeStr(agent.agentClass, 'Agent class not assigned')} · {safeStr(agent.runtime, 'runtime not configured')}
                         </span>
                       </div>
                     </div>
@@ -290,7 +236,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               onClick={() => (onNavigate ? onNavigate('people-agents') : navigate('/agents'))}
               className="w-full mt-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              View Swarm Details
+              View Agent Directory
               <ArrowUpRight className="w-4 h-4" />
             </button>
           </Card>

@@ -1,9 +1,9 @@
-/** CMS store — generic collections registry (Zustand), the same pattern any app
- *  can reuse: register a collection definition + seed items once, then bind
- *  <CollectionRepeater> + <DynamicPageView> to that collection id anywhere.
- *  Phase 1: hydrates from Supabase when a coach is signed in (org_id resolved),
- *  otherwise transparently keeps the bundled seed — no auth UI exists yet, so
- *  today this always falls back to seed, but the live path is wired and ready.
+/** Marketplace CMS store — shared collection registry and tenant-partitioned
+ *  in-memory projection for the Web Desktop apps.
+ *  Collection definitions are source-controlled. The explicit demo tenant may
+ *  use bundled sample rows; authenticated Marketplace tenants start empty and
+ *  hydrate only from their active workspace_data tables. Remote failures are
+ *  surfaced and never converted into demo content.
  *
  *  Brief-F (couche d'écriture, 2026-08-07) — `updateItem` n'était plus seul.
  *  `addItem` et `removeItem` suivent exactement la même voie : set optimiste,
@@ -33,8 +33,10 @@ import type { CmsCollectionDef, CmsItem } from './types';
 import {
   hydrateCollection,
   upsertItem as repoUpsertItem,
+  upsertItemRequired as repoUpsertItemRequired,
   upsertCollectionDef,
   removeItem as repoRemoveItem,
+  removeItemRequired as repoRemoveItemRequired,
 } from './repository';
 import type {
   CmsItemTenant,
@@ -74,8 +76,11 @@ interface CmsState {
   /* ── Legacy CRUD (active tenant, flat view) ─────────────────────────── */
   registerCollection: (def: CmsCollectionDef, seedItems: CmsItem[]) => void;
   updateItem: (collectionId: string, id: string, patch: Partial<CmsItem>) => void;
+  updateItemPersisted: (collectionId: string, id: string, patch: Partial<CmsItem>) => Promise<AddItemResult>;
   addItem: (collectionId: string, partial: Omit<CmsItem, 'id'>) => AddItemResult;
+  addItemPersisted: (collectionId: string, partial: Omit<CmsItem, 'id'>) => Promise<AddItemResult>;
   removeItem: (collectionId: string, id: string) => { ok: boolean; error?: string };
+  removeItemPersisted: (collectionId: string, id: string) => Promise<{ ok: boolean; error?: string }>;
 
   /* ── Tenant-aware CRUD (partition shape) ────────────────────────────── */
   registerCollectionFor: (
@@ -164,7 +169,11 @@ export const useCmsStore = create<CmsState>((set, get) => ({
   /* ── Tenant-aware registration ─────────────────────────────────────── */
   registerCollectionFor: (tenantId, def, seedItems) => {
     const stampedDef = stampCollection(def, tenantId);
-    const stampedItems = seedItems.map((it) => stampTenant(it, tenantId));
+    // Bundled sample records are restricted to the explicit local demo tenant.
+    // A real Marketplace tenant starts empty and is hydrated only from its
+    // workspace_data rows; it must never inherit Coach demo customers/agents.
+    const tenantSeedItems = tenantId === TENANT_DEMO_COACH ? seedItems : [];
+    const stampedItems = tenantSeedItems.map((it) => stampTenant(it, tenantId));
 
     set((s) => {
       const tenantCollections = s.collectionsByTenant[tenantId] ?? {};
@@ -192,7 +201,7 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     // Best-effort persistence (Supabase side, single-tenant today).
     void upsertCollectionDef(stampedDef);
     void hydrateCollection(stampedDef.id).then((liveItems) => {
-      if (liveItems && liveItems.length > 0) {
+      if (liveItems !== null) {
         const stamped = liveItems.map((it) => stampTenant(it, tenantId));
         set((s) => {
           const tenantItemsMap = (s.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
@@ -210,6 +219,10 @@ export const useCmsStore = create<CmsState>((set, get) => ({
           };
         });
       }
+    }).catch((err: unknown) => {
+      // Keep the tenant's real collection empty and expose the failure; never
+      // replace a failed remote read with bundled demo records.
+      console.error(`[cms] hydration failed for "${stampedDef.id}"`, err);
     });
   },
 
@@ -240,13 +253,49 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     });
 
     const updated = get().itemsByTenant[tenantId]?.[collectionId]?.find((it) => it.id === id);
-    if (updated) void repoUpsertItem(collectionId, updated);
+    if (updated && tenantId !== TENANT_DEMO_COACH) {
+      void repoUpsertItem(collectionId, updated).catch((err: unknown) => {
+        console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
+      });
+    }
   },
 
   updateItem: (collectionId, id, patch) => {
     const tenantId = get().activeTenantId;
     get().updateItemFor(tenantId, collectionId, id, patch);
   },
+
+  updateItemPersisted: async (collectionId, id, patch) => {
+    const tenantId = get().activeTenantId;
+    const current = get().itemsByTenant[tenantId]?.[collectionId]?.find((item) => item.id === id);
+    if (!current) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
+    const updated: CmsItemTenant = { ...current, ...patch, tenant_id: tenantId };
+    // The explicit Coach demo tenant is intentionally memory-only. Keep the
+    // same persisted-method contract for shared UI components without ever
+    // sending demo rows to the Marketplace workspace repository.
+    if (tenantId === TENANT_DEMO_COACH) {
+      get().updateItemFor(tenantId, collectionId, id, patch);
+      return { ok: true, item: updated };
+    }
+    try {
+      await repoUpsertItemRequired(collectionId, updated);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextList = list.map((item) => item.id === id ? updated : item);
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: nextList } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true, item: updated };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote update failed.' };
+    }
+  },
+
 
   /* ── Tenant-aware add ──────────────────────────────────────────────── */
   addItemFor: (tenantId, collectionId, partial) => {
@@ -270,7 +319,9 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoUpsertItem(collectionId, item);
+    if (tenantId !== TENANT_DEMO_COACH) void repoUpsertItem(collectionId, item).catch((err: unknown) => {
+      console.error(`[cms] persistence failed for "${collectionId}/${id}"`, err);
+    });
     return { ok: true, item };
   },
 
@@ -278,6 +329,32 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     return get().addItemFor(tenantId, collectionId, partial);
   },
+
+  addItemPersisted: async (collectionId, partial) => {
+    const tenantId = get().activeTenantId;
+    const def = get().collectionsByTenant[tenantId]?.[collectionId];
+    if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    if (tenantId === TENANT_DEMO_COACH) return get().addItemFor(tenantId, collectionId, partial);
+    const id = makeId(collectionId);
+    const item: CmsItemTenant = { id, tenant_id: tenantId, ...partial };
+    try {
+      await repoUpsertItemRequired(collectionId, item);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: [...list, item] } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true, item };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote insert failed.' };
+    }
+  },
+
 
   /* ── Tenant-aware remove ───────────────────────────────────────────── */
   removeItemFor: (tenantId, collectionId, id) => {
@@ -306,7 +383,9 @@ export const useCmsStore = create<CmsState>((set, get) => ({
         ...(isActive ? { items: nextFlat } : {}),
       };
     });
-    void repoRemoveItem(collectionId, id);
+    if (tenantId !== TENANT_DEMO_COACH) void repoRemoveItem(collectionId, id).catch((err: unknown) => {
+      console.error(`[cms] delete failed for "${collectionId}/${id}"`, err);
+    });
     return { ok: true };
   },
 
@@ -314,6 +393,32 @@ export const useCmsStore = create<CmsState>((set, get) => ({
     const tenantId = get().activeTenantId;
     return get().removeItemFor(tenantId, collectionId, id);
   },
+
+  removeItemPersisted: async (collectionId, id) => {
+    const tenantId = get().activeTenantId;
+    const def = get().collectionsByTenant[tenantId]?.[collectionId];
+    if (!def) return { ok: false, error: `Collection inconnue : "${collectionId}".` };
+    if (tenantId === TENANT_DEMO_COACH) return get().removeItemFor(tenantId, collectionId, id);
+    const current = get().itemsByTenant[tenantId]?.[collectionId] ?? [];
+    if (!current.some((item) => item.id === id)) return { ok: false, error: `Item introuvable : "${id}" dans "${collectionId}".` };
+    try {
+      await repoRemoveItemRequired(collectionId, id);
+      set((state) => {
+        const tenantItems = (state.itemsByTenant[tenantId] ?? {}) as Record<string, CmsItemTenant[]>;
+        const list = tenantItems[collectionId] ?? [];
+        const nextItemsByTenant: Record<TenantId, Record<string, CmsItemTenant[]>> = { ...state.itemsByTenant, [tenantId]: { ...tenantItems, [collectionId]: list.filter((item) => item.id !== id) } };
+        const isActive = state.activeTenantId === tenantId;
+        return {
+          itemsByTenant: nextItemsByTenant,
+          ...(isActive ? { items: { ...(nextItemsByTenant[tenantId] as Record<string, CmsItemTenant[]>) } } : {}),
+        };
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Remote delete failed.' };
+    }
+  },
+
 
   /* ── Tenant lifecycle ──────────────────────────────────────────────── */
   setTenant: (tenantId) => {

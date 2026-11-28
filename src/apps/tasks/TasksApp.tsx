@@ -187,9 +187,9 @@ export function TasksApp() {
       setWindowDetail(null);
     }
   }, [detail, setWindowDetail]);
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
-  const removeItem = useCmsStore(s => s.removeItem);
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const addItem = useCmsStore(s => s.addItemPersisted);
+  const removeItem = useCmsStore(s => s.removeItemPersisted);
   const addToast = useShellStore(s => s.addToast);
 
   /* Brief-F — la couche d'écriture : un humain doit pouvoir créer une tâche.
@@ -198,26 +198,34 @@ export function TasksApp() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerLabel, setComposerLabel] = useState('');
   const [composerWhen, setComposerWhen] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
+  const [mutatingTaskId, setMutatingTaskId] = useState<string | null>(null);
 
-  const submitNewTask = (): void => {
+  const submitNewTask = async (): Promise<void> => {
+    if (savingTask) return;
     const label = composerLabel.trim();
     if (label.length === 0) {
       addToast({ source: 'Tasks', type: 'warning', message: 'Le titre est obligatoire.' });
       return;
     }
-    const result = addItem('tasks', {
-      label,
-      when: composerWhen.trim() || 'today',
-      group: 'today',
-      done: false,
-    });
-    if (result.ok) {
-      addToast({ source: 'Tasks', type: 'success', message: `Ajouté : ${label}` });
-      setComposerLabel('');
-      setComposerWhen('');
-      setComposerOpen(false);
-    } else {
-      addToast({ source: 'Tasks', type: 'warning', message: result.error ?? 'Création impossible.' });
+    setSavingTask(true);
+    try {
+      const result = await addItem('tasks', {
+        label,
+        when: composerWhen.trim() || 'today',
+        group: 'today',
+        done: false,
+      });
+      if (result.ok) {
+        addToast({ source: 'Tasks', type: 'success', message: `Ajouté et enregistré : ${label}` });
+        setComposerLabel('');
+        setComposerWhen('');
+        setComposerOpen(false);
+      } else {
+        addToast({ source: 'Tasks', type: 'warning', message: result.error ?? 'Création impossible.' });
+      }
+    } finally {
+      setSavingTask(false);
     }
   };
 
@@ -227,22 +235,41 @@ export function TasksApp() {
     setComposerOpen(false);
   };
 
-  const removeTask = (id: string): void => {
-    const current = tasks.find((t) => t.id === id);
-    const result = removeItem('tasks', id);
-    if (result.ok) {
-      addToast({ source: 'Tasks', type: 'success', message: `Supprimé : ${String(current?.label ?? id)}` });
-    } else {
-      addToast({ source: 'Tasks', type: 'warning', message: result.error ?? 'Suppression impossible.' });
+  const removeTask = async (id: string): Promise<void> => {
+    if (mutatingTaskId) return;
+    const current = tasks.find((task) => task.id === id);
+    setMutatingTaskId(id);
+    try {
+      const result = await removeItem('tasks', id);
+      if (result.ok) {
+        addToast({ source: 'Tasks', type: 'success', message: `Supprimé du workspace : ${String(current?.label ?? id)}` });
+      } else {
+        addToast({ source: 'Tasks', type: 'warning', message: result.error ?? 'Suppression impossible.' });
+      }
+    } finally {
+      setMutatingTaskId(null);
     }
   };
 
-  const toggle = (id: string) => {
-    const current = tasks.find(t => t.id === id);
-    if (current && !current.done) {
-      addToast({ source: 'Tasks', type: 'success', message: `Done: ${current.label}` });
+  const toggle = async (id: string): Promise<void> => {
+    if (mutatingTaskId) return;
+    const current = tasks.find((task) => task.id === id);
+    if (!current) return;
+    setMutatingTaskId(id);
+    try {
+      const result = await updateItem('tasks', id, { done: !current.done });
+      if (result.ok) {
+        addToast({
+          source: 'Tasks',
+          type: current.done ? 'info' : 'success',
+          message: current.done ? `Réouvert : ${current.label}` : `Terminé et enregistré : ${current.label}`,
+        });
+      } else {
+        addToast({ source: 'Tasks', type: 'warning', message: result.error ?? 'Mise à jour non enregistrée.' });
+      }
+    } finally {
+      setMutatingTaskId(null);
     }
-    updateItem('tasks', id, { done: !current?.done });
   };
 
   /* Ouverture d'une fiche.
@@ -312,7 +339,7 @@ export function TasksApp() {
               value={composerLabel}
               onChange={(e) => setComposerLabel(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewTask();
+                if (e.key === 'Enter') void submitNewTask();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="Décrire la tâche…"
@@ -335,7 +362,7 @@ export function TasksApp() {
               value={composerWhen}
               onChange={(e) => setComposerWhen(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNewTask();
+                if (e.key === 'Enter') void submitNewTask();
                 if (e.key === 'Escape') cancelComposer();
               }}
               placeholder="ex. Thu 14:00 · tomorrow · next week"
@@ -359,7 +386,8 @@ export function TasksApp() {
                 Annuler
               </button>
               <button
-                onClick={submitNewTask}
+                onClick={() => void submitNewTask()}
+              disabled={savingTask}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,

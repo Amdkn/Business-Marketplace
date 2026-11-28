@@ -1,5 +1,5 @@
 // src/hooks/useCollection.ts
-// ADR-OMK-001 D4 — React hook over the repository layer.
+// ADR-MARKETPLACE-001 D4 — React hook over the repository layer.
 // Views consume this instead of importing mock constants directly.
 // Provides {data, loading, error, create, reload}; works with Supabase or localStorage fallback.
 

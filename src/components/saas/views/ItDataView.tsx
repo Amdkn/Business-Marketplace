@@ -1,174 +1,136 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card } from '../components/Card';
 import { ViewShell } from '../components/ViewShell';
-import { Server, Database, Activity, Wifi, Shield, HardDrive, RefreshCw } from 'lucide-react';
+import { Activity, Database, Server, ShieldCheck } from 'lucide-react';
+import { supabase, SUPABASE_READY } from '../lib/supabase';
 
-// Zero Bug Sprint (D6 #98) — local StackConnection interface (mock-only view).
-// Defined inline because StackConnection was removed from types.ts (no DB table).
-interface StackConnection {
-  id: string;
-  name: string;
-  status: 'Connected' | 'Maintenance' | 'Error';
-  latency: string;
-  uptime: string;
-  type: 'Database' | 'API' | 'Auth' | 'AI';
+interface MarketplaceHealth {
+  status: string;
+  service: string;
+  version: string;
+  persistence: string;
+  database?: {
+    database_name?: string;
+    checked_at?: string;
+  };
 }
 
-const STACK_CONNECTIONS: ReadonlyArray<StackConnection> = [
-  { id: 'C1', name: 'Supabase Postgres', status: 'Connected', latency: '24ms', uptime: '99.98%', type: 'Database' },
-  { id: 'C2', name: 'Stripe API', status: 'Connected', latency: '112ms', uptime: '99.92%', type: 'API' },
-  { id: 'C3', name: 'Gemini Inference', status: 'Connected', latency: '380ms', uptime: '99.85%', type: 'AI' },
-  { id: 'C4', name: 'Auth (JWT Hook)', status: 'Connected', latency: '18ms', uptime: '100%', type: 'Auth' },
-  { id: 'C5', name: 'S3 Object Store', status: 'Maintenance', latency: '—', uptime: '99.50%', type: 'Database' },
-];
-
-const iconForType = (type: StackConnection['type']): React.ComponentType<{ className?: string }> => {
-  if (type === 'Database') return Database;
-  if (type === 'API') return Wifi;
-  if (type === 'Auth') return Shield;
-  return Activity;
-};
-
-const statusStyle = (status: StackConnection['status']): string => {
-  if (status === 'Connected') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (status === 'Maintenance') return 'bg-amber-50 text-amber-700 border-amber-200';
-  return 'bg-red-50 text-red-700 border-red-200';
-};
-
-const statusDotStyle = (status: StackConnection['status']): string => {
-  if (status === 'Connected') return 'bg-emerald-500';
-  if (status === 'Maintenance') return 'bg-amber-500';
-  return 'bg-red-500';
-};
-
-const latencyColor = (status: StackConnection['status']): string => {
-  return status === 'Connected' ? 'text-emerald-600 font-bold' : 'text-slate-400';
-};
-
 export const ItDataView: React.FC = () => {
+  const [health, setHealth] = useState<MarketplaceHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async (): Promise<void> => {
+    if (!SUPABASE_READY) {
+      setError('Marketplace Supabase is not configured.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('marketplace-api', { method: 'GET' });
+      if (invokeError) throw invokeError;
+      if (!data || data.status !== 'ok') throw new Error('Marketplace API health endpoint did not return an OK status.');
+      setHealth(data as MarketplaceHealth);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to verify Marketplace API health.');
+      setHealth(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const checkedAt = health?.database?.checked_at
+    ? new Date(health.database.checked_at).toLocaleString()
+    : 'Not reported';
+
   return (
     <ViewShell
       title="IT & Infrastructure"
-      subtitle="System status, connectivity, and data health monitoring."
-      loading={false}
-      error={null}
+      subtitle="Live Marketplace API and database connectivity. Unmeasured telemetry is shown as unavailable."
+      loading={loading}
+      error={error}
       isEmpty={false}
       emptyTitle=""
+      onRetry={() => void load()}
       actions={
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-white px-3 py-1.5 rounded-lg border border-stone-200 shadow-sm">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          System Operational
-        </div>
+        <span className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border ${
+          health?.status === 'ok'
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            : 'text-slate-500 bg-stone-50 border-stone-200'
+        }`}>
+          <span className={`h-2 w-2 rounded-full ${health?.status === 'ok' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+          {health?.status === 'ok' ? 'API reachable' : 'Status unavailable'}
+        </span>
       }
     >
-      <div className="space-y-8">
-        <section>
-          <h2 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-emerald-600" />
-            Stack Connectivity
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {STACK_CONNECTIONS.map((conn) => {
-              const Icon = iconForType(conn.type);
-              return (
-                <Card
-                  key={conn.id}
-                  className="p-5 flex flex-col justify-between hover:border-emerald-300 hover:shadow-md transition-all"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-500">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-wider border ${statusStyle(conn.status)}`}
-                    >
-                      <div className={`w-1.5 h-1.5 rounded-full ${statusDotStyle(conn.status)}`} />
-                      {conn.status}
-                    </div>
-                  </div>
+      {health && (
+        <div className="space-y-8">
+          <section>
+            <h2 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-emerald-600" /> Verified Connectivity
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700"><Server className="w-5 h-5" /></div>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-800 mb-1">{conn.name}</h3>
-                    <div className="flex justify-between items-end text-xs text-slate-500 font-mono pt-2 border-t border-stone-100 mt-2">
-                      <span>
-                        Latency: <span className={latencyColor(conn.status)}>{conn.latency}</span>
-                      </span>
-                      <span>Up: {conn.uptime}</span>
-                    </div>
+                    <h3 className="font-semibold text-slate-900">Marketplace API</h3>
+                    <p className="text-xs text-emerald-700">HTTP health check passed</p>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
-            <Database className="w-5 h-5 text-emerald-600" />
-            Data Health
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-6 flex flex-col items-center justify-center text-center hover:border-emerald-200 transition-colors">
-              <div className="mb-3 p-3 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                <RefreshCw className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Last Backup</span>
-              <span className="text-2xl font-bold text-slate-900 mt-1">24 mins ago</span>
-              <span className="text-xs text-slate-500 mt-2">Automated · AES-256</span>
-            </Card>
-
-            <Card className="p-6 flex flex-col items-center justify-center text-center hover:border-blue-200 transition-colors">
-              <div className="mb-3 p-3 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                <HardDrive className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Database Size</span>
-              <span className="text-2xl font-bold text-slate-900 mt-1">4.2 GB</span>
-              <div className="w-32 h-2 bg-stone-200 rounded-full mt-3 overflow-hidden">
-                <div className="bg-blue-500 w-1/4 h-full rounded-full" />
-              </div>
-            </Card>
-
-            <Card className="p-6 flex flex-col items-center justify-center text-center hover:border-purple-200 transition-colors">
-              <div className="mb-3 p-3 rounded-full bg-purple-50 text-purple-600 border border-purple-200">
-                <Activity className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">API Requests</span>
-              <span className="text-2xl font-bold text-slate-900 mt-1">1.2M / mo</span>
-              <span className="text-xs text-slate-500 mt-2">Within Tier 2 Limits</span>
-            </Card>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
-            <Server className="w-5 h-5 text-emerald-600" />
-            Service Inventory
-          </h2>
-          <Card className="p-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-slate-500 text-xs">Total Services</p>
-                <p className="font-bold text-slate-900 text-lg">{STACK_CONNECTIONS.length}</p>
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs">Healthy</p>
-                <p className="font-bold text-emerald-600 text-lg">
-                  {STACK_CONNECTIONS.filter((c) => c.status === 'Connected').length}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs">Maintenance</p>
-                <p className="font-bold text-amber-600 text-lg">
-                  {STACK_CONNECTIONS.filter((c) => c.status === 'Maintenance').length}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs">Avg. Uptime</p>
-                <p className="font-bold text-slate-900 text-lg">99.85%</p>
-              </div>
+                </div>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">Service</dt><dd className="font-mono text-slate-800">{health.service}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">API version</dt><dd className="font-mono text-slate-800">{health.version}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">Persistence</dt><dd className="text-slate-800">{health.persistence}</dd></div>
+                </dl>
+              </Card>
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-700"><Database className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Database connection</h3>
+                    <p className="text-xs text-emerald-700">Server-side query passed</p>
+                  </div>
+                </div>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">Connection</dt><dd className="font-semibold text-emerald-700">Healthy</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">Database</dt><dd className="font-mono text-slate-800">{health.database?.database_name ?? 'Connected'}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-slate-500">Last checked</dt><dd className="text-slate-800 text-right">{checkedAt}</dd></div>
+                </dl>
+              </Card>
             </div>
-          </Card>
-        </section>
-      </div>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" /> Operational Telemetry
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-5">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Backup history</p>
+                <p className="text-lg font-semibold text-slate-500 mt-2">Not exposed</p>
+                <p className="text-xs text-slate-500 mt-2">No verified backup timestamp is available through this health endpoint.</p>
+              </Card>
+              <Card className="p-5">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Database size</p>
+                <p className="text-lg font-semibold text-slate-500 mt-2">Not reported</p>
+                <p className="text-xs text-slate-500 mt-2">Storage metrics require a separate platform telemetry source.</p>
+              </Card>
+              <Card className="p-5">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">API request volume</p>
+                <p className="text-lg font-semibold text-slate-500 mt-2">Not measured</p>
+                <p className="text-xs text-slate-500 mt-2">No request counter or observability ingestion is connected to this view.</p>
+              </Card>
+            </div>
+          </section>
+        </div>
+      )}
     </ViewShell>
   );
 };

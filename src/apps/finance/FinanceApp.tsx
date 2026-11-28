@@ -4,7 +4,6 @@ import { AppFrame, SectionHead, type AppSection } from '../../components/AppFram
 import { Card, StatCard } from '../_ui/kit';
 import { useCollectionDrill } from '../../hooks/useCollectionDrill';
 import { useCmsStore } from '../../lib/cms/cms.store';
-import type { CmsItem } from '../../lib/cms/types';
 import { useWindowPage } from '../../contexts/WindowContext';
 import { AppDetailOverlay } from '../../components/cms/AppDetailOverlay';
 import { DynamicPageView } from '../../components/cms/DynamicPageView';
@@ -15,6 +14,7 @@ import { FleetItemGrid } from '../_ui/FleetItemCard';
 import { CollectionRepeater } from '../../components/cms/CollectionRepeater';
 import { seedFinanceCms } from './seed';
 import { useShellStore } from '../../stores/shell.store';
+import { useIsDemoTenant } from '../../lib/cms/useIsDemoTenant';
 
 registerItemDetail('finance', FinanceItemDetail);
 seedFinanceCms();
@@ -27,69 +27,56 @@ const ACCENT = '#0d9488';
 // for the month label (~14px) + the gap-2 (8px) below it.
 const RUNWAY_BAR_PX = 160;
 
-function Overview() {
-  // KPIs from the CMS store. Empty state: we still render the section title,
-  // but each StatCard falls back to a placeholder when its item is missing —
-  // never an unhandled undefined.
-  const items = useCmsStore(s => s.items['finance_overview']) ?? [];
-  const byId = (id: string): CmsItem | undefined => items.find(i => i.id === `overview-${id}`);
-  // CmsItem values are typed as `unknown` because the shape is dynamic. We
-  // coerce to string at the boundary so StatCard (strictly typed) doesn't
-  // have to know about CMS shape.
-  const txt = (item: CmsItem | undefined, key: string): string => {
-    if (!item) return '';
-    const v = item[key];
-    return typeof v === 'string' ? v : '';
-  };
-  // StatCard tone is a closed union. Anything else (including our 'default'
-  // sentinel) falls back to a sensible per-card default supplied by the caller.
-  type StatTone = 'ok' | 'warn' | 'danger' | 'accent';
-  const tone = (item: CmsItem | undefined, fallback: StatTone): StatTone => {
-    const t = txt(item, 'tone');
-    return t === 'ok' || t === 'warn' || t === 'danger' || t === 'accent' ? t : fallback;
-  };
+function formatInvoiceAmount(amount: number, currency: string | null | undefined): string {
+  const code = String(currency ?? '').toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(amount); } catch { /* use explicit unset label */ }
+  }
+  return `${amount.toLocaleString()} · currency not set`;
+}
 
-  const mrr = byId('mrr');
-  const burn = byId('burn');
-  const runway = byId('runway');
-  const ltvCac = byId('ltv-cac');
+function Overview() {
+  const invoices = useCmsStore((state) => state.items.invoices ?? []);
+  const paid = invoices.filter((invoice) => /paid/i.test(String(invoice.status ?? ''))).length;
+  const open = invoices.length - paid;
+  const outstandingByCurrency = new Map<string, number>();
+  for (const invoice of invoices) {
+    if (/paid/i.test(String(invoice.status ?? ''))) continue;
+    const currency = String(invoice.currency ?? '').toUpperCase() || 'UNSET';
+    outstandingByCurrency.set(currency, (outstandingByCurrency.get(currency) ?? 0) + Number(invoice.amount ?? 0));
+  }
+  const currencyLines = [...outstandingByCurrency.entries()].map(([currency, amount]) =>
+    currency === 'UNSET' ? `${amount.toLocaleString()} · currency not set` : formatInvoiceAmount(amount, currency));
 
   return (
     <div className="p-7">
-      <SectionHead title="Finance overview" subtitle="Unit economics at a glance" />
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard
-          label={txt(mrr, 'label') || 'MRR'}
-          value={txt(mrr, 'value') || '—'}
-          tone={tone(mrr, 'ok')}
-          hint={txt(mrr, 'hint') || 'no data'}
-        />
-        <StatCard
-          label={txt(burn, 'label') || 'Monthly burn'}
-          value={txt(burn, 'value') || '—'}
-          tone={tone(burn, 'warn')}
-          hint={txt(burn, 'hint')}
-        />
-        <StatCard
-          label={txt(runway, 'label') || 'Runway'}
-          value={txt(runway, 'value') || '—'}
-          tone={tone(runway, 'accent')}
-          hint={txt(runway, 'hint')}
-        />
+      <SectionHead title="Finance overview" subtitle="Persisted workspace invoices · no synthetic MRR, burn or cash runway." />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Invoices" value={String(invoices.length)} tone="accent" hint="Workspace records" />
+        <StatCard label="Paid" value={String(paid)} tone="ok" hint="Status recorded as paid" />
+        <StatCard label="Open" value={String(open)} tone={open ? 'warn' : 'ok'} hint="Not marked paid" />
+        <StatCard label="Currencies" value={String(outstandingByCurrency.size)} tone="accent" hint="Outstanding balances kept separate" />
       </div>
-      <div className="mt-4">
-        <StatCard
-          label={txt(ltvCac, 'label') || 'LTV : CAC'}
-          value={txt(ltvCac, 'value') || '—'}
-          tone={tone(ltvCac, 'ok')}
-          hint={txt(ltvCac, 'hint')}
-        />
+      <div className="mt-4 rounded-xl border p-4" style={{ background: 'var(--theme-surface)', borderColor: 'var(--panel-border)' }}>
+        <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--theme-text-muted)' }}>Outstanding by currency</h3>
+        {currencyLines.length === 0 ? <p className="mt-2 text-sm" style={{ color: 'var(--theme-text-dim)' }}>No open invoices in this workspace.</p> :
+          <ul className="mt-3 space-y-2">{currencyLines.map((line) => <li key={line} className="text-sm font-semibold tabular-nums" style={{ color: 'var(--theme-text)' }}>{line}</li>)}</ul>}
       </div>
     </div>
   );
 }
 
-function Runway() {
+function FinanceUnavailable({ title, description }: { title: string; description: string }) {
+  return <div className="p-7">
+    <SectionHead title={title} subtitle="Finance source not connected" />
+    <Card className="p-6">
+      <p className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>No verified records available</p>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>{description}</p>
+    </Card>
+  </div>;
+}
+
+function DemoRunway() {
   const items = useCmsStore(s => s.items['finance_overview']) ?? [];
   const projection = items.find(i => i.id === 'overview-projection');
   const rawProjection = projection?.projection;
@@ -143,6 +130,8 @@ function Runway() {
 
 export function FinanceApp() {
   const invoices = useCmsStore(s => s.items['invoices']) ?? [];
+  const clients = useCmsStore(s => s.items['clients']) ?? [];
+  const isDemoTenant = useIsDemoTenant();
   const plancherItems = useCmsStore(s => s.items['plancher_marges']) ?? [];
   const budgetItems = useCmsStore(s => s.items['budget_tokens']) ?? [];
   const invoicesDrill = useCollectionDrill('invoices', 'Invoices');
@@ -150,8 +139,8 @@ export function FinanceApp() {
   const courbeDrill = useCollectionDrill('courbe_demande', 'Courbes');
   const budgetDrill = useCollectionDrill('budget_tokens', 'Tokens');
   const formesDrill = useCollectionDrill('formes_prix', 'Formes');
-  const updateItem = useCmsStore(s => s.updateItem);
   const addItem = useCmsStore(s => s.addItem);
+  const addItemPersisted = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
   const [detail, setDetail] = useState<FinanceDetailItem | null>(null);
   const { setDetail: setWindowDetail } = useWindowPage();
@@ -173,10 +162,10 @@ export function FinanceApp() {
       subtitle: String(item.number ?? item.id),
       status: String(item.status ?? 'open'),
       kpis: [
-        { label: 'Amount', value: `$${Number(item.amount ?? 0).toLocaleString()}` },
+        { label: 'Amount', value: formatInvoiceAmount(Number(item.amount ?? 0), String(item.currency ?? '')) },
         { label: 'Status', value: String(item.status ?? 'open') },
-        { label: 'Due', value: String(item.dueDate ?? '—') },
-        { label: 'Issued', value: String(item.issued ?? '—') },
+        { label: 'Due', value: String(item.dueAt ?? item.due ?? '—') },
+        { label: 'Issued', value: String(item.issuedAt ?? item.issued ?? '—') },
       ],
       rows: [
         { label: 'Description', value: String(item.description ?? item.memo ?? '') },
@@ -187,66 +176,63 @@ export function FinanceApp() {
     invoicesDrill.open(id);
   };
 
-  /** Mark an invoice as paid. The mutation is two-step: (1) flip the `status`
-   *  field to 'Paid', (2) emit a success toast so the coach can see the change
-   *  hit the store. The store's `updateItem` is fire-and-forget here — there
-   *  is no batch to revert if it fails, which is fine for a one-shot status. */
-  const markPaid = (id: string): void => {
-    const item = invoices.find((c) => c.id === id);
-    if (!item) return;
-    if (String(item.status) === 'paid' || String(item.status) === 'Paid') {
-      addToast({ source: 'Finance', type: 'warning', message: 'Already paid.' });
-      return;
-    }
-    updateItem('invoices', id, { status: 'Paid' });
-    addToast({ source: 'Finance', type: 'success', message: `Marked ${String(item.client ?? id)} as paid.` });
-  };
 
-  /** Compose a new invoice. The coach enters a client name and an amount; the
-   *  rest of the fields are defaulted to canonical Civadelle values. The
-   *  number is derived from the current ISO month, and the due date is set
-   *  30 days out. The mutation flows through `addItem` so the seed kanban
-   *  sees the new row immediately. */
+  /** Create an invoice for an existing workspace client. The record is
+   *  published to the UI only after the workspace repository confirms the write. */
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composerClient, setComposerClient] = useState('');
+  const [composerClientId, setComposerClientId] = useState('');
   const [composerAmount, setComposerAmount] = useState('');
+  const [composerCurrency, setComposerCurrency] = useState('');
+  const [savingInvoice, setSavingInvoice] = useState(false);
 
-  const submitNewInvoice = (): void => {
-    const client = composerClient.trim();
+  const submitNewInvoice = async (): Promise<void> => {
+    const client = clients.find((candidate) => String(candidate.id) === composerClientId);
     const amountNum = Number(composerAmount);
-    if (client.length === 0) {
-      addToast({ source: 'Finance', type: 'warning', message: 'Client name is required.' });
+    const currency = composerCurrency.trim().toUpperCase();
+    if (!client) {
+      addToast({ source: 'Finance', type: 'warning', message: 'Select an existing workspace client.' });
       return;
     }
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
       addToast({ source: 'Finance', type: 'warning', message: 'Amount must be a positive number.' });
       return;
     }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      addToast({ source: 'Finance', type: 'warning', message: 'Enter a valid ISO 4217 currency code.' });
+      return;
+    }
     const now = new Date();
     const due = new Date(now.getTime() + 30 * 86400_000);
-    const labelMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const result = addItem('invoices', {
-      client,
-      number: `INV-${labelMonth}-${String(invoices.length + 1).padStart(3, '0')}`,
+    setSavingInvoice(true);
+    const invoiceDraft = {
+      client: String(client.name ?? client.title ?? client.id),
+      clientId: String(client.id),
       amount: amountNum,
+      currency,
       status: 'Sent',
       due: due.toISOString().slice(0, 10),
-      issued: now.toISOString().slice(0, 10),
-      description: 'Invoice line · Citadelle monthly',
-    });
+      dueAt: due.toISOString(),
+      issuedAt: now.toISOString(),
+    };
+    const result = isDemoTenant
+      ? addItem('invoices', invoiceDraft)
+      : await addItemPersisted('invoices', invoiceDraft);
+    setSavingInvoice(false);
     if (result.ok) {
-      addToast({ source: 'Finance', type: 'success', message: `Invoice created for ${client}.` });
-      setComposerClient('');
+      addToast({ source: 'Finance', type: 'success', message: isDemoTenant ? `Demo invoice created for ${String(client.name ?? client.id)}.` : `Invoice persisted for ${String(client.name ?? client.id)}.` });
+      setComposerClientId('');
       setComposerAmount('');
+      setComposerCurrency('');
       setComposerOpen(false);
     } else {
-      addToast({ source: 'Finance', type: 'warning', message: result.error ?? 'Could not create invoice.' });
+      addToast({ source: 'Finance', type: 'warning', message: result.error ?? 'Could not persist invoice.' });
     }
   };
 
   const cancelComposer = (): void => {
-    setComposerClient('');
+    setComposerClientId('');
     setComposerAmount('');
+    setComposerCurrency('');
     setComposerOpen(false);
   };
 
@@ -345,7 +331,7 @@ export function FinanceApp() {
       <div className="p-7">
         <SectionHead
           title="Invoices"
-          subtitle="Reconciled nightly via Stripe"
+          subtitle="Persisted workspace invoices · payment capture and reconciliation are not connected"
           action={
             !composerOpen ? (
               <button
@@ -381,23 +367,18 @@ export function FinanceApp() {
                 >
                   Client
                 </label>
-                <input
+                <select
                   id="invoice-composer-client"
                   autoFocus
-                  value={composerClient}
-                  onChange={(e) => setComposerClient(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewInvoice();
-                    if (e.key === 'Escape') cancelComposer();
-                  }}
-                  placeholder="Ava Chen"
+                  required
+                  value={composerClientId}
+                  onChange={(e) => setComposerClientId(e.target.value)}
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
-                  style={{
-                    background: 'var(--theme-bg)',
-                    border: '1px solid var(--panel-border)',
-                    color: 'var(--theme-text)',
-                  }}
-                />
+                  style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }}
+                >
+                  <option value="">Select a workspace client</option>
+                  {clients.map((client) => <option key={String(client.id)} value={String(client.id)}>{String(client.name ?? client.title ?? client.id)}</option>)}
+                </select>
               </div>
               <div>
                 <label
@@ -405,17 +386,17 @@ export function FinanceApp() {
                   style={{ color: 'var(--theme-text-dim)' }}
                   htmlFor="invoice-composer-amount"
                 >
-                  Amount (USD)
+                  Amount
                 </label>
                 <input
                   id="invoice-composer-amount"
                   type="number"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   min="0"
                   value={composerAmount}
                   onChange={(e) => setComposerAmount(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNewInvoice();
+                    if (e.key === 'Enter') void submitNewInvoice();
                     if (e.key === 'Escape') cancelComposer();
                   }}
                   placeholder="1200"
@@ -426,6 +407,14 @@ export function FinanceApp() {
                     color: 'var(--theme-text)',
                   }}
                 />
+              </div>
+              <div>
+                <label className="block text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1.5" style={{ color: 'var(--theme-text-dim)' }} htmlFor="invoice-composer-currency">Currency (ISO 4217)</label>
+                <input id="invoice-composer-currency" required maxLength={3} value={composerCurrency}
+                  onChange={(e) => setComposerCurrency(e.target.value.toUpperCase())} placeholder="USD"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
+                  style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }} />
+
               </div>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
@@ -441,14 +430,15 @@ export function FinanceApp() {
                 Cancel
               </button>
               <button
-                onClick={submitNewInvoice}
+                onClick={() => void submitNewInvoice()}
+                disabled={savingInvoice || !composerClientId || !composerCurrency.trim()}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Create invoice
+                {savingInvoice ? 'Saving…' : 'Create invoice'}
               </button>
             </div>
           </div>
@@ -463,8 +453,9 @@ export function FinanceApp() {
             const clientName = String(inv.client ?? inv.title ?? 'Invoice');
             const invNumber = String(inv.number ?? inv.id);
             const invDesc = String(inv.description ?? inv.memo ?? '');
-            const dueDate = String(inv.dueDate ?? inv.due ?? '');
+            const dueDate = String(inv.dueAt ?? inv.due ?? '');
             const amount = Number(inv.amount ?? 0);
+            const amountLabel = formatInvoiceAmount(amount, String(inv.currency ?? ''));
             return (
               <div
                 key={String(inv.id)}
@@ -512,7 +503,7 @@ export function FinanceApp() {
                     >
                       <span className="font-semibold tabular-nums" style={{ color: 'var(--theme-text)' }}>
                         <span className="mr-1" style={{ color: 'var(--theme-text-dim)' }}>amount</span>
-                        ${amount.toLocaleString('en-US')}
+                        {amountLabel}
                       </span>
                       <span className="truncate flex-1">{dueDate ? `due ${dueDate}` : 'no due date'}</span>
                     </div>
@@ -524,18 +515,14 @@ export function FinanceApp() {
                 >
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); markPaid(String(inv.id)); }}
-                    disabled={isPaid}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{
-                      background: isPaid ? 'var(--theme-surface-hover)' : '#16a34a',
-                      color: isPaid ? 'var(--theme-text-dim)' : '#ffffff',
-                      border: '1px solid var(--panel-border)',
-                    }}
-                    aria-label={`Mark ${clientName} paid`}
+                    disabled
+                    title="Payment reconciliation requires a connected payment provider and finance ledger workflow."
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold opacity-50 cursor-not-allowed"
+                    style={{ background: 'var(--theme-surface-hover)', color: 'var(--theme-text-dim)', border: '1px solid var(--panel-border)' }}
+                    aria-label={`Payment reconciliation unavailable for ${clientName}`}
                   >
                     <Check className="w-3.5 h-3.5" />
-                    {isPaid ? 'Paid' : 'Mark paid'}
+                    {isPaid ? 'Paid' : 'Payment flow unavailable'}
                   </button>
                 </div>
               </div>
@@ -548,11 +535,11 @@ export function FinanceApp() {
 
   const sections: AppSection[] = [
     { id: 'overview', label: 'Overview', icon: BarChart3, render: Overview },
-    { id: 'runway', label: 'Runway', icon: PiggyBank, render: Runway },
-    { id: 'planchers', label: 'Planchers', icon: Scale, render: Planchers },
-    { id: 'courbes', label: 'Courbes', icon: LineChart, render: Courbes },
-    { id: 'tokens', label: 'Tokens', icon: Coins, render: Budgets },
-    { id: 'formes', label: 'Formes', icon: CircleDollarSign, render: Formes },
+    { id: 'runway', label: 'Runway', icon: PiggyBank, render: () => isDemoTenant ? <DemoRunway /> : <FinanceUnavailable title="Cash runway" description="Cash balances and operating burn are not connected to a verified source. This view remains unavailable until bank/ledger balances and an approved forecast are available." /> },
+    { id: 'planchers', label: 'Planchers', icon: Scale, render: () => isDemoTenant ? <Planchers /> : <FinanceUnavailable title="Margin floors" description="Margin-floor scenarios are local demo fixtures. A persistent pricing and margin policy table has not been connected." /> },
+    { id: 'courbes', label: 'Courbes', icon: LineChart, render: () => isDemoTenant ? <Courbes /> : <FinanceUnavailable title="Demand curves" description="Demand curves are local demo fixtures. No persistent demand forecast source is connected to this workspace." /> },
+    { id: 'tokens', label: 'Tokens', icon: Coins, render: () => isDemoTenant ? <Budgets /> : <FinanceUnavailable title="AI budgets" description="Token budgets require provider usage and billing events. The runtime usage source is not connected." /> },
+    { id: 'formes', label: 'Formes', icon: CircleDollarSign, render: () => isDemoTenant ? <Formes /> : <FinanceUnavailable title="Pricing models" description="Pricing-model experiments are local demo fixtures. No persistent pricing-model catalogue is connected." /> },
     { id: 'invoices', label: 'Invoices', icon: Receipt, render: Invoices },
   ];
 

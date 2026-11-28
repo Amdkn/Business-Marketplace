@@ -1,8 +1,8 @@
 // src/components/views/ClientDetailView.tsx
-// Zero Bug Sprint — rewritten to match omk_saas.clients schema.
+// Zero Bug Sprint — rewritten to match Marketplace tenant client records.
 //
 // Bug fixes (D6 #98, D6 #105a):
-//   - `client.progress` removed (no DB column). Derived from status via STATUS_PROGRESS.
+//   - Removed the synthetic status-to-progress percentage; only persisted status is shown.
 //   - `client.date` removed → use `client.createdAt` formatted via formatDate().
 //   - Hardcoded "Org ID: 00000000-…-0001" replaced with `client.orgId ?? '—'` (real value).
 //   - Hardcoded DEMO_DOCUMENTS / DEMO_TIMELINE removed (D6 #105a — they lied about data).
@@ -28,7 +28,9 @@ import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { clientsRepo } from '../data/clients.repo';
 import { documentsRepo } from '../data/documents.repo';
+import { activityRepo } from '../data/activity.repo';
 import type { Client, Document } from '../lib/types';
+import type { ClientActivityEvent } from '../data/activity.repo';
 import { CLIENT_STATUS_LABEL } from '../lib/statusLabels';
 import { useToast } from '../contexts/ToastContext';
 import { formatDate, safeArray, safeStr } from '../lib/safe';
@@ -37,14 +39,7 @@ type LoadState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'not_found' }
-  | { kind: 'ready'; client: Client; docs: Document[] };
-
-const STATUS_PROGRESS: Record<Client['status'], number> = {
-  active: 80,
-  prospect: 20,
-  paused: 50,
-  archived: 100,
-};
+  | { kind: 'ready'; client: Client; docs: Document[]; activity: ClientActivityEvent[] };
 
 const VARIANT_BY_STATUS: Record<Client['status'], 'success' | 'warning' | 'danger' | 'info'> = {
   active: 'success',
@@ -65,6 +60,9 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({ name: '', email: '', phone: '', service: '', status: 'prospect' as Client['status'] });
 
   const activeId = clientId ?? params.id;
 
@@ -75,14 +73,14 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
       return;
     }
     setState({ kind: 'loading' });
-    Promise.all([clientsRepo.findById(id), documentsRepo.list()])
-      .then(([client, allDocs]) => {
+    Promise.all([clientsRepo.findById(id), documentsRepo.list(), activityRepo.listForClient(id)])
+      .then(([client, allDocs, activity]) => {
         if (!client) {
           setState({ kind: 'not_found' });
           return;
         }
         const linkedDocs = safeArray<Document>(allDocs).filter((d) => d.clientId === client.id);
-        setState({ kind: 'ready', client, docs: linkedDocs });
+        setState({ kind: 'ready', client, docs: linkedDocs, activity });
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Failed to load client';
@@ -97,6 +95,44 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
       onBack();
     } else {
       navigate('/clients');
+    }
+  };
+
+  const startEditing = (): void => {
+    if (state.kind !== 'ready') return;
+    setDraft({
+      name: state.client.name,
+      email: state.client.email ?? '',
+      phone: state.client.phone ?? '',
+      service: state.client.service ?? '',
+      status: state.client.status,
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = async (): Promise<void> => {
+    if (state.kind !== 'ready' || saving) return;
+    const name = draft.name.trim();
+    if (!name) {
+      showToast('Client name is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await clientsRepo.update(state.client.id, {
+        name,
+        email: draft.email.trim() || null,
+        phone: draft.phone.trim() || null,
+        service: draft.service.trim() || null,
+        status: draft.status,
+      });
+      setState((previous) => previous.kind === 'ready' ? { ...previous, client: updated } : previous);
+      setIsEditing(false);
+      showToast(`Client "${updated.name}" saved.`, 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to save client.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -163,8 +199,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
     .slice(0, 2)
     .join('')
     .toUpperCase();
-  const status = (client?.status && client.status in STATUS_PROGRESS ? client.status : 'active') as Client['status'];
-  const progress = STATUS_PROGRESS[status] ?? 0;
+  const status = client.status;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -180,7 +215,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
           <button
             type="button"
             aria-label="Edit client"
-            onClick={() => showToast('Edit form coming in D2.', 'info')}
+            onClick={startEditing}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
           >
             <Edit3 className="w-4 h-4" /> Edit
@@ -195,6 +230,48 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
           </button>
         </div>
       </div>
+
+      {isEditing && (
+        <Card className="p-5">
+          <form onSubmit={(event) => { event.preventDefault(); void handleSave(); }} className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Edit client record</h2>
+              <span className="text-[11px] text-slate-500">Workspace record</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="text-xs font-medium text-slate-600">
+                Name
+                <input required value={draft.name} onChange={(event) => setDraft((value) => ({ ...value, name: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Email
+                <input type="email" value={draft.email} onChange={(event) => setDraft((value) => ({ ...value, email: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Phone
+                <input value={draft.phone} onChange={(event) => setDraft((value) => ({ ...value, phone: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Service
+                <input value={draft.service} onChange={(event) => setDraft((value) => ({ ...value, service: event.target.value }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900" />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                Status
+                <select value={draft.status} onChange={(event) => setDraft((value) => ({ ...value, status: event.target.value as Client['status'] }))} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-slate-900">
+                  <option value="prospect">Prospect</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" disabled={saving} onClick={() => setIsEditing(false)} className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={saving || !draft.name.trim()} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save client'}</button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {/* Hero card */}
       <Card className="p-6">
@@ -217,16 +294,8 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
               </Badge>
             </div>
             <div className="mt-4 h-px bg-stone-200" />
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span className="font-medium text-slate-700">{progress}% complete</span>
-                <span className="flex items-center gap-1">
-                  <CalendarClock className="w-3.5 h-3.5" /> Last update: {formatDate(client.updatedAt)}
-                </span>
-              </div>
-              <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
-              </div>
+            <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+              <CalendarClock className="w-3.5 h-3.5" /> Last update: {formatDate(client.updatedAt)}
             </div>
           </div>
         </div>
@@ -249,7 +318,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
               <dt className="text-slate-500 flex items-center gap-2">
                 <Hash className="w-3.5 h-3.5" /> Phone
               </dt>
-              <dd className="text-slate-400 italic text-xs">+ Add phone</dd>
+              <dd className="text-slate-900 font-medium truncate ml-3">{safeStr(client.phone, '—')}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-slate-500 flex items-center gap-2">
@@ -286,10 +355,6 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
               </dd>
             </div>
             <div className="flex items-center justify-between">
-              <dt className="text-slate-500">Status weight</dt>
-              <dd className="text-slate-900 font-medium">{progress}%</dd>
-            </div>
-            <div className="flex items-center justify-between">
               <dt className="text-slate-500">Started</dt>
               <dd className="text-slate-900 font-medium">{formatDate(client.createdAt)}</dd>
             </div>
@@ -297,7 +362,7 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
         </Card>
       </div>
 
-      {/* Linked documents (from omk_saas.documents, filtered by clientId) */}
+      {/* Linked documents (from Marketplace tenant documents, filtered by clientId) */}
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <FileText className="w-4 h-4 text-slate-400" /> Documents ({docs.length})
@@ -322,14 +387,25 @@ export const ClientDetailView: React.FC<ClientDetailViewProps> = ({ clientId, on
         )}
       </Card>
 
-      {/* Activity timeline placeholder (D2) */}
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-slate-400" /> Activity Timeline
+          <Activity className="w-4 h-4 text-slate-400" /> Activity Timeline ({state.activity.length})
         </h3>
-        <p className="text-sm text-slate-400 italic">
-          Activity timeline — D2 backlog (no omk_saas.activity table yet).
-        </p>
+        {state.activity.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">No activity events have been recorded for this client yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {state.activity.map((event) => (
+              <li key={event.id} className="flex items-start justify-between gap-4 border-l-2 border-emerald-200 pl-4 py-1">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{event.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{event.clientName || state.client.name}</p>
+                </div>
+                <time className="text-xs text-slate-500 shrink-0">{formatDate(event.createdAt)}</time>
+              </li>
+            ))}
+          </ol>
+        )}
       </Card>
     </div>
   );

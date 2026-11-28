@@ -74,6 +74,7 @@ const STORE_WRITER_RE = /setProperty\(`\$\{p\}--([a-zA-Z0-9-]+)`/g;
  *  entre accolades pour y extraire les declarations `--xxx: ...`. */
 const ROOT_BLOCK_RE = /:root\s*{([^}]*)}/g;
 const DATA_THEME_BLOCK_RE = /\[\s*data-theme[^\]]*\]\s*{([^}]*)}/g;
+const SELECTOR_BLOCK_RE = /(?:^|})\s*([^@{}][^{]*)\{([^{}]*)\}/g;
 
 /** Declaration `--xxx: valeur;` a l'interieur d'un bloc statique. */
 const DECL_RE = /--([a-zA-Z0-9-]+)\s*:/g;
@@ -160,10 +161,9 @@ function collectCssWriters(): string[] {
     const blocks: string[] = [];
     for (const m of src.matchAll(ROOT_BLOCK_RE)) blocks.push(m[1]);
     for (const m of src.matchAll(DATA_THEME_BLOCK_RE)) blocks.push(m[1]);
+    for (const m of src.matchAll(SELECTOR_BLOCK_RE)) blocks.push(m[2]);
     for (const body of blocks) {
-      for (const d of body.matchAll(DECL_RE)) {
-        names.push(d[1]);
-      }
+      for (const d of body.matchAll(DECL_RE)) names.push(d[1]);
     }
   }
   return uniq(names);

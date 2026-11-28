@@ -38,7 +38,7 @@ export const SignupView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">Create account</h1>
-            <span className="text-xs text-slate-500 font-medium tracking-wide">OMK Services · BUSINESS OS</span>
+            <span className="text-xs text-slate-500 font-medium tracking-wide">A'Space Marketplace · BUSINESS OS</span>
           </div>
         </div>
 

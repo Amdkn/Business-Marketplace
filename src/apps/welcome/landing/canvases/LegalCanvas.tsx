@@ -1,4 +1,4 @@
-/** OMK Legal canvas — NDA pipeline + compliance matrix + shield log + audit pack.
+/** A’Space Legal canvas — NDA pipeline + compliance matrix + shield log + audit pack.
  *
  *  Why this layout, not the landing template:
  *  Legal's proof is regulatory, not aspirational. A coach hiring agents cares
@@ -216,7 +216,7 @@ export function LegalCanvas({ page, activePageId, onSelectPage }: {
               ))}
             </div>
             <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--panel-border-subtle)]">
-              <span className="text-[10px] text-[var(--theme-text-dim)]">14 fichiers · 2.3 MB · sceau OMK signé · prêt à envoyer</span>
+              <span className="text-[10px] text-[var(--theme-text-dim)]">14 fichiers · 2.3 MB · sceau A’Space signé · prêt à envoyer</span>
               <button className="inline-flex items-center gap-1.5 rounded-full bg-[var(--theme-accent)] text-white px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-[var(--theme-accent-hover)]">
                 <PenLine className="w-3 h-3" /> Exporter
               </button>
@@ -265,7 +265,7 @@ export function LegalCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

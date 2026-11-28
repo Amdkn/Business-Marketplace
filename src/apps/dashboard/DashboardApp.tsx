@@ -26,14 +26,14 @@
  *
  * DoD 9/9 (Brief E 2026-08-09) — les 2 TODO initiaux (validation cards,
  * pipeline cards) sont branchés : chaque clic ouvre un détail ou navigue
- * vers une autre app ; une mutation CMS `updateItem('clients', id, ...)`
+ * vers une autre app ; une persisted CMS mutation `updateItemPersisted('clients', id, ...)`
  * persiste l'état "pinned" sur les fiches pipeline ; un état vide est
  * rendu sans crash si la collection `clients` est vide ; chaque mutation
  * pousse un toast (succès ou erreur) via `useShellStore.addToast`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  AlertTriangle, BarChart3, Bot, Building2, Clock, Compass, GitBranch,
+  AlertTriangle, BarChart3, Bot, Building2, Compass, GitBranch,
   History, LayoutDashboard, ListChecks, MessageSquare, Pin, ScrollText,
   Sparkles, Wallet, Wind,
 } from 'lucide-react';
@@ -41,7 +41,6 @@ import { AppFrame, SectionHead, type AppSection } from '../../components/AppFram
 import { useCmsStore } from '../../lib/cms/cms.store';
 import type { CmsItem } from '../../lib/cms/types';
 import { useShellStore } from '../../stores/shell.store';
-import { useWindowPage } from '../../contexts/WindowContext';
 import { useCollectionDrill } from '../../hooks/useCollectionDrill';
 import { AppDetailOverlay } from '../../components/cms/AppDetailOverlay';
 import { FleetItemCard, FleetItemGrid } from '../_ui/FleetItemCard';
@@ -56,8 +55,6 @@ import { Sessions } from './dashboard/sections/Sessions';
 import { Usage } from './dashboard/sections/Usage';
 import { Cost } from './dashboard/sections/Cost';
 import { AuditLog } from './dashboard/sections/AuditLog';
-import { AgentDetailPage } from './dashboard/sections/AgentDetail';
-import { useDashboardAgents } from './dashboard/cmsAgents';
 import { ACCENT } from './dashboard/Primitives';
 // Modules de sections livres par les vagues 2 et 3, chacune cloisonnee dans son
 // dossier pour pouvoir travailler en parallele sans conflit sur ce fichier.
@@ -81,19 +78,16 @@ interface ValidationCard {
 /** Build Wind Direction validations from LIVE state.
  *  Brief: "soit tu les dérives d'une source réelle (incidents, approbations,
  *  factures en retard…), soit tu assumes le seed **et tu le dis à l'écran**."
- *  On derive first; if nothing emerges, fall back to the seed and mark it
- *  visibly as a demo fixture. */
+ *  Empty means no live workspace validation is pending; never inject sample alerts. */
 function deriveValidations(
   clients: CmsItem[],
   invoices: CmsItem[],
   deals: CmsItem[],
-): { cards: ValidationCard[]; fromSeed: boolean } {
+): ValidationCard[] {
   const cards: ValidationCard[] = [];
 
   // Open invoices (status != Paid) — top 2 by amount.
-  const open = invoices
-    .filter((i) => i.status !== 'Paid')
-    .sort((a, b) => Number(b.amount ?? 0) - Number(a.amount ?? 0));
+  const open = invoices.filter((i) => i.status !== 'Paid');
   open.slice(0, 2).forEach((inv) => {
     cards.push({
       id: `val-invoice-${String(inv.id)}`,
@@ -134,36 +128,7 @@ function deriveValidations(
       });
     });
 
-  if (cards.length === 0) {
-    return {
-      cards: [
-        {
-          id: 'val-seed-techflow',
-          title: 'Validation devis client TechFlow',
-          when: 'Démo seed',
-          tone: 'warn',
-          clientId: 'techflow',
-        },
-        {
-          id: 'val-seed-priya',
-          title: 'Retard livraison projet GreenScale',
-          when: 'Démo seed',
-          tone: 'danger',
-          clientId: 'priya-nandan',
-        },
-        {
-          id: 'val-seed-stripe',
-          title: 'Mise à jour Stripe requise',
-          when: 'Démo seed',
-          tone: 'accent',
-          targetApp: 'finance',
-          targetSection: 'Overview',
-        },
-      ],
-      fromSeed: true,
-    };
-  }
-  return { cards: cards.slice(0, 4), fromSeed: false };
+  return cards.slice(0, 4);
 }
 
 export function DashboardApp() {
@@ -171,20 +136,13 @@ export function DashboardApp() {
   const clientsDef = useCmsStore(s => s.collections['clients']);
   const deals = useCmsStore(s => s.items['deals']) ?? [];
   const invoices = useCmsStore(s => s.items['invoices']) ?? [];
-  const updateItem = useCmsStore((s) => s.updateItem);
+  const updateItem = useCmsStore((s) => s.updateItemPersisted);
+  const [mutatingClientId, setMutatingClientId] = useState<string | null>(null);
   const activeCount = clients.filter(c => c.status === 'Active').length;
   const onboardingCount = clients.filter(c => c.status === 'Onboarding').length;
   const churnCount = clients.filter(c => c.status === 'Churn' || c.status === 'AtRisk').length;
   const openApp = useShellStore((s) => s.openApp);
   const addToast = useShellStore((s) => s.addToast);
-
-  // Agent detail overlay — opened by clicking an agent card. The list now
-  // comes from the CMS partition (useDashboardAgents) so creating / deleting
-  // an agent from the Agents section propagates here without re-mounting.
-  const [openAgentId, setOpenAgentId] = useState<string | null>(null);
-  const { setDetail: setWindowDetail } = useWindowPage();
-  const dashboardAgents = useDashboardAgents();
-  const openAgent = openAgentId ? dashboardAgents.find((a) => a.id === openAgentId) ?? null : null;
 
   // Clients drill — Pipeline cards open a client detail overlay.
   // We pick the labels Dashboard uses so the breadcrumb segment is consistent.
@@ -203,27 +161,9 @@ export function DashboardApp() {
   const prevClient = openClientIndex > 0 ? clients[openClientIndex - 1] : undefined;
   const nextClient = openClientIndex >= 0 && openClientIndex < clients.length - 1 ? clients[openClientIndex + 1] : undefined;
 
-  // Breadcrumb publisher: ONE source of truth per overlay. Both `openAgent`
-  // and `openClient` cannot be visible simultaneously in practice (clicking
-  // one dismisses the other) so we let agent win. `setWindowDetail` was
-  // previously fighting the `useCollectionDrill` publisher on the same
-  // window — the fix collapses the state into the drill for clients, and
-  // keeps the manual publisher only for the agent overlay.
-  useEffect(() => {
-    if (openAgent) {
-      setWindowDetail({ label: openAgent.name, onBack: () => setOpenAgentId(null) });
-    }
-    // No else: when openAgent is null but openClient is set, the drill is
-    // already publishing the crumb through `setDetail`. Setting it again
-    // here would race the drill and produce the double `onBack` described
-    // in the SOCLE_ACQUIS. When both are null, the drill's effect clears it.
-  }, [openAgent, setWindowDetail]);
-
-  const weightOf = (c: (typeof clients)[number]): number => Number(c.health ?? (c.status === 'Onboarding' ? 45 : 20));
-
-  /** Toggle the `pinned` flag on a client. Persists via the CMS store.
-   *  Toast on success and on error (mutation ratée → revert + message visible). */
-  const togglePin = (clientId: string): void => {
+  /** Toggle a persisted workspace client's pipeline pin. */
+  const togglePin = async (clientId: string): Promise<void> => {
+    if (mutatingClientId) return;
     const current = clients.find((c) => c.id === clientId);
     if (!current) {
       addToast({ source: 'Dashboard', type: 'warning', message: 'Client introuvable — refresh.' });
@@ -231,62 +171,57 @@ export function DashboardApp() {
     }
     const previous = Boolean((current as Record<string, unknown>).pinned);
     const next = !previous;
-    // Optimistic update — `updateItem` writes to the partition + mirror synchronously;
-    // if the underlying repository rejects, the toast surfaces the error and the
-    // caller can refresh (no silent revert path because the store doesn't track
-    // rejected writes yet — we surface the failure instead of swallowing it).
-    updateItem('clients', clientId, { pinned: next, pinnedAt: next ? new Date().toISOString() : null });
-    addToast({
-      source: 'Dashboard',
-      type: next ? 'success' : 'info',
-      message: next
-        ? `Pinned ${String(current.name ?? clientId)} to your pipeline.`
-        : `Unpinned ${String(current.name ?? clientId)}.`,
-    });
+    setMutatingClientId(clientId);
+    try {
+      const result = await updateItem('clients', clientId, {
+        pinned: next,
+        pinnedAt: next ? new Date().toISOString() : null,
+      });
+      if (result.ok) {
+        addToast({
+          source: 'Dashboard',
+          type: next ? 'success' : 'info',
+          message: next
+            ? `Pinned ${String(current.name ?? clientId)} to your pipeline.`
+            : `Unpinned ${String(current.name ?? clientId)}.`,
+        });
+      } else {
+        addToast({ source: 'Dashboard', type: 'warning', message: result.error ?? 'Client pin was not saved.' });
+      }
+    } finally {
+      setMutatingClientId(null);
+    }
   };
 
-  /** Validation card handler: route to client (drill open) or to a sibling app.
-   *  Also marks the validation as acknowledged on the linked client, so the
-   *  dashboard reacts to its own actions. */
-  const openValidation = (v: ValidationCard): void => {
-    addToast({ source: 'Dashboard', type: 'info', message: `Acknowledged: ${v.title}` });
+  /** Acknowledge a validation on its linked client before opening the detail. */
+  const openValidation = async (v: ValidationCard): Promise<void> => {
     if (v.clientId) {
       const exists = clients.some((c) => c.id === v.clientId);
       if (exists) {
-        updateItem('clients', v.clientId, { lastValidatedAt: new Date().toISOString() });
+        const result = await updateItem('clients', v.clientId, { lastValidatedAt: new Date().toISOString() });
+        if (result.ok) {
+          addToast({ source: 'Dashboard', type: 'success', message: `Validation recorded: ${v.title}` });
+        } else {
+          addToast({ source: 'Dashboard', type: 'warning', message: result.error ?? 'Validation marker was not saved.' });
+        }
         clientsDrill.open(v.clientId);
         return;
       }
     }
-    if (v.targetApp) {
-      openApp(v.targetApp, v.targetSection ?? v.targetApp);
-    }
+    addToast({ source: 'Dashboard', type: 'info', message: `Opened validation: ${v.title}` });
+    if (v.targetApp) openApp(v.targetApp, v.targetSection ?? v.targetApp);
   };
 
-  // Wind Direction: derive from live state, fall back to seed and label it.
-  const { cards: validations, fromSeed: validationsFromSeed } = useMemo(
-    () => deriveValidations(clients, invoices, deals),
-    [clients, invoices, deals],
-  );
+  // Wind Direction derives only from persisted workspace records.
+  const validations = useMemo(() => deriveValidations(clients, invoices, deals), [clients, invoices, deals]);
 
-  /* ─────────────────────────── Wind Direction (live or seed) ────────────────────── */
+  /* ─────────────────────────── Wind Direction (persisted signals) ─────────────── */
 
   const Validation = () => (
     <div className="p-7">
       <SectionHead
         title="Wind Direction"
-        subtitle={validationsFromSeed
-          ? 'Things requiring your validation (démo seed — pas de signal live)'
-          : 'Things requiring your validation (dérivées du CMS live)'}
-        action={validationsFromSeed ? (
-          <span
-            data-wind-direction-source="seed"
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-            style={{ background: 'rgba(180,83,9,0.10)', color: '#b45309', border: '1px solid rgba(180,83,9,0.35)' }}
-          >
-            <Clock className="h-3 w-3" /> Démo seed
-          </span>
-        ) : undefined}
+        subtitle="Things requiring validation, derived from persisted workspace records."
       />
       {validations.length === 0 ? (
         <div
@@ -316,8 +251,8 @@ export function DashboardApp() {
               statusTone={v.tone}
               accent={v.tone === 'warn' ? '#f59e0b' : v.tone === 'danger' ? '#dc2626' : '#3b82f6'}
               icon={v.tone === 'warn' ? <AlertTriangle className="w-5 h-5" /> : v.tone === 'danger' ? <AlertTriangle className="w-5 h-5" /> : <Compass className="w-5 h-5" />}
-              meta={validationsFromSeed ? 'Démo seed' : `Reported ${v.when}`}
-              onClick={() => openValidation(v)}
+              meta={`Reported ${v.when}`}
+              onClick={() => { void openValidation(v); }}
             />
           ))}
         </FleetItemGrid>
@@ -357,22 +292,15 @@ export function DashboardApp() {
     // Live metrics from the CMS partition — each tile derives from real items,
     // not from a hard-coded array. If a collection is empty, we still render
     // an empty-state number (0) instead of a fake placeholder.
-    const pipelineOpen = deals
-      .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost')
-      .reduce((acc, d) => acc + Number(d.value ?? 0), 0);
     const wonCount = deals.filter((d) => d.stage === 'Won').length;
     const openDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost').length;
 
-    const outstandingInvoices = invoices
-      .filter((i) => i.status !== 'Paid')
-      .reduce((acc, i) => acc + Number(i.amount ?? 0), 0);
+    const openInvoiceCount = invoices.filter((i) => i.status !== 'Paid').length;
     const paidInvoices = invoices.filter((i) => i.status === 'Paid').length;
     const totalInvoices = invoices.length;
 
     // Runway — months of cash left at the average monthly burn (avg outstanding × 1.5).
     // This is a rough indicator, not a forecast; we surface the assumption in the UI.
-    const monthlyBurn = totalInvoices > 0 ? outstandingInvoices / Math.max(1, totalInvoices) : 0;
-    const assumedCashMonths = monthlyBurn > 0 ? Math.min(36, Math.round(outstandingInvoices / Math.max(1, monthlyBurn) * 1.5)) : 0;
 
     const domains = [
       {
@@ -380,9 +308,9 @@ export function DashboardApp() {
         label: 'Sales',
         icon: Compass,
         accent: '#ea580c',
-        sub: 'pipeline this quarter',
-        metric: `$${(pipelineOpen / 1000).toFixed(1)}K`,
-        delta: `${wonCount} won · ${openDeals} open`,
+        sub: 'open opportunities',
+        metric: `${openDeals}`,
+        delta: `${wonCount} won`,
         tone: 'accent' as const,
       },
       {
@@ -390,10 +318,10 @@ export function DashboardApp() {
         label: 'Finance',
         icon: Wallet,
         accent: '#ca8a04',
-        sub: outstandingInvoices > 0 ? `${outstandingInvoices.toFixed(0)} outstanding` : 'invoices up to date',
-        metric: `${assumedCashMonths}mo`,
-        delta: paidInvoices > 0 ? `${paidInvoices} paid` : 'awaiting first paid',
-        tone: outstandingInvoices === 0 ? 'ok' as const : 'warn' as const,
+        sub: 'unpaid invoices',
+        metric: `${openInvoiceCount}`,
+        delta: `${paidInvoices} paid · ${totalInvoices} total`,
+        tone: openInvoiceCount === 0 ? 'ok' as const : 'warn' as const,
       },
       {
         key: 'clients' as const,
@@ -410,18 +338,15 @@ export function DashboardApp() {
         label: 'Operations',
         icon: ListChecks,
         accent: '#4f46e5',
-        sub: 'incidents in queue',
-        metric: `${onboardingCount}`,
-        delta: onboardingCount === 0 ? 'queue clear' : 'onboarding open',
-        tone: onboardingCount === 0 ? 'ok' as const : 'warn' as const,
+        sub: 'operational incident feed',
+        metric: '—',
+        delta: 'not connected',
+        tone: 'accent' as const,
       },
     ];
 
     // Top 3 open deals by value — sorted desc, capped to 3.
-    const topOpenDeals = [...deals]
-      .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost')
-      .sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0))
-      .slice(0, 3);
+    const topOpenDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost').slice(0, 3);
 
     return (
       <div className="p-7 space-y-6">
@@ -524,9 +449,6 @@ export function DashboardApp() {
                         {String(d.offer ?? '')}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: 'var(--theme-text)' }}>
-                      ${Number(d.value ?? 0).toLocaleString()}
-                    </span>
                   </li>
                 ))}
               </ul>
@@ -600,9 +522,9 @@ export function DashboardApp() {
             Interconnection
           </div>
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-            Sales pipeline feeds Finance runway. Operations owns the deploy surface. People fills
-            every squad. <strong style={{ color: 'var(--theme-text)' }}>Drill any domain</strong> from
-            above — the rest follow the same CCD. Numbers above are derived from your live CMS data.
+            Sales, Finance and Clients are summarized from persisted workspace records. Cash runway,
+            incident telemetry and AI execution metrics remain unavailable until their source systems
+            are connected. <strong style={{ color: 'var(--theme-text)' }}>Drill any domain</strong> from above.
           </p>
         </div>
       </div>
@@ -612,7 +534,7 @@ export function DashboardApp() {
   /* ─────────────────────────── Client Pipeline (kept) ─────────────────────────── */
 
   const sortedClients = useMemo(() => {
-    // Pinned clients float to the top; otherwise preserve seed order.
+    // Pinned clients float to the top; otherwise preserve workspace order.
     const pinnedFirst = [...clients].sort((a, b) => {
       const ap = Boolean((a as Record<string, unknown>).pinned);
       const bp = Boolean((b as Record<string, unknown>).pinned);
@@ -633,7 +555,7 @@ export function DashboardApp() {
     <div className="p-7">
       <SectionHead
         title="Client ledger"
-        subtitle="Every account, every weight. Click a card to open the client detail; use the pin to keep it on top of your pipeline."
+        subtitle="Every persisted account. Open a client record or pin it to keep it visible in your pipeline."
       />
       {sortedClients.length === 0 ? (
         <div
@@ -649,7 +571,7 @@ export function DashboardApp() {
           </div>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed">
             Once a client is added in the Clients app, they show up here with their
-            segment, status, and weight. Use the pin to keep important accounts on top.
+            segment and status. Use the pin to keep important accounts on top.
           </p>
           <button
             type="button"
@@ -684,18 +606,17 @@ export function DashboardApp() {
                   statusTone={c.status === 'Active' ? 'ok' : c.status === 'Onboarding' ? 'warn' : 'danger'}
                   accent={ACCENT}
                   icon={<GitBranch className="w-5 h-5" />}
-                  metricLabel="weight"
-                  metricValue={`${weightOf(c)}%`}
-                  meta={pinned ? 'Pinned to pipeline' : 'Pipeline tier'}
+                  meta={pinned ? 'Pinned to pipeline' : 'Workspace record'}
                   onClick={() => openPipelineClient(id)}
                 />
                 <button
                   type="button"
                   aria-label={pinned ? `unpin ${name}` : `pin ${name}`}
                   aria-pressed={pinned}
+                  disabled={mutatingClientId === id}
                   onClick={(e) => {
                     e.stopPropagation();
-                    togglePin(id);
+                    void togglePin(id);
                   }}
                   className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:scale-105 active:scale-95"
                   style={{
@@ -720,7 +641,7 @@ export function DashboardApp() {
   const sections: AppSection[] = [
     { id: 'overview',  label: 'Overview',      icon: BarChart3,   render: ({ navigateToSection }) => <Overview navigateToSection={navigateToSection} /> },
     { id: 'cockpit',   label: 'CEO Cockpit',   icon: Compass,     render: CeoCockpit },
-    { id: 'agents',    label: 'Agents',        icon: Bot,         render: () => <Agents onSelect={setOpenAgentId} /> },
+    { id: 'agents',    label: 'Agents',        icon: Bot,         render: () => <Agents /> },
     { id: 'chat',      label: 'Chat',          icon: MessageSquare, render: () => <Chat /> },
     { id: 'playground',label: 'Playground',    icon: Sparkles,    render: () => <Playground /> },
     { id: 'jarvis',    label: 'Jarvis',        icon: Sparkles,    render: () => <Jarvis /> },
@@ -751,16 +672,6 @@ export function DashboardApp() {
         accent={ACCENT}
         sections={sections}
       />
-      {openAgent ? (
-        <AppDetailOverlay
-          appId="dashboard"
-          accent={ACCENT}
-          onBack={() => setOpenAgentId(null)}
-          motion={{ kind: 'pop-scale', durationMs: 200 }}
-        >
-          <AgentDetailPage agent={openAgent} onBack={() => setOpenAgentId(null)} />
-        </AppDetailOverlay>
-      ) : null}
       {openClient && clientsDef ? (
         <AppDetailOverlay
           appId="dashboard"

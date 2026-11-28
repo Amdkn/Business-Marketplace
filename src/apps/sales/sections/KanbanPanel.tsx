@@ -14,6 +14,13 @@ import { ACCENT, FONT_BODY, LOSE, PageHeader, RELANCE, WIN } from './Primitives'
 const DEAL_STAGES = ['Qualified', 'Proposal', 'Won', 'Lost'] as const;
 type DealStageValue = typeof DEAL_STAGES[number];
 
+function formatDealValue(value: number, currency: string): string {
+  if (/^[A-Z]{3}$/.test(currency)) {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(value); } catch { /* unknown currency code */ }
+  }
+  return `${value.toLocaleString()} · currency not set`;
+}
+
 function nextStage(current: string): DealStageValue {
   const idx = DEAL_STAGES.indexOf(current as DealStageValue);
   if (idx === -1) return 'Qualified';
@@ -23,32 +30,40 @@ function nextStage(current: string): DealStageValue {
 
 export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void }): ReactElement {
   const deals = useCmsStore(s => s.items['deals']) ?? [];
-  const updateItem = useCmsStore(s => s.updateItem);
-  const addItem = useCmsStore(s => s.addItem);
+  const clients = useCmsStore(s => s.items['clients']) ?? [];
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
+  const addItem = useCmsStore(s => s.addItemPersisted);
   const addToast = useShellStore(s => s.addToast);
 
-  const advance = (id: string, name: string, current: string): void => {
+  const [saving, setSaving] = useState(false);
+
+  const advance = async (id: string, name: string, current: string): Promise<void> => {
     const next = nextStage(current);
     if (next === current) {
       addToast({ source: 'Sales', type: 'warning', message: `${name} is already at the final stage.` });
       return;
     }
-    updateItem('deals', id, { stage: next });
-    addToast({ source: 'Sales', type: 'success', message: `${name} → ${next}` });
+    if (saving) return;
+    setSaving(true);
+    try {
+      const result = await updateItem('deals', id, { stage: next });
+      if (result.ok) addToast({ source: 'Sales', type: 'success', message: `${name} → ${next} · saved` });
+      else addToast({ source: 'Sales', type: 'warning', message: result.error ?? 'Deal stage was not saved.' });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  /** Compose a new deal inline. The coach enters the client name, picks an
-   *  offer and a value; the stage defaults to "Qualified" (first stage) so
-   *  the new card lands in the leftmost column of the kanban. The mutation
-   *  flows through addItem so the new row appears without a refresh. */
+  /** Create a deal linked to an existing workspace client with an explicit currency. */
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composerClient, setComposerClient] = useState('');
+  const [composerClientId, setComposerClientId] = useState('');
   const [composerOffer, setComposerOffer] = useState<'Citadelle' | 'Programme'>('Citadelle');
-  const [composerValue, setComposerValue] = useState('1800');
+  const [composerValue, setComposerValue] = useState('');
+  const [composerCurrency, setComposerCurrency] = useState('');
 
-  const submitNewDeal = (): void => {
-    const client = composerClient.trim();
-    if (client.length === 0) {
+  const submitNewDeal = async (): Promise<void> => {
+    const client = clients.find((candidate) => String(candidate.id) === composerClientId);
+    if (!client) {
       addToast({ source: 'Sales', type: 'warning', message: 'Client name is required.' });
       return;
     }
@@ -57,17 +72,29 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
       addToast({ source: 'Sales', type: 'warning', message: 'Deal value must be a positive number.' });
       return;
     }
-    const result = addItem('deals', {
-      client,
+    const currency = composerCurrency.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      addToast({ source: 'Sales', type: 'warning', message: 'Enter a valid ISO 4217 currency code.' });
+      return;
+    }
+    if (saving) return;
+    setSaving(true);
+    const clientName = String(client.name ?? client.title ?? client.id);
+    const result = await addItem('deals', {
+      client: clientName,
+      clientId: String(client.id),
       offer: composerOffer,
       value: valueNum,
+      currency,
       stage: 'Qualified',
     });
+    setSaving(false);
     if (result.ok) {
-      addToast({ source: 'Sales', type: 'success', message: `Deal added: ${client} ($${valueNum.toLocaleString('en-US')}).` });
-      setComposerClient('');
+      addToast({ source: 'Sales', type: 'success', message: `Deal added: ${clientName} (${formatDealValue(valueNum, currency)}).` });
+      setComposerClientId('');
       setComposerOffer('Citadelle');
-      setComposerValue('1800');
+      setComposerValue('');
+      setComposerCurrency('');
       setComposerOpen(false);
     } else {
       addToast({ source: 'Sales', type: 'warning', message: result.error ?? 'Could not create deal.' });
@@ -75,9 +102,10 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
   };
 
   const cancelComposer = (): void => {
-    setComposerClient('');
+    setComposerClientId('');
     setComposerOffer('Citadelle');
-    setComposerValue('1800');
+    setComposerValue('');
+    setComposerCurrency('');
     setComposerOpen(false);
   };
 
@@ -88,7 +116,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
   const otherDeals = deals.filter((d) => !knownStageSet.has(String(d.stage)));
   const hasOther = otherDeals.length > 0;
 
-  const allColumns: { title: string; accent: string; items: { id: string; stage: string; clientName: string; offer: string; value: number }[] }[] = DEAL_STAGES.map((stage) => ({
+  const allColumns: { title: string; accent: string; items: { id: string; stage: string; clientName: string; clientId: string; offer: string; value: number; currency: string }[] }[] = DEAL_STAGES.map((stage) => ({
     title: stage,
     accent: stage === 'Won' ? WIN : stage === 'Lost' ? LOSE : stage === 'Proposal' ? ACCENT : RELANCE,
     items: deals
@@ -96,9 +124,11 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
       .map((d) => ({
         id: String(d.id),
         stage: String(d.stage),
-        clientName: String(d.client ?? 'Untitled'),
+        clientName: String(d.client ?? d.title ?? 'Untitled'),
+        clientId: String(d.clientId ?? ''),
         offer: String(d.offer ?? ''),
         value: Number(d.value ?? 0),
+        currency: String(d.currency ?? ''),
       })),
   }));
   if (hasOther) {
@@ -108,9 +138,11 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
       items: otherDeals.map((d) => ({
         id: String(d.id),
         stage: String(d.stage ?? '—'),
-        clientName: String(d.client ?? 'Untitled'),
+        clientName: String(d.client ?? d.title ?? 'Untitled'),
+        clientId: String(d.clientId ?? ''),
         offer: String(d.offer ?? ''),
         value: Number(d.value ?? 0),
+        currency: String(d.currency ?? ''),
       })),
     });
   }
@@ -129,13 +161,16 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
           onClick={() => onSelect({
             id: d.id,
             kind: 'deal',
+            clientId: d.clientId,
+            currency: d.currency,
+            amount: d.value,
             title: d.clientName,
             subtitle: d.offer,
             status: d.stage,
-            summary: `Deal valued at $${d.value.toLocaleString('en-US')}. Move forward to track progress.`,
+            summary: `Deal value: ${formatDealValue(d.value, d.currency)}. Move forward to track progress.`,
             fields: [
               { label: 'Offer', value: d.offer },
-              { label: 'Value', value: `$${d.value.toLocaleString('en-US')}` },
+              { label: 'Value', value: formatDealValue(d.value, d.currency) },
               { label: 'Stage', value: d.stage },
             ],
           })}
@@ -145,14 +180,15 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
           <span className="block text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>{d.clientName}</span>
           <span className="block text-[11.5px] mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>{d.offer}</span>
           <span className="block text-[10.5px] font-mono mt-1" style={{ color: 'var(--theme-text-dim)' }}>
-            ${d.value.toLocaleString('en-US')}
+            {formatDealValue(d.value, d.currency)}
           </span>
         </button>
         {col.title !== 'Other' && col.title !== 'Won' && col.title !== 'Lost' ? (
           <div className="mt-2 flex items-center justify-end">
             <button
               type="button"
-              onClick={() => advance(d.id, d.clientName, d.stage)}
+              onClick={() => void advance(d.id, d.clientName, d.stage)}
+              disabled={saving}
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
               style={{
                 background: 'var(--theme-surface-hover)',
@@ -178,10 +214,10 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
             title: d.clientName,
             subtitle: d.offer,
             status: d.stage,
-            summary: `Deal valued at $${d.value.toLocaleString('en-US')}. Move forward to track progress.`,
+            summary: `Deal value: ${formatDealValue(d.value, d.currency)}. Move forward to track progress.`,
             fields: [
               { label: 'Offer', value: d.offer },
-              { label: 'Value', value: `$${d.value.toLocaleString('en-US')}` },
+              { label: 'Value', value: formatDealValue(d.value, d.currency) },
               { label: 'Stage', value: d.stage },
             ],
           })}
@@ -201,13 +237,12 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
       <PageHeader
         eyebrow="Sales OS · live operating layer · Kanban"
         title="Sales OS"
-        subtitle="A CMS-driven view of the deal pipeline. Each card is a writable mutation — the coach's edits flow back to the store."
+        subtitle="Persisted workspace deal records. Client links and currency are validated at creation."
         meta={{ label: 'Deals', value: `${deals.length}`, sub: 'Updated live' }}
       />
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-[12px]" style={{ color: 'var(--theme-text-dim)' }}>
-          Move a deal from column to column as it progresses. A Won deal exposes
-          a Generate invoice action in its dossier.
+          Move a deal through its stages. Every new deal must reference an existing workspace client and carry an explicit currency.
         </p>
         {!composerOpen ? (
           <button
@@ -230,7 +265,7 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
           className="mt-3 rounded-xl border p-4"
           style={{ background: 'var(--theme-surface)', borderColor: 'var(--panel-border)' }}
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             <div>
               <label
                 className="block text-[10.5px] font-bold uppercase tracking-[0.18em] mb-1.5"
@@ -239,23 +274,18 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
               >
                 Client
               </label>
-              <input
+              <select
                 id="deals-composer-client"
                 autoFocus
-                value={composerClient}
-                onChange={(e) => setComposerClient(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitNewDeal();
-                  if (e.key === 'Escape') cancelComposer();
-                }}
-                placeholder="Elena Marquez"
+                required
+                value={composerClientId}
+                onChange={(e) => setComposerClientId(e.target.value)}
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{
-                  background: 'var(--theme-bg)',
-                  border: '1px solid var(--panel-border)',
-                  color: 'var(--theme-text)',
-                }}
-              />
+                style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }}
+              >
+                <option value="">Select a workspace client</option>
+                {clients.map((client) => <option key={String(client.id)} value={String(client.id)}>{String(client.name ?? client.title ?? client.id)}</option>)}
+              </select>
             </div>
             <div>
               <label
@@ -286,20 +316,20 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
                 style={{ color: 'var(--theme-text-dim)' }}
                 htmlFor="deals-composer-value"
               >
-                Value (USD)
+                Amount
               </label>
               <input
                 id="deals-composer-value"
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 min="0"
                 value={composerValue}
                 onChange={(e) => setComposerValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitNewDeal();
+                  if (e.key === 'Enter') void submitNewDeal();
                   if (e.key === 'Escape') cancelComposer();
                 }}
-                placeholder="1800"
+                placeholder="1200"
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
                 style={{
                   background: 'var(--theme-bg)',
@@ -307,6 +337,12 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
                   color: 'var(--theme-text)',
                 }}
               />
+            </div>
+            <div>
+              <label className="block text-[10.5px] font-bold uppercase tracking-[0.18em] mb-1.5" style={{ color: 'var(--theme-text-dim)' }} htmlFor="deals-composer-currency">Currency (ISO 4217)</label>
+              <input id="deals-composer-currency" required maxLength={3} value={composerCurrency} onChange={(e) => setComposerCurrency(e.target.value.toUpperCase())}
+                placeholder="USD" className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
+                style={{ background: 'var(--theme-bg)', border: '1px solid var(--panel-border)', color: 'var(--theme-text)' }} />
             </div>
             <div className="flex items-end justify-end gap-2">
               <button
@@ -323,14 +359,15 @@ export function KanbanPanel({ onSelect }: { onSelect: (item: DetailItem) => void
               </button>
               <button
                 type="button"
-                onClick={submitNewDeal}
+                onClick={() => void submitNewDeal()}
+                disabled={saving || clients.length === 0 || !composerClientId || !composerCurrency.trim()}
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: ACCENT,
                   color: '#ffffff',
                 }}
               >
-                Create deal
+                {saving ? 'Saving…' : 'Create deal'}
               </button>
             </div>
           </div>

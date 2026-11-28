@@ -1,0 +1,12 @@
+BEGIN;
+CREATE INDEX disputes_order_idx ON finance.disputes(order_id);
+CREATE INDEX disputes_payment_intent_idx ON finance.disputes(payment_intent_id) WHERE payment_intent_id IS NOT NULL;
+CREATE INDEX journal_entries_reversal_idx ON finance.journal_entries(reversal_of_entry_id) WHERE reversal_of_entry_id IS NOT NULL;
+CREATE INDEX journal_lines_account_org_currency_idx ON finance.journal_lines(account_id,organization_id,currency);
+CREATE INDEX journal_lines_entry_org_currency_idx ON finance.journal_lines(journal_entry_id,organization_id,currency);
+CREATE INDEX payment_intents_buyer_org_idx ON finance.payment_intents(buyer_organization_id);
+CREATE INDEX payment_intents_seller_org_idx ON finance.payment_intents(seller_organization_id);
+CREATE INDEX payout_items_seller_org_idx ON finance.payout_items(seller_organization_id);
+CREATE INDEX refunds_order_idx ON finance.refunds(order_id);
+CREATE INDEX refunds_payment_intent_idx ON finance.refunds(payment_intent_id);
+COMMIT;

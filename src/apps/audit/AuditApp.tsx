@@ -119,24 +119,18 @@ export function AuditApp() {
   const automatabiliteDrill = useCollectionDrill('audit_automatabilite', 'Automatabilité');
   const roiDrill = useCollectionDrill('audit_arbitrage_roi', 'ROI');
 
-  /* Brief-F — couche d'écriture. Le manuel est D4 append-only sur le fond,
-   * mais une fiche par critère gagne un état "relue" (signé humain). C'est
-   * la seule mutation : on pose un timestamp + un actor sur l'item, sans
-   * toucher au contenu canonique. Toast global au résultat.
-   *
-   * `updateItem` (active tenant, vue plate) renvoie `void` dans cette
-   * codebase — le verdict est « la fonction n'a pas jete ». Si elle
-   * jetait un jour (collection inconnue), on garderait le silence et
-   * l'utilisateur reverrait son item : c'est l'echec attendu, pas un
-   * toast d'erreur. Le check `result !== undefined` du passe
-   * precedent etait faux : `void` est toujours `undefined`, donc le
-   * toast partait toujours — qu'il y ait eu ecriture ou pas. */
-  const updateItem = useCmsStore(s => s.updateItem);
+  /* Review markers are workspace writes. Only acknowledge after the repository
+   * confirms the update; the canonical criterion text remains unchanged. */
+  const updateItem = useCmsStore(s => s.updateItemPersisted);
   const addToast = useShellStore(s => s.addToast);
-  const markReviewed = (collectionId: string, id: string, label: string): void => {
+  const markReviewed = async (collectionId: string, id: string, label: string): Promise<void> => {
     const reviewedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    updateItem(collectionId, id, { reviewedAt, reviewedBy: 'human:ops' });
-    addToast({ source: 'Audit', type: 'success', message: `Critère marqué relu : ${label}` });
+    const result = await updateItem(collectionId, id, { reviewedAt, reviewedBy: 'human:ops' });
+    if (result.ok) {
+      addToast({ source: 'Audit', type: 'success', message: `Critère marqué relu et enregistré : ${label}` });
+    } else {
+      addToast({ source: 'Audit', type: 'warning', message: result.error ?? 'Review marker was not saved.' });
+    }
   };
 
   const sections: AppSection[] = useMemo(() => [
@@ -164,7 +158,7 @@ export function AuditApp() {
           icon={GRILLES[1].icon}
           collectionId="audit_arbitrage"
           drill={arbitrageDrill}
-          onMarkReviewed={(id, label) => markReviewed('audit_arbitrage', id, label)}
+          onMarkReviewed={(id, label) => { void markReviewed('audit_arbitrage', id, label); }}
         />
       ),
     },
@@ -180,7 +174,7 @@ export function AuditApp() {
           icon={GRILLES[2].icon}
           collectionId="audit_contexte"
           drill={contexteDrill}
-          onMarkReviewed={(id, label) => markReviewed('audit_contexte', id, label)}
+          onMarkReviewed={(id, label) => { void markReviewed('audit_contexte', id, label); }}
         />
       ),
     },
@@ -196,7 +190,7 @@ export function AuditApp() {
           icon={GRILLES[3].icon}
           collectionId="audit_donnees"
           drill={donneesDrill}
-          onMarkReviewed={(id, label) => markReviewed('audit_donnees', id, label)}
+          onMarkReviewed={(id, label) => { void markReviewed('audit_donnees', id, label); }}
         />
       ),
     },
@@ -212,7 +206,7 @@ export function AuditApp() {
           icon={GRILLES[4].icon}
           collectionId="audit_automatabilite"
           drill={automatabiliteDrill}
-          onMarkReviewed={(id, label) => markReviewed('audit_automatabilite', id, label)}
+          onMarkReviewed={(id, label) => { void markReviewed('audit_automatabilite', id, label); }}
         />
       ),
     },
@@ -228,7 +222,7 @@ export function AuditApp() {
           icon={GRILLES[5].icon}
           collectionId="audit_arbitrage_roi"
           drill={roiDrill}
-          onMarkReviewed={(id, label) => markReviewed('audit_arbitrage_roi', id, label)}
+          onMarkReviewed={(id, label) => { void markReviewed('audit_arbitrage_roi', id, label); }}
         />
       ),
     },

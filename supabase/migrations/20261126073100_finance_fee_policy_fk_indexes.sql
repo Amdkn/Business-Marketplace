@@ -1,0 +1,2 @@
+CREATE INDEX fee_policies_created_by_user_idx ON finance.fee_policies(created_by_user_id);
+CREATE INDEX fee_policies_scope_organization_idx ON finance.fee_policies(scope_organization_id) WHERE scope_organization_id IS NOT NULL;

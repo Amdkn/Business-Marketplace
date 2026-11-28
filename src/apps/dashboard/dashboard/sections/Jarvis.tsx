@@ -16,10 +16,11 @@ import { Bot, Lock, Mic, MicOff, Sparkles } from 'lucide-react';
 import { JARVIS_ROUTINES, JARVIS_SUGGESTIONS, USAGE_TODAY, MONTH_SUMMARY } from '../seed';
 import { useDashboardAgents } from '../cmsAgents';
 import { ACCENT, GhostButton, IconChip, KpiTile, LiveDot, Panel, Pill, SectionTitle } from '../Primitives';
+import { useDashboardDemoMode, RuntimeUnavailable } from '../demoMode';
 import { useVoiceNavigation } from '../../../../hooks/useVoiceNavigation';
 import { useShellStore } from '../../../../stores/shell.store';
 
-export function Jarvis() {
+function DemoJarvis() {
   const { listening, toggle, supported, lastTranscript } = useVoiceNavigation();
   const transcriptRef = useRef<HTMLDivElement>(null);
   const addToast = useShellStore((s) => s.addToast);
@@ -240,4 +241,12 @@ export function Jarvis() {
       </div>
     </div>
   );
+}
+
+
+export function Jarvis() {
+  const isDemo = useDashboardDemoMode();
+  return isDemo
+    ? <DemoJarvis />
+    : <RuntimeUnavailable title="Jarvis" description="The read-only copilot requires a connected agent runtime and verified workspace context. Demo routines and suggestions are confined to the demo tenant." />;
 }

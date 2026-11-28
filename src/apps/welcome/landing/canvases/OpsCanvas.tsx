@@ -1,4 +1,4 @@
-/** OMK Operations canvas — vertical runbook timeline + incident feed.
+/** A’Space Operations canvas — vertical runbook timeline + incident feed.
  *
  *  Why this layout, not the landing template:
  *  Operations is procedural. The proof of an operations cockpit isn't a
@@ -228,7 +228,7 @@ export function OpsCanvas({ page, activePageId, onSelectPage }: {
         </section>
 
         <BackToTop onClick={() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} />
-        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · OMK AaaS canon</footer>
+        <footer className="text-center text-xs text-[var(--theme-text-dim)] pb-2">{page.brand} · {page.domain} · Coach OS · A’Space AaaS canon</footer>
       </div>
     </PageChrome>
   );

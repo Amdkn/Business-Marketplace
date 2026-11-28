@@ -2,7 +2,7 @@
 // Tests de queries.ts — la lecture du journal d'audit.
 // Couvre tests #4 à #10 du BRIEF_AUDIT_LOG.
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendEvent,
   __resetInMemoryBufferForTest,
@@ -16,6 +16,19 @@ import {
   rowFromEvent,
 } from './queries';
 import type { EventRecord } from './event';
+
+// These tests target the deterministic in-memory demo path. Vercel exposes
+// production Supabase environment variables during build; never let a unit
+// test silently switch to a real tenant/API branch because those vars exist.
+vi.mock('../supabase', () => ({
+  supabaseConfigured: false,
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: null } }),
+    },
+  },
+}));
+
 
 beforeEach(() => {
   __resetInsertSpyForTest();

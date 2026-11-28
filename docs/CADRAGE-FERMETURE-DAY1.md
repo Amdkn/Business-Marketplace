@@ -1,7 +1,7 @@
 # Cadrage — Fermer Day 1 (RECOVERY)
 
 > Document de cadrage, préparé le 2026-11-27.
-> Tête vérifiée : `8326c4485fa4d67d2e9019fa7eff4f9853048e9b` (PR n° 1, brouillon).
+> Tête vérifiée : `c11a9bdaf4530ed3fe4a2f08c42579b2493742f6` (PR n° 1, brouillon). Corrections de l'audit contradictoire Gemini (27 nov.) appliquées.
 > Document de référence : `docs/MANUEL-EXPLOITATION.md` (§ 5 pour les critères
 > de sortie complets, § 7 pour les blocages).
 
@@ -13,8 +13,19 @@ isolé des autres locataires — sans intervention manuelle, sans l'auteur du
 code.
 
 Ce n'est pas écrire du code. Le code de la chaîne existe déjà à la tête
-`8326c44`. C'est **prouver, dans le navigateur, sur l'aperçu de référence**,
+`c11a9bd`. C'est **prouver, dans le navigateur, sur l'aperçu de référence**,
 que la chaîne fonctionne de bout en bout.
+
+**Bloquant n° 1 (nouveau, audit Gemini 27 nov., vérifié au dépôt) :**
+l'inscription échoue avant `create_tenant` — `mailer_autoconfirm=false`
+sans SMTP (`docs/AUTH_CONFIGURATION_2026-11-26.md`), et
+`AuthProvider.signUp()` appelle `signInWithPassword` immédiatement après
+`signUp`. Un inconnu qui s'inscrit reçoit « Email not confirmed » et
+`create_tenant` n'est jamais appelé. **Décision ouverte (Capitaine) :**
+(a) `mailer_autoconfirm=true` temporaire, acté par écrit comme limite
+Day 1 — la preuve 2-tenants passe tout de suite ; (b) brancher un SMTP +
+découpler `create_tenant` après confirmation email, avant Day 1. Tant que
+ce n'est pas tranché, aucune preuve d'inscription ne peut passer.
 
 ## 2. Découverte qui change le cadrage (vérifiée au dépôt)
 
@@ -23,7 +34,7 @@ une fonction `sign-up-organization` qui n'existe pas, et `create_organization`
 ne créerait pas le premier workspace. **Cette description est dépassée par le
 code livré ensuite dans la même journée** (commits `0c4f966` « onboarding
 backend atomique » et `c05f278` « câblage onboarding App »), vérifié à la tête
-`8326c44` :
+`c11a9bd` :
 
 - `src/components/saas/auth/AuthProvider.tsx` appelle `marketplace-api`,
   action `create_tenant` (aucune fonction `sign-up-organization` n'existe
@@ -70,10 +81,10 @@ Atomicité, vérifiée dans le code (`marketplace-api/index.ts`) :
 ```
 Inscription Auth (user)
   → Organization
-    → Membership (B1_OWNER)
+    → Membership (B1_CEO)
       → Workspace
         → Workspace Owner
-          → Contexte JWT (org_id, role)
+          → Contexte résolu (RPC get_current_workspace_context)
 ```
 
 Chaque maillon doit être vérifié dans le navigateur, sur l'aperçu de
@@ -81,12 +92,15 @@ référence, sans intervention manuelle en base :
 
 - L'utilisateur s'inscrit depuis la page d'inscription et arrive dans un
   workspace vide qui porte son nom d'organisation.
-- Après inscription, le JWT porte `org_id` et `role` corrects ; un
-  rafraîchissement de session les conserve (dépend du hook JWT, voir § 6).
-- Le contexte JWT est résolu dès la première requête : soit par les
-  revendications (`org_id`, `role`) posées par le hook, soit par une
-  résolution serveur déterministe. Une résolution qui exige une seconde
-  connexion ou une intervention manuelle ne ferme pas Day 1.
+- Après inscription, le contexte (`organization_id`, `workspace_id`,
+  `role_code`) est résolu via la RPC
+  `identity.get_current_workspace_context()` ; un rafraîchissement de
+  session le conserve. Le JWT ne porte pas `org_id` / `role` : le hook JWT
+  est un vestige legacy, voir § 5.
+- Le contexte est résolu dès la première requête par la RPC
+  `identity.get_current_workspace_context()` (résolution serveur
+  déterministe). Une résolution qui exige une seconde connexion ou une
+  intervention manuelle ne ferme pas Day 1.
 
 Ce qui n'est **pas** prouvé à ce jour (matrice `docs/evidence/`,
 D1.03 / D1.04 / D1.09) : l'inscription dans le navigateur, la confirmation
@@ -95,31 +109,38 @@ locataires.
 
 ## 5. Verrou 3 — Frontière `identity` propre
 
-Fait vérifié au dépôt (migration `20261124000100_identity_tenant_foundation.sql`) :
-**le rôle `authenticated` n'a aucun droit sur les tables `identity`**
-(`REVOKE ALL ... FROM PUBLIC, anon, authenticated`). Le navigateur ne lit
-jamais ces tables directement ; l'accès passe par les Edge Functions
-(`service_role`).
+Fait vérifié au dépôt (migration
+`20261124000100_identity_tenant_foundation.sql`) : le rôle `authenticated`
+n'a aucun droit **par défaut** sur les tables `identity` — la migration
+commence par `REVOKE ALL ... FROM PUBLIC, anon, authenticated`
+(lignes 160–161). **Mais la même migration accorde ensuite** `USAGE` sur le
+schéma `identity` et `SELECT` (sous RLS, sur `auth.uid()`) sur
+`identity.organizations`, `identity.organization_memberships`,
+`identity.delegations` et `identity.role_bindings` (lignes 162–164) ; la
+migration `20261124024550` ajoute `SELECT, INSERT, UPDATE` sur
+`identity.profiles` pour `authenticated`. Les politiques RLS de ces tables
+filtrent sur `auth.uid()` (ex. `organizations_read_active_member`).
+**Seuls `identity.agent_principals`, `identity.agent_delegations` et le
+schéma `enterprise` sont fermés au navigateur — et c'est la bonne
+frontière.** (Correction de l'audit Gemini 27 nov., confirmée au dépôt :
+notre première lecture s'arrêtait aux `REVOKE` et manquait les `GRANT` qui
+suivent dans la même migration.)
 
-Fait vérifié au dépôt : le hook `custom_access_token_hook` qui pose
-`org_id` / `role` dans le JWT **n'existe pas dans les 69 migrations
-appliquées** — son SQL n'est présent que dans l'archive legacy
+Fait vérifié au dépôt : le hook `custom_access_token_hook` **n'existe pas
+dans les 69 migrations appliquées** — son SQL n'est présent que dans
+l'archive legacy
 (`supabase/archive/legacy-unapplied-migrations/20260811000004_jwt_hook.sql`).
-Sa configuration côté tableau de bord Supabase est donc **à confirmer avant
-toute preuve** : sans lui, `org_id` / `role` sont absents du JWT et la RLS
-retourne silencieusement 0 ligne (voir `AuthProvider.tsx`, commentaire
-d'en-tête, et ADR-SUPABASE-001).
-
-Résolution exigée, sans jamais relâcher les politiques RLS en lecture
-publique :
-
-- Soit le hook est confirmé / déployé côté tableau de bord Supabase et pose
-  bien `org_id` et `role` ;
-- Soit l'accès aux données d'identité passe par une RPC `SECURITY DEFINER`
-  ou une projection dédiée soumise à RLS — le précédent existe déjà dans le
-  dépôt (fonctions `identity.is_active_workspace_member` et
-  `identity.can_manage_workspace`, migration
-  `20261126092033_workspace_policy_predicate_definer_boundary.sql`).
+**Il est un vestige legacy, pas un bloquant : 0 politique RLS dans
+`supabase/migrations` ne lit `auth.jwt()`** (vérifié : aucune occurrence).
+Les politiques de `workspace_data` et du bucket privé
+`marketplace-documents` filtrent sur `auth.uid()` via
+`identity.is_active_workspace_member` /
+`identity.can_manage_workspace` (`SECURITY DEFINER`, migration
+`20261126092033`), et `AuthProvider` résout le contexte via la RPC
+`identity.get_current_workspace_context()` (`SECURITY DEFINER`, exécutable
+par `authenticated`, migration `20261126093031`). Le commentaire d'en-tête
+d'`AuthProvider.tsx` (L3–4) est obsolète — à nettoyer en phase
+implémentation, sans modifier le code ici.
 
 **Interdiction formelle : accorder un droit de lecture publique sur
 `identity`, ou désactiver une politique RLS pour faire passer la preuve.**
@@ -145,8 +166,8 @@ reste OUVERT, quels que soient les tests unitaires ou l'aperçu.
 
 ### 6.2. Isolation positive
 
-- Le JWT de A résout uniquement l'organisation et le workspace de A ;
-  le JWT de B résout uniquement l'organisation et le workspace de B.
+- Le contexte résolu pour A (via la RPC) désigne uniquement
+  l'organisation et le workspace de A ; idem pour B.
 - Chacun ne voit que ses propres données (CRUD, listes, stockage).
 
 ### 6.3. Tests négatifs obligatoires
@@ -197,7 +218,7 @@ Tant qu'un seul de ces points manque, le gate Day 1 reste **OUVERT**.
 
 | N° | Étape | Livrable |
 |---|---|---|
-| 1 | Confirmer les prérequis cloud (§ 8, R-01 à R-04) : hook JWT, version déployée de `marketplace-api`, référence du projet Supabase, aperçu à la tête actuelle | Note datée dans la matrice |
+| 1 | Trancher le bloquant n° 1 (mailer : autoconfirm temporaire ou SMTP + découplage — décision ouverte du Capitaine, § 8 R-01) et confirmer les prérequis cloud (§ 8, R-02 à R-04) : version déployée de `marketplace-api`, référence du projet Supabase, aperçu à la tête actuelle | Décision écrite + note datée dans la matrice |
 | 2 | Vérifier que l'aperçu Vercel à la tête en cours est READY et que `bun run verify` passe | Lien de l'aperçu, commit vérifié |
 | 3 | Exécuter le parcours d'inscription (critère 6.1, Tenant A) dans le navigateur, session authentifiée | Capture + date + auteur dans la matrice |
 | 4 | Créer le Tenant B de test, vérifier l'isolation positive et les tests négatifs (critères 6.2, 6.3) | Preuves inscrites dans la matrice |
@@ -210,10 +231,10 @@ Tant qu'un seul de ces points manque, le gate Day 1 reste **OUVERT**.
 
 | N° | Risque | Effet si avéré | Parade |
 |---|---|---|---|
-| R-01 | Hook JWT non configuré côté cloud (SQL absent des migrations appliquées, présent uniquement dans l'archive legacy) | `org_id` / `role` absents du JWT → RLS silencieuse, 0 ligne | Vérifier le hook sur le tableau de bord avant l'étape 3 ; sinon le déployer |
+| R-01 | **`mailer_autoconfirm=false` sans SMTP** (`docs/AUTH_CONFIGURATION_2026-11-26.md`) ; `AuthProvider.signUp()` appelle `signInWithPassword` immédiatement → « Email not confirmed » → `create_tenant` jamais appelé | Aucune inscription possible, aucune preuve Day 1 | **Décision OUVERTE (Capitaine) :** (a) `mailer_autoconfirm=true` temporaire, acté comme limite Day 1, preuve 2-tenants tout de suite ; (b) SMTP + `create_tenant` découplé après confirmation email, avant Day 1 |
 | R-02 | Version déployée de `marketplace-api` : v30 (matrice) contre v31 (session S6) | La preuve testerait une ancienne version | Confirmer la version déployée, redéployer à la tête en cours si besoin |
-| R-03 | Projet Supabase : `swegnrvaxxgfrnshdpxx` (sessions) contre `qjrwcdzaebyqponqkiqs` (fichier `linked-project.json` du dépôt) | Preuves faites sur le mauvais projet | Confirmer le projet vivant avant l'étape 3 |
-| R-04 | Pas de SMTP personnel | Confirmation email et réinitialisation impossibles à prouver | Configurer un SMTP, ou accepter la limite par écrit et retirer ces deux points des critères (décision à inscrire) |
+| R-03 | Projet Supabase : **CLOS** — `swegnrvaxxgfrnshdpxx` (« Aspace MarketPlace ») est l'unique projet vivant (audit Gemini 27 nov., base live) | — | Corriger `linked-project.json` côté poste du Capitaine (`supabase link --project-ref swegnrvaxxgfrnshdpxx`) |
+| R-04 | Réinitialisation de mot de passe : dépend de l'email, donc de la décision R-01 | Parcours non prouvable tant que R-01 n'est pas tranché | Parcours testé après la décision R-01, ou limite acceptée par écrit |
 | R-05 | Quota Vercel 24 h | Aperçu indisponible au moment de la preuve ; tests de régression OAuth déjà bloqués une fois (quota 402) | Planifier les preuves hors pic de quota ; sortir du Free si le blocage se répète |
 | R-06 | Bug de parsing des scopes OAuth (callback v2, worker v8) | Connexion d'adaptateur en échec pendant les preuves | Le bug relève de Day 2 (adaptateurs) ; ne pas le laisser bloquer Day 1, sauf s'il touche l'inscription elle-même |
 | R-07 | La tête avance pendant les preuves (25 commits entre `b7c2b29` et `8326c44`) | Preuves faites sur une tête dépassée | Figer la tête au début de l'étape 2 ; toute nouvelle livraison rouvre la vérification de l'aperçu |

@@ -1,7 +1,7 @@
 # Cadrage — Fermer Day 1 (RECOVERY)
 
 > Document de cadrage, préparé le 2026-11-27.
-> Tête vérifiée : `c11a9bdaf4530ed3fe4a2f08c42579b2493742f6` (PR n° 1, brouillon). Corrections de l'audit contradictoire Gemini (27 nov.) appliquées.
+> Tête vérifiée : `9addd37f091a88314d55feb7730e3cae214231c5` (PR n° 1, brouillon). Corrections de l'audit contradictoire Gemini (27 nov.) appliquées ; décision mailer tranchée par le Capitaine le 2026-11-27 19:59 (option 1, autoconfirm temporaire).
 > Document de référence : `docs/MANUEL-EXPLOITATION.md` (§ 5 pour les critères
 > de sortie complets, § 7 pour les blocages).
 
@@ -13,7 +13,7 @@ isolé des autres locataires — sans intervention manuelle, sans l'auteur du
 code.
 
 Ce n'est pas écrire du code. Le code de la chaîne existe déjà à la tête
-`c11a9bd`. C'est **prouver, dans le navigateur, sur l'aperçu de référence**,
+`9addd37`. C'est **prouver, dans le navigateur, sur l'aperçu de référence**,
 que la chaîne fonctionne de bout en bout.
 
 **Bloquant n° 1 (nouveau, audit Gemini 27 nov., vérifié au dépôt) :**
@@ -21,11 +21,17 @@ l'inscription échoue avant `create_tenant` — `mailer_autoconfirm=false`
 sans SMTP (`docs/AUTH_CONFIGURATION_2026-11-26.md`), et
 `AuthProvider.signUp()` appelle `signInWithPassword` immédiatement après
 `signUp`. Un inconnu qui s'inscrit reçoit « Email not confirmed » et
-`create_tenant` n'est jamais appelé. **Décision ouverte (Capitaine) :**
-(a) `mailer_autoconfirm=true` temporaire, acté par écrit comme limite
-Day 1 — la preuve 2-tenants passe tout de suite ; (b) brancher un SMTP +
-découpler `create_tenant` après confirmation email, avant Day 1. Tant que
-ce n'est pas tranché, aucune preuve d'inscription ne peut passer.
+`create_tenant` n'est jamais appelé. **Décision TRANCHÉE le 2026-11-27
+19:59 (Capitaine) : option 1 — `mailer_autoconfirm=true` temporaire,
+dérogation Day 1 (environnement fermé / aperçu uniquement).** Préalable
+aux preuves : basculer le réglage dans le tableau de bord du projet
+`swegnrvaxxgfrnshdpxx` (1 réglage, 0 commit), sans refactoriser
+`AuthProvider.tsx` ni risquer le quota Vercel. **Garde-fou :** les
+critères « confirmation email » et « mot de passe oublié » sortent du
+gate Day 1 et basculent en ticket bloquant obligatoire (`not_started`)
+avant ouverture publique / Day 3 — branchement SMTP perso + repassage
+à `mailer_autoconfirm=false` + découplage de `create_tenant`
+post-confirmation.
 
 ## 2. Découverte qui change le cadrage (vérifiée au dépôt)
 
@@ -34,7 +40,7 @@ une fonction `sign-up-organization` qui n'existe pas, et `create_organization`
 ne créerait pas le premier workspace. **Cette description est dépassée par le
 code livré ensuite dans la même journée** (commits `0c4f966` « onboarding
 backend atomique » et `c05f278` « câblage onboarding App »), vérifié à la tête
-`c11a9bd` :
+`9addd37` :
 
 - `src/components/saas/auth/AuthProvider.tsx` appelle `marketplace-api`,
   action `create_tenant` (aucune fonction `sign-up-organization` n'existe
@@ -103,8 +109,7 @@ référence, sans intervention manuelle en base :
   intervention manuelle ne ferme pas Day 1.
 
 Ce qui n'est **pas** prouvé à ce jour (matrice `docs/evidence/`,
-D1.03 / D1.04 / D1.09) : l'inscription dans le navigateur, la confirmation
-email, le cycle de session, le deuxième locataire, le refus croisé entre
+D1.03 / D1.04 / D1.09) : l'inscription dans le navigateur, le cycle de session, le deuxième locataire, le refus croisé entre
 locataires.
 
 ## 5. Verrou 3 — Frontière `identity` propre
@@ -198,8 +203,8 @@ preuve dans le navigateur).
 - **Stockage privé** : un fichier déposé dans le workspace n'est lisible
   que par son locataire.
 - **Session** : déconnexion puis reconnexion, le contexte est retrouvé ;
-  mot de passe oublié : parcours testé ou limite acceptée par écrit
-  (voir § 8, risque R-04).
+  mot de passe oublié : hors gate Day 1 — ticket bloquant obligatoire
+  avant ouverture publique / Day 3 (voir § 8, R-01 / R-04).
 - **Sauvegarde / restauration** : une sauvegarde est démontrée, ou la
   limite Free est acceptée par écrit comme limite de la franchise.
 - **Test E-Myth** : un opérateur qui n'a pas écrit le code exécute les
@@ -218,7 +223,7 @@ Tant qu'un seul de ces points manque, le gate Day 1 reste **OUVERT**.
 
 | N° | Étape | Livrable |
 |---|---|---|
-| 1 | Trancher le bloquant n° 1 (mailer : autoconfirm temporaire ou SMTP + découplage — décision ouverte du Capitaine, § 8 R-01) et confirmer les prérequis cloud (§ 8, R-02 à R-04) : version déployée de `marketplace-api`, référence du projet Supabase, aperçu à la tête actuelle | Décision écrite + note datée dans la matrice |
+| 1 | Appliquer la décision tranchée du Capitaine (27 nov. 19:59) : basculer `mailer_autoconfirm=true` dans le tableau de bord du projet `swegnrvaxxgfrnshdpxx` (1 réglage, 0 commit, préalable aux preuves) et confirmer les prérequis cloud (§ 8, R-02 à R-04) : version déployée de `marketplace-api`, référence du projet Supabase, aperçu à la tête actuelle | Réglage appliqué + décision écrite + note datée dans la matrice |
 | 2 | Vérifier que l'aperçu Vercel à la tête en cours est READY et que `bun run verify` passe | Lien de l'aperçu, commit vérifié |
 | 3 | Exécuter le parcours d'inscription (critère 6.1, Tenant A) dans le navigateur, session authentifiée | Capture + date + auteur dans la matrice |
 | 4 | Créer le Tenant B de test, vérifier l'isolation positive et les tests négatifs (critères 6.2, 6.3) | Preuves inscrites dans la matrice |
@@ -231,10 +236,10 @@ Tant qu'un seul de ces points manque, le gate Day 1 reste **OUVERT**.
 
 | N° | Risque | Effet si avéré | Parade |
 |---|---|---|---|
-| R-01 | **`mailer_autoconfirm=false` sans SMTP** (`docs/AUTH_CONFIGURATION_2026-11-26.md`) ; `AuthProvider.signUp()` appelle `signInWithPassword` immédiatement → « Email not confirmed » → `create_tenant` jamais appelé | Aucune inscription possible, aucune preuve Day 1 | **Décision OUVERTE (Capitaine) :** (a) `mailer_autoconfirm=true` temporaire, acté comme limite Day 1, preuve 2-tenants tout de suite ; (b) SMTP + `create_tenant` découplé après confirmation email, avant Day 1 |
+| R-01 | **`mailer_autoconfirm=false` sans SMTP** (`docs/AUTH_CONFIGURATION_2026-11-26.md`) ; `AuthProvider.signUp()` appelle `signInWithPassword` immédiatement → « Email not confirmed » → `create_tenant` jamais appelé | Aucune inscription possible, aucune preuve Day 1 | **Décision TRANCHÉE le 2026-11-27 19:59 (Capitaine) : option (a) — `mailer_autoconfirm=true` temporaire, dérogation Day 1 (environnement fermé / aperçu uniquement).** Préalable aux preuves : basculer le réglage dans le tableau de bord `swegnrvaxxgfrnshdpxx` (1 réglage, 0 commit). **Garde-fou :** confirmation email + mot de passe oublié = ticket bloquant obligatoire (`not_started`) avant ouverture publique / Day 3 — SMTP perso + repassage à `mailer_autoconfirm=false` + découplage de `create_tenant` post-confirmation |
 | R-02 | Version déployée de `marketplace-api` : v30 (matrice) contre v31 (session S6) | La preuve testerait une ancienne version | Confirmer la version déployée, redéployer à la tête en cours si besoin |
 | R-03 | Projet Supabase : **CLOS** — `swegnrvaxxgfrnshdpxx` (« Aspace MarketPlace ») est l'unique projet vivant (audit Gemini 27 nov., base live) | — | Corriger `linked-project.json` côté poste du Capitaine (`supabase link --project-ref swegnrvaxxgfrnshdpxx`) |
-| R-04 | Réinitialisation de mot de passe : dépend de l'email, donc de la décision R-01 | Parcours non prouvable tant que R-01 n'est pas tranché | Parcours testé après la décision R-01, ou limite acceptée par écrit |
+| R-04 | Réinitialisation de mot de passe : dépend de l'email, donc de la décision R-01 | Parcours non prouvable tant que R-01 n'est pas tranché | Hors gate Day 1 — ticket bloquant obligatoire (`not_started`) avant ouverture publique / Day 3 : SMTP perso + `mailer_autoconfirm=false` + découplage (voir R-01) |
 | R-05 | Quota Vercel 24 h | Aperçu indisponible au moment de la preuve ; tests de régression OAuth déjà bloqués une fois (quota 402) | Planifier les preuves hors pic de quota ; sortir du Free si le blocage se répète |
 | R-06 | Bug de parsing des scopes OAuth (callback v2, worker v8) | Connexion d'adaptateur en échec pendant les preuves | Le bug relève de Day 2 (adaptateurs) ; ne pas le laisser bloquer Day 1, sauf s'il touche l'inscription elle-même |
 | R-07 | La tête avance pendant les preuves (25 commits entre `b7c2b29` et `8326c44`) | Preuves faites sur une tête dépassée | Figer la tête au début de l'étape 2 ; toute nouvelle livraison rouvre la vérification de l'aperçu |
